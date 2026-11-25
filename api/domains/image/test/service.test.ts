@@ -8,6 +8,7 @@ import type { Capabilities, Prepared } from "../../capabilities";
 import type { InferencePort } from "../../inference";
 import type { LarmPlayground, LarmTestTarget } from "../../larm";
 import { createQueue, migrations as queueMigrations } from "../../queue";
+import type { ChildExecution } from "../../tool-runtime";
 import { migrations, registerImage } from "..";
 import { createImage, imageListInTransaction } from "../service";
 import { waitFor as until } from "../../../infrastructure/wait-for";
@@ -65,6 +66,26 @@ afterEach(async () => {
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
+const execution = (id: string, runId: string, conversationId: string) =>
+	({
+		id,
+		executionId: "exec-1",
+		revision: 1,
+		step: 0,
+		chainRevisionId: "toolchain:image.create@1",
+		request: "森の画像を作って",
+		refs: [],
+		source: {
+			conversationId,
+			messageId: "m1",
+			runId,
+			request: "森の画像を作って",
+			digest: "d",
+		},
+		deadline: Date.now() + 120_000,
+		modelCalls: 6,
+	}) as unknown as ChildExecution;
+
 type Options = {
 	planValue?: string;
 	targets?: LarmTestTarget[];
@@ -83,10 +104,8 @@ function setup(options: Options = {}) {
 	stores.push(store);
 	const queue = createQueue(store);
 	const executed: unknown[] = [];
-	const jobs: Array<[string, string]> = [];
-	const finished: string[] = [];
 	const inference = {
-		captureControlInTransaction: () => "request-1",
+		captureUserControlInTransaction: () => "request-1",
 		executeControl: async () => ({
 			requestId: "request-1",
 			attemptId: "attempt-1",
@@ -142,11 +161,14 @@ function setup(options: Options = {}) {
 		inference,
 		capabilities,
 		gateway: () => gateway,
-		onJob: (_db, runId, jobId) => jobs.push([runId, jobId]),
-		onFinished: (_db, runId) => finished.push(runId),
+		validateExecutionInTransaction: () => true,
 	});
 	queue.start();
-	const start = (runId = "run-1", conversationId = "main") =>
+	const start = (
+		runId = "run-1",
+		conversationId = "main",
+		callId = `call-${runId}`,
+	) =>
 		store.write((db) =>
 			image.startInTransaction(db, {
 				runId,
@@ -154,29 +176,29 @@ function setup(options: Options = {}) {
 				question: "森の画像を作って",
 				originalRequest: "森の画像を作って",
 				deadline: Date.now() + 120_000,
+				execution: execution(callId, runId, conversationId),
 			}),
 		);
-	return { store, queue, image, executed, jobs, finished, start };
+	return { store, queue, image, executed, start };
 }
 const settled = (h: ReturnType<typeof setup>, id: string) => () => {
 	const state = h.image.get(id)?.state;
 	return state !== "planning" && state !== "generating";
 };
 
-test("a request becomes a planning record with one plan job and is idempotent per run", async () => {
+test("a request becomes a planning record with one plan job and is idempotent per execution", async () => {
 	const h = setup();
 	const first = await h.start();
 	const again = await h.start();
 	expect(again).toEqual(first);
-	expect(h.jobs).toHaveLength(1);
-	expect(h.jobs[0]![0]).toBe("run-1");
+	expect(first.jobId).toBeString();
 	const record = h.image.get(first.id)!;
 	expect(record.state).toBe("planning");
 	expect(record.prompt).toBeNull();
 	await h.queue.close(100);
 });
 
-test("plan then generate completes the record with the artifact and notifies once", async () => {
+test("plan then generate completes the record with the artifact ", async () => {
 	const h = setup();
 	const { id } = await h.start();
 	await until(settled(h, id));
@@ -192,12 +214,11 @@ test("plan then generate completes the record with the artifact and notifies onc
 	expect(h.executed).toEqual([
 		{ text: "a forest", width: 256, height: 256, format: "png", seed: 1 },
 	]);
-	expect(h.finished).toEqual(["run-1"]);
 	expect(
-		h.store.read((db) => h.image.resultInTransaction(db, "run-1")),
+		h.store.read((db) => h.image.resultForCallInTransaction(db, id)),
 	).toEqual(record);
 	expect(
-		h.store.read((db) => h.image.resultInTransaction(db, "other")),
+		h.store.read((db) => h.image.resultForCallInTransaction(db, "other")),
 	).toBeNull();
 	await h.queue.close(100);
 });
@@ -213,7 +234,6 @@ test("a studio plan completes without calling the generation service", async () 
 		action: "studio",
 	});
 	expect(h.executed).toEqual([]);
-	expect(h.finished).toEqual(["run-1"]);
 	await h.queue.close(100);
 });
 
@@ -232,7 +252,6 @@ test("an invalid plan fails the record with a stable code", async () => {
 			errorCode: code,
 		});
 		expect(h.executed).toEqual([]);
-		expect(h.finished).toEqual(["run-1"]);
 		await h.queue.close(100);
 	}
 });

@@ -112,12 +112,6 @@ export function createSelections(store: SqliteStore, now: () => number) {
 		});
 		return saved.id;
 	}
-	function linkTaskInTransaction(db: Database, runId: string, taskId: string) {
-		db.query("UPDATE toolchain_selections SET task_id=? WHERE run_id=?").run(
-			taskId,
-			runId,
-		);
-	}
 	/** The end of the run the selection started; the first terminal result wins. */
 	function settleSelectionInTransaction(
 		db: Database,
@@ -236,15 +230,6 @@ export function createSelections(store: SqliteStore, now: () => number) {
 			.get(runId) as { toolchain_id: string | null } | null;
 		return row?.toolchain_id ?? undefined;
 	}
-	/** The request text the conversation handed to the toolchain of a run. */
-	function requestOfRunInTransaction(db: Database, runId: string) {
-		const row = db
-			.query(
-				"SELECT request_text FROM toolchain_selections WHERE run_id=? AND decision='toolchain'",
-			)
-			.get(runId) as { request_text: string | null } | null;
-		return row?.request_text ?? undefined;
-	}
 	/** The query vector stored for a run, so procedures can be matched without a new embedding call. */
 	function queryOfRunInTransaction(db: Database, runId: string) {
 		const row = db
@@ -297,11 +282,9 @@ export function createSelections(store: SqliteStore, now: () => number) {
 	return {
 		pruneInTransaction,
 		recordSelectionInTransaction,
-		linkTaskInTransaction,
 		settleSelectionInTransaction,
 		markRecipeInTransaction,
 		toolchainOfRunInTransaction,
-		requestOfRunInTransaction,
 		offeredInRunInTransaction(
 			db: Database,
 			runId: string,

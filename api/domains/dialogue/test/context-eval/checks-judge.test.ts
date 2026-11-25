@@ -166,7 +166,7 @@ test("a generation without an utterance gives the judge its trigger; the events 
 				},
 			],
 		},
-		trigger: { kind: "todo_changed" },
+		trigger: { kind: "notice" },
 		expect: {
 			checks: [],
 			rubric: [{ axis: "speech_judgment", condition: "話す" }],
@@ -176,7 +176,7 @@ test("a generation without an utterance gives the judge its trigger; the events 
 		buildJudgeRequest(fixed, answer(""), "RULES").messages[1]!.content,
 	);
 	expect(payload.currentInput).toBeNull();
-	expect(payload.trigger).toEqual({ kind: "todo_changed" });
+	expect(payload.trigger).toEqual({ kind: "notice" });
 	expect(payload.facts.conversationEvents).toEqual([
 		expect.objectContaining({ heard: "partial", deliveredText: "調べ" }),
 	]);

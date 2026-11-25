@@ -1,5 +1,43 @@
 import { z } from "zod";
 import {
+	executionReference,
+	type ExecutionReference,
+	type RoutedPipelineStep,
+} from "../../tool-runtime";
+
+/**
+ * The fields of a `delegate` call besides its request and refs, carried as they were given: the start uses what the
+ * conversation's dispatch used (routed steps for a pipeline), and the ticket is checked to still hold them.
+ */
+export type AssignmentDetails = {
+	inputs?: Record<string, unknown>;
+	target?: string;
+	diagnosticRef?: string;
+	resolveUnsaved?: "discard";
+	routedSteps?: RoutedPipelineStep[];
+};
+
+const assignmentDetails = z.strictObject({
+	inputs: z.record(z.string(), z.unknown()).optional(),
+	target: z.string().min(1).optional(),
+	diagnosticRef: z
+		.string()
+		.regex(/^e[1-9]\d{0,12}$/u)
+		.optional(),
+	resolveUnsaved: z.literal("discard").optional(),
+	routedSteps: z
+		.array(
+			z.strictObject({
+				text: z.string(),
+				entry: z.string(),
+				revisionId: z.string().min(1),
+				after: z.array(z.number().int().nonnegative()),
+			}),
+		)
+		.max(16)
+		.optional(),
+});
+import {
 	agendaSnapshotSchema,
 	type AgendaSnapshot,
 } from "eumenes-agency/agenda";
@@ -26,6 +64,39 @@ export type AgendaResearchTicket = {
 	refs: string[];
 	/** The sources of those references (Memory stamps) captured when it started. */
 	inputs: string[];
+	/** The operation was checkpointed and its acceptance still needs to be reconciled. */
+	pendingAdmission?: true;
+	/** Work the user asked a toolchain for (`delegate`): started with the user's request as its authority. */
+	assignment?: true;
+	/** The resources the request names (an assignment's `delegate` refs), handed to the toolchain as they were. */
+	references?: ExecutionReference[];
+	/** An assignment's other `delegate` fields, as they were given. */
+	details?: AssignmentDetails;
+};
+
+/**
+ * What the user asked a toolchain for through `delegate`, kept by the agent's item id until the item is started: the
+ * agent holds the item (its request, status, question and result), the host what the toolchain needs to start it.
+ */
+export type AgendaAssignment = {
+	itemId: string;
+	toolchainId: string;
+	revisionId: string;
+	/** The toolchain's name as the agent says it (`delegatedTo`). */
+	title: string;
+	references: ExecutionReference[];
+	/** The user's words the request was made in: the toolchain takes the work as the user's, not the agency's. */
+	source: AssignmentSource;
+	details?: AssignmentDetails;
+};
+
+/** The user-message source of an assignment (a standard execution source without host-issued extras). */
+export type AssignmentSource = {
+	conversationId: string;
+	messageId: string;
+	runId: string;
+	request: string;
+	digest: string;
 };
 
 /** A result of the researcher, kept for the agent to read (the host's note store of the conversation). */
@@ -52,6 +123,15 @@ export type AgendaHostSnapshot = {
 	agent: AgendaSnapshot;
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
+	researchRefusals?: AgendaResearchRefusal[];
+	/** Absent in a checkpoint written before assignments were held. */
+	assignments?: AgendaAssignment[];
+};
+
+export type AgendaResearchRefusal = {
+	key: string;
+	code: string;
+	sources: string[];
 };
 
 const strings = z.array(z.string());
@@ -70,8 +150,36 @@ const snapshotSchema = z.strictObject({
 			at: z.number(),
 			refs: strings,
 			inputs: strings,
+			pendingAdmission: z.literal(true).optional(),
+			assignment: z.literal(true).optional(),
+			references: z.array(executionReference).optional(),
+			details: assignmentDetails.optional(),
 		}),
 	),
+	researchRefusals: z
+		.array(
+			z.strictObject({ key: z.string(), code: z.string(), sources: strings }),
+		)
+		.optional(),
+	assignments: z
+		.array(
+			z.strictObject({
+				itemId: z.string().min(1),
+				toolchainId: z.string().min(1),
+				revisionId: z.string().min(1),
+				title: z.string().min(1),
+				references: z.array(executionReference),
+				source: z.strictObject({
+					conversationId: z.string().min(1),
+					messageId: z.string().min(1),
+					runId: z.string().min(1),
+					request: z.string(),
+					digest: z.string().min(1),
+				}),
+				details: assignmentDetails.optional(),
+			}),
+		)
+		.optional(),
 	// A checkpoint written before the plans-and-interests note was retired carries it: read and dropped.
 	profile: z.unknown().optional(),
 	notes: z.array(
@@ -102,10 +210,12 @@ export function agendaSources(value: AgendaHostSnapshot): string[] {
 		...new Set([
 			...value.agent.items.flatMap((i) => i.refs.map(baseRef)),
 			...value.tickets.flatMap((t) => [...t.refs.map(baseRef), ...t.inputs]),
+			...(value.researchRefusals ?? []).flatMap((r) => r.sources.map(baseRef)),
 			...value.notes.flatMap((n) => [
 				...n.refs.map(baseRef),
 				...(n.inputs ?? []),
 			]),
+			...(value.assignments ?? []).map((a) => a.source.messageId),
 		]),
 	];
 }
@@ -131,8 +241,18 @@ export function forgetAgenda(
 			.filter((n) => gone([...n.refs, ...(n.inputs ?? [])]))
 			.map((n) => `note:${n.id}`),
 	);
+	const tickets = value.tickets.filter(
+		(t) => !gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lost.has(r)),
+	);
+	const retained = new Set(tickets.map((ticket) => ticket.id));
+	const lostItems = new Set(
+		value.tickets
+			.filter((ticket) => !retained.has(ticket.id))
+			.map((ticket) => ticket.itemId),
+	);
 	const items = value.agent.items.filter(
-		(i) => !gone(i.refs) && !i.refs.some((r) => lost.has(r)),
+		(i) =>
+			!lostItems.has(i.id) && !gone(i.refs) && !i.refs.some((r) => lost.has(r)),
 	);
 	// A checkpoint written before the note was retired still holds it: it is not carried on.
 	const { profile: _retired, ...rest } = value as AgendaHostSnapshot & {
@@ -142,10 +262,24 @@ export function forgetAgenda(
 		...rest,
 		revision: value.revision + 1,
 		agent: { ...value.agent, items },
-		tickets: value.tickets.filter(
-			(t) =>
-				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lost.has(r)),
-		),
+		tickets,
+		...(value.researchRefusals
+			? {
+					researchRefusals: value.researchRefusals.filter(
+						(r) => !gone(r.sources),
+					),
+				}
+			: {}),
 		notes: value.notes.filter((n) => !lost.has(`note:${n.id}`)),
+		// An assignment goes with its item, and with the user's words it was asked in.
+		...(value.assignments
+			? {
+					assignments: value.assignments.filter(
+						(a) =>
+							items.some((i) => i.id === a.itemId) &&
+							!gone([a.source.messageId]),
+					),
+				}
+			: {}),
 	};
 }

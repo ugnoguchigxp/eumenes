@@ -1,7 +1,6 @@
 import { systemContext } from "../../../infrastructure/system-context";
 import type { AgentToolDefinition } from "../contracts";
 import { TOOL_NAMES } from "./generation-tools";
-import { lineText } from "./input-text";
 import { handWith, type Fields } from "./routed-actions";
 import type { ChoiceCandidate } from "./routed-choice";
 import { offerSources } from "./conversation-offers";
@@ -16,8 +15,6 @@ const RESOURCE_REFS = 8;
 /** What a search's query and a hand-over's request keep of the reply's words. */
 const QUERY_CHARS = 2000;
 const REQUEST_CHARS = 8000;
-/** The TODO's title, taken from the request the reply wrote (`## State` shows it in every later turn). */
-const TITLE_CHARS = 120;
 
 /** The reply's two tools; what they do is the host's text, when to use them the agent's rules. */
 export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
@@ -46,11 +43,7 @@ export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
 					maxLength: REQUEST_CHARS,
 					description: "担当への作業指示全文",
 				},
-				revises: { type: "string", description: "訂正元の確認 c<n>" },
 				diagnosticRef: { type: "string", description: "該当診断参照 e<n>" },
-				// The agent's rules name these two; the host decides both itself.
-				mode: { type: "string", enum: ["execute"] },
-				impact: { type: "string" },
 			},
 		},
 	},
@@ -68,7 +61,6 @@ export function createTalkWork(turn: Turn) {
 	const found = new Map<string, ChoiceCandidate>(
 		turn.input.offers?.map(({ card }) => [card.id, retainedChoice(turn, card)]),
 	);
-	let revisionUnderCorrection: number | undefined;
 	const controls = createWorkControls(turn);
 	const tools = [...TALK_WORK_TOOLS, ...controls.tools];
 
@@ -98,7 +90,6 @@ export function createTalkWork(turn: Turn) {
 				summary: card.summary,
 				useWhen: card.useWhen,
 				execution: choice.execution,
-				minImpact: choice.minImpact,
 				...(choice.produces?.length ? { produces: choice.produces } : {}),
 			});
 		}
@@ -136,23 +127,11 @@ export function createTalkWork(turn: Turn) {
 
 	async function delegate(args: Record<string, unknown>): Promise<Answer> {
 		const request = typeof args.request === "string" ? args.request.trim() : "";
-		let revision = revisionUnderCorrection;
-		if (args.revises !== undefined) {
-			const item = [
-				...turn.routed!.pending.confirmations,
-				...(turn.routed!.pending.revisions ?? []),
-			].find((c) => `c${c.ref}` === args.revises);
-			if (!item || !(await turn.decline(item.ref, true)))
-				return answer({ delegated: false, code: "revision_not_open" });
-			revision = item.ref;
-			revisionUnderCorrection = revision;
-		}
 		if (!request || request.length > REQUEST_CHARS)
 			return answer({
 				delegated: false,
 				code: "invalid_arguments",
 				field: "request",
-				...(revision ? { revises: `c${revision}` } : {}),
 			});
 		if (typeof args.toolchain !== "string")
 			return answer({
@@ -181,9 +160,7 @@ export function createTalkWork(turn: Turn) {
 		}
 		if (choice.execution === "instant") {
 			const answered = await turn.act(TOOL_NAMES.delegate, {
-				mode: "execute",
 				toolchain: choice.id,
-				impact: "none",
 				inputs: filled.fields.inputs ?? {},
 			});
 			if ("refused" in answered)
@@ -197,7 +174,6 @@ export function createTalkWork(turn: Turn) {
 				code?: unknown;
 			};
 			// The reply tells the answer in its own words (a read's result does the same).
-			if (revision && result.answered === true) await turn.decline(revision);
 			return result.answered === true && typeof result.answer === "string"
 				? answer({ answered: true, answer: result.answer })
 				: answer({
@@ -209,41 +185,23 @@ export function createTalkWork(turn: Turn) {
 		// The pending-switch control is the only path here that can request discard of unsaved work.
 		const { resolveUnsaved: _unsaved, ...given } = filled.fields;
 		const fields: Fields = {
-			...(revision ? { revises: revision } : {}),
 			...(resources.length ? { refs: resources } : {}),
 			...given,
 			...(typeof args.diagnosticRef === "string"
 				? { diagnosticRef: args.diagnosticRef }
 				: {}),
 			request,
-			words: lineText(request).slice(0, TITLE_CHARS),
 		};
-		const before = turn.executed.length;
-		const step = await handWith(
-			turn,
-			choice,
-			fields,
-			systemContext("dialogue.contexts.local.router-announce", {
-				title: lineText(choice.title).slice(0, 30),
-			}),
-			request,
-		);
-		if (step !== "done")
-			return answer({
-				delegated: false,
-				code: typeof step === "object" ? step.retry : "not_delegated",
-			});
-		// Handed over (the host's announcement is the run's answer), or the host stated a confirmation: the reply ends.
-		const confirmed = turn.executed
-			.slice(before)
-			.some(
-				({ call, outcome }) =>
-					call.name === TOOL_NAMES.delegate && outcome.confirmationId,
-			);
-		return answer(
-			confirmed ? { confirmation: true } : { delegated: true },
-			true,
-		);
+		const step = await handWith(turn, choice, fields, request);
+		// The conversation went to a session (the host's announcement is the run's answer): the reply ends. An
+		// assignment is the agent's: the reply goes on and tells the user in its own words.
+		if (step === "done") return answer({ delegated: true }, true);
+		if (typeof step === "object" && "assigned" in step)
+			return answer(step.assigned);
+		return answer({
+			delegated: false,
+			code: typeof step === "object" ? step.retry : "not_delegated",
+		});
 	}
 
 	return {
@@ -252,7 +210,7 @@ export function createTalkWork(turn: Turn) {
 		call(name: string, args: Record<string, unknown>) {
 			if (name === TOOL_NAMES.search) return find(args);
 			if (name === TOOL_NAMES.delegate) return delegate(args);
-			return controls.call(name, args);
+			return controls.call(args);
 		},
 	};
 }

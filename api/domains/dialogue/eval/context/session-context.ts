@@ -9,7 +9,6 @@ import type { InferencePort } from "../../../inference";
 import type { QueueService } from "../../../queue";
 import type { DialogueDeps } from "../../service/context";
 import { createPrepare } from "../../service/generation-prepare";
-import { createWorkLedger } from "../../service/work-ledger";
 import { evalConversationAgent } from "./conversation-agent";
 import type { EvalCard, Persona, SeedWiring } from "./session-types";
 
@@ -53,7 +52,7 @@ export function createSessionContext(
 	let runs = 0;
 	const uuid = () =>
 		`00000000-0000-4000-8000-${String(++ids).padStart(12, "0")}`;
-	/** `@key` of a seeded event or TODO -> the id the services gave it. */
+	/** `@key` of a seeded event -> the id the services gave it. */
 	const refs = new Map<string, string>();
 	const resolve = (value: unknown): unknown => {
 		if (typeof value === "string") {
@@ -96,20 +95,16 @@ export function createSessionContext(
 				})),
 		} as unknown as NonNullable<DialogueDeps["toolchains"]>,
 		conversationAgent: evalConversationAgent,
-		agency: { workChangedInTransaction: () => {} },
 		worldContext: {
 			knownNamesInTransaction: () => ports.worldNames,
 		},
 	};
-	const work = createWorkLedger(deps);
-	deps.work = work;
 	return {
 		wiring,
 		store,
 		conversation,
 		events: continuity.events,
 		deps,
-		work,
 		ports,
 		refs,
 		resolve,

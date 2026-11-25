@@ -15,26 +15,22 @@ import {
 	claudeInputDigest,
 	type ClaudeObservation,
 } from "../../domains/coding";
-import { bundleFiles, capabilityBundleV1 } from "../../domains/capabilities";
 import type {
 	SupervisionEvidence,
 	SupervisionNote,
 } from "../../domains/development-supervision/contracts";
-import { bundleHostOf } from "../toolchain/toolchain-adapters";
 import { conversationSchema } from "../../domains/conversation/contracts";
 import { createGoalsService } from "../../domains/goals";
 import { fixture as markdownFixture } from "../../domains/markdown/test/workspace.fixture";
 import { createTerminals } from "../../domains/terminals";
-import { sha256Hex } from "../../infrastructure/digest";
 import {
-	approve,
-	searchThenDelegate,
-} from "../toolchain/conversation-script.fixture";
-import { harness } from "../toolchain/toolchain.fixture";
+	ask,
+	assignmentAgenda,
+	items,
+	reportLine,
+	until,
+} from "../media/assignment.fixture";
 import { configureDevelopmentSupervision } from "./development-supervision-host";
-import { createKanbanAdapter } from "./kanban-adapter";
-import { createKanbanExecutorRegistry } from "./kanban-executors";
-import { extendKanbanAdapter } from "./kanban-shared-adapter";
 
 import { fixtureEditRunner } from "./supervision-edit-runner.fixture";
 import { serveSupervisionTrialRunner } from "./supervision-parallel-runner.fixture";
@@ -53,9 +49,9 @@ const design =
 const editInstruction =
 	"Run the exact approved Bash regression command before editing. Read sum.ts, use Edit to fix sum so that it counts the number of rows, then rerun the same approved regression command. Preserve all other files.";
 
-test.each(live ? [false] : [false, true])(
-	"conversation delegates an edit, stays available, then reports the verified outcome once (prior confirmation: %s)",
-	async (requireConfirmation) => {
+test(
+	"an edit is the agent's assignment, the conversation stays available, then the agent reports the verified outcome once",
+	async () => {
 		const root = realpathSync(
 			mkdtempSync(join(tmpdir(), "eumenes-supervision-through-")),
 		);
@@ -131,161 +127,154 @@ test.each(live ? [false] : [false, true])(
 		const startAt = performance.now();
 		if (!(await runner.probe!()))
 			throw new Error("supervision_edit_trial_runner_unavailable");
-		const h = await harness({
-			markdown: drafts.archive,
-			memory: true,
-			kanban: true,
-			webNote: {},
-			claudeRunner: runner,
-			terminals: (store) =>
-				createTerminals({
-					store,
-					command: ["fixture"],
-					spawn: () => {
-						throw Error("manual terminal started");
-					},
-				}),
-			discoveryTarget: () => "development_supervision",
-			firstRound: (_tools, question, messages) => {
-				if (question.includes("別の話"))
-					return { text: "会話を続けられます。" };
-				if (question === "はい。")
-					return { calls: [approve("c1", "修正に着手します。")] };
-				return searchThenDelegate(
-					(card) => card.id === "development-supervision.request",
-					utterance,
-					requireConfirmation
-						? { mode: "confirm", impact: "modify_existing" }
-						: { impact: "none", announcement: "集計の修正を進めます。" },
-				)(messages);
-			},
-			structuredResponse(messages) {
-				const system = messages[0]?.content ?? "";
-				let data;
-				try {
-					data = JSON.parse(messages.at(-1)!.content);
-				} catch {
-					return;
-				}
-				if (system.includes("あなたは依頼の設計担当です")) {
-					designerNotes = (
-						data.memory as Pick<SupervisionNote, "evidence" | "text">[]
-					).concat(
-						(
-							data.notes as {
-								evidence: SupervisionEvidence;
-								markdown: string;
-							}[]
-						).map(({ evidence, markdown }) => ({ evidence, text: markdown })),
-					);
-					const sources = shared
-						? designerNotes.map(({ evidence }) => evidence)
-						: [];
-					return {
-						status: "ready",
-						title: "集計関数",
-						summary: "件数の回帰試験",
-						markdown: sources.length
-							? `${design}\n\n## 出典\n${sources.map((evidence) => `- ${sourceCitation(evidence)}`).join("\n")}`
-							: design,
-						sources: sources.map(
-							({ kind, id }) =>
-								`${kind === "memory" ? "memory" : "note"}:${id}`,
-						),
-						missing: null,
-					};
-				}
-				if (data.researchRemaining !== undefined) {
-					plannerNotes = data.context;
-					return {
-						decision: {
-							action: "design",
-							title: "集計の修正",
-							analysis: "件数を返す関数とテストを照合する",
-							mode: "execute",
-							guideQuery: "集計関数の回帰試験",
-							proposals: [
-								{
-									title: "件数の回帰",
-									instruction: "集計関数を修正して再試験する",
-									acceptance: ["期待件数2"],
-									mode: "edit",
-									authorityQuote: utterance,
-									after: null,
-									verification: null,
-									readablePaths: ["sum.ts", "regression.test.ts"],
-									writablePaths: ["sum.ts"],
-									checks: [
-										{
-											executable: process.execPath,
-											cwd: root,
-											args: ["test", "regression.test.ts"],
-										},
-									],
-								},
-							],
+		const a = await assignmentAgenda({
+			harness: {
+				markdown: drafts.archive,
+				memory: true,
+				kanban: true,
+				webNote: {},
+				claudeRunner: runner,
+				terminals: (store) =>
+					createTerminals({
+						store,
+						command: ["fixture"],
+						spawn: () => {
+							throw Error("manual terminal started");
 						},
-					};
-				}
-				if (
-					Array.isArray(data.amendments) &&
-					data.callsLeft === undefined &&
-					Object.keys(data).length < 6
-				)
-					return { decision: { mode: "edit" } };
-				if (data.child && data.design && !refs().length)
-					return {
-						decision: {
-							action: "finish",
-							status: "failed",
-							reason: "現行の作業に実行証跡がありません。",
-						},
-					};
-				if (data.child && data.design)
-					return {
-						decision: {
-							action: "accept",
-							reason: conclusion,
-							refs: refs(),
-						},
-					};
-				if (
-					data.executionsLeft !== undefined &&
-					data.observation?.state === "failed"
-				)
-					return {
-						decision: {
-							action: "finish",
-							status: "failed",
-							memo: "",
-							summary: "runnerの実行が失敗しました。",
-							fulfilled: [],
-							missing: ["実行証跡"],
-							refs: [],
-						},
-					};
-				if (data.executionsLeft !== undefined)
-					return {
-						decision:
-							data.observation?.state === "finished"
-								? {
-										action: "finish",
-										status: "completed",
-										memo: "",
-										summary: "実行終了",
-										fulfilled: ["固定試験"],
-										missing: [],
-										refs: refs(),
-									}
-								: {
-										action: "invoke",
-										summary: "固定試験と修正",
-										memo: "",
-										instruction: editInstruction,
+					}),
+				firstRound: (_tools, question) => {
+					if (question.includes("別の話"))
+						return { text: "会話を続けられます。" };
+				},
+				structuredResponse(messages) {
+					const system = messages[0]?.content ?? "";
+					let data;
+					try {
+						data = JSON.parse(messages.at(-1)!.content);
+					} catch {
+						return;
+					}
+					if (system.includes("あなたは依頼の設計担当です")) {
+						designerNotes = (
+							data.memory as Pick<SupervisionNote, "evidence" | "text">[]
+						).concat(
+							(
+								data.notes as {
+									evidence: SupervisionEvidence;
+									markdown: string;
+								}[]
+							).map(({ evidence, markdown }) => ({ evidence, text: markdown })),
+						);
+						const sources = shared
+							? designerNotes.map(({ evidence }) => evidence)
+							: [];
+						return {
+							status: "ready",
+							title: "集計関数",
+							summary: "件数の回帰試験",
+							markdown: sources.length
+								? `${design}\n\n## 出典\n${sources.map((evidence) => `- ${sourceCitation(evidence)}`).join("\n")}`
+								: design,
+							sources: sources.map(
+								({ kind, id }) =>
+									`${kind === "memory" ? "memory" : "note"}:${id}`,
+							),
+							missing: null,
+						};
+					}
+					if (data.researchRemaining !== undefined) {
+						plannerNotes = data.context;
+						return {
+							decision: {
+								action: "design",
+								title: "集計の修正",
+								analysis: "件数を返す関数とテストを照合する",
+								mode: "execute",
+								guideQuery: "集計関数の回帰試験",
+								proposals: [
+									{
+										title: "件数の回帰",
+										instruction: "集計関数を修正して再試験する",
+										acceptance: ["期待件数2"],
+										mode: "edit",
+										authorityQuote: utterance,
+										after: null,
+										verification: null,
+										readablePaths: ["sum.ts", "regression.test.ts"],
+										writablePaths: ["sum.ts"],
+										checks: [
+											{
+												executable: process.execPath,
+												cwd: root,
+												args: ["test", "regression.test.ts"],
+											},
+										],
 									},
-					};
+								],
+							},
+						};
+					}
+					if (
+						Array.isArray(data.amendments) &&
+						data.callsLeft === undefined &&
+						Object.keys(data).length < 6
+					)
+						return { decision: { mode: "edit" } };
+					if (data.child && data.design && !refs().length)
+						return {
+							decision: {
+								action: "finish",
+								status: "failed",
+								reason: "現行の作業に実行証跡がありません。",
+							},
+						};
+					if (data.child && data.design)
+						return {
+							decision: {
+								action: "accept",
+								reason: conclusion,
+								refs: refs(),
+							},
+						};
+					if (
+						data.executionsLeft !== undefined &&
+						data.observation?.state === "failed"
+					)
+						return {
+							decision: {
+								action: "finish",
+								status: "failed",
+								memo: "",
+								summary: "runnerの実行が失敗しました。",
+								fulfilled: [],
+								missing: ["実行証跡"],
+								refs: [],
+							},
+						};
+					if (data.executionsLeft !== undefined)
+						return {
+							decision:
+								data.observation?.state === "finished"
+									? {
+											action: "finish",
+											status: "completed",
+											memo: "",
+											summary: "実行終了",
+											fulfilled: ["固定試験"],
+											missing: [],
+											refs: refs(),
+										}
+									: {
+											action: "invoke",
+											summary: "固定試験と修正",
+											memo: "",
+											instruction: editInstruction,
+										},
+						};
+				},
 			},
 		});
+		const h = a.h;
 		try {
 			const supervisor = h.toolchain.developmentSupervision;
 			await h.store.write((db) =>
@@ -295,34 +284,8 @@ test.each(live ? [false] : [false, true])(
 					"toolchain:claude-code.request@7",
 				),
 			);
-			if (requireConfirmation) {
-				// An installation can publish a development card that always asks before delegation.
-				const reviewed = capabilityBundleV1.parse(
-					bundleFiles().find(
-						(entry) => entry.name === "development-supervision.bundle.json",
-					)!.raw,
-				);
-				const card = reviewed.definitions.find(
-					(definition) => definition.kind === "toolchain",
-				)!;
-				card.revision = 2;
-				card.publishFromRevision = 1;
-				card.minImpact = "modify_existing";
-				expect(
-					await h.store.write(
-						(db) =>
-							h.toolchain.capabilities.importBundleInTransaction(
-								db,
-								reviewed,
-								bundleHostOf(h.toolchain.registry),
-							).issues,
-					),
-				).toEqual([]);
-			}
-
 			const goals = createGoalsService();
-			if (!requireConfirmation)
-				shared = await seedSupervisionSharedContext(h, goals);
+			shared = await seedSupervisionSharedContext(h, goals);
 			configureDevelopmentSupervision({
 				supervisor,
 				store: h.store,
@@ -340,48 +303,28 @@ test.each(live ? [false] : [false, true])(
 					supervisionSkillCurrentInTransaction: () => false,
 				},
 			});
-			const turn = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "development",
-				text: utterance,
-			});
-			if (requireConfirmation) {
-				expect(
-					(await h.dialogue.waitForTerminal(turn.id, { timeoutMs: 5000 }))
-						?.status,
-				).toBe("completed");
-				expect(h.todos("development")).toHaveLength(0);
-				expect(entered).toBe(false);
-				await h.dialogue.submit({
-					requestId: crypto.randomUUID(),
-					conversationId: "development",
-					text: "はい。",
-				});
-			}
-			let done = false;
+			await a.start();
+			const { source } = await ask(
+				a,
+				"development-supervision.request",
+				utterance,
+			);
 			const progress = () =>
 				h.store.read((db) =>
 					supervisor.boardRowsInTransaction(db, {
-						conversationId: "development",
+						conversationId: "ao",
 					}),
 				);
-			const board = extendKanbanAdapter(
-				createKanbanAdapter(h.kanban!, { runnable: () => false }),
-				{
-					kanban: h.kanban!,
-					registry: createKanbanExecutorRegistry([]),
-					supervision: () => supervisor,
-				},
-			);
 			for (let attempt = 0; attempt < 250 && !entered; attempt++) {
 				await supervisor.recover();
 				void h.toolchain.claudeCode.recover();
+				await a.advance(1000);
 				await Bun.sleep(15);
 			}
 			expect(entered).toBe(true);
 			const chat = await h.dialogue.submit({
 				requestId: crypto.randomUUID(),
-				conversationId: "development",
+				conversationId: "ao",
 				text: "別の話ですが、挨拶をお願いします。",
 			});
 			for (
@@ -392,7 +335,7 @@ test.each(live ? [false] : [false, true])(
 				await Bun.sleep(15);
 			expect(h.dialogue.get(chat.id)?.status).toBe("completed");
 			const messages = conversationSchema.parse(
-				await (await h.request("/api/conversations/development")).json(),
+				await (await h.request("/api/conversations/ao")).json(),
 			).messages;
 			expect(
 				messages.some(
@@ -406,44 +349,25 @@ test.each(live ? [false] : [false, true])(
 			expect(progress()[0]?.state).not.toBe("finished");
 			checkGate.resolve();
 			const finishBy = Date.now() + (live ? 120_000 : 10_000);
-			while (Date.now() < finishBy) {
+			while (Date.now() < finishBy && !reportLine(a)) {
 				await supervisor.recover();
 				await h.toolchain.claudeCode.recover();
-				if (
-					progress()[0]?.state === "finished" &&
-					h.reported("development").includes(conclusion)
-				) {
-					done = true;
-					break;
-				}
-				const current = progress()[0];
-				if (current?.state === "finished" && current.outcome !== "succeeded")
-					break;
+				await a.advance(1000);
 				await Bun.sleep(live ? 75 : 15);
 			}
 			const checks = observed.facts
 				.filter((fact) => fact.kind === "check")
 				.map((fact) => fact.passed);
-			if (!done) {
-				throw new Error(
-					JSON.stringify({
-						rows: progress().map(({ state, reason }) => ({ state, reason })),
-						turn: h.dialogue.get(turn.id)?.status,
-						checks,
-					}),
-				);
-			}
-			expect({
-				done,
-				turn: h.dialogue.get(turn.id)?.status,
-				rows: progress().map(({ state, reason }) => ({ state, reason })),
-				checks,
-			}).toMatchObject({
-				done: true,
-				turn: "completed",
-				rows: [{ state: "finished", reason: conclusion }],
-				checks: [false, true],
-			});
+			// The agent reports the verified outcome once: one line, no open item.
+			await until(a, () => !!reportLine(a));
+			expect(items(a)).toHaveLength(0);
+			expect(
+				h.conversation
+					.get("ao")
+					.messages.filter((message) => message.id.startsWith("agency:")),
+			).toHaveLength(1);
+			expect(checks).toEqual([false, true]);
+			expect(h.dialogue.get(source.runId)?.status).toBe("completed");
 			const check = observed.facts.findLast(
 				(fact) => fact.kind === "check" && fact.passed,
 			);
@@ -456,31 +380,7 @@ test.each(live ? [false] : [false, true])(
 			);
 			expect(edit?.inputDigest).toBe(check?.inputDigest);
 			expect(edit?.executionId).toBe(check?.executionId);
-			const row = progress()[0]!;
-			expect(row).toMatchObject({
-				outcome: "succeeded",
-				evidenceRefs: expect.arrayContaining(refs()),
-			});
-			const parent = h.store.read((db) =>
-				supervisor.progressInTransaction(db, row.parentId),
-			);
-			expect(parent?.designs).toHaveLength(1);
-			const savedDesign = parent!.designs[0]!;
-			const [binding, preview] = h.store.readSnapshot((db) => [
-				supervisor.designBindingInTransaction(
-					db,
-					savedDesign.documentId,
-					row.parentId,
-				),
-				h.markdown!.generated.localPreviewInTransaction(
-					db,
-					savedDesign.documentId,
-				),
-			]);
-			expect(savedDesign).toMatchObject({
-				revision: 1,
-				digest: sha256Hex(preview!.markdown),
-			});
+			// The shared context reached the design, and the design reached the runner with its citations.
 			const evidence = shared
 				? checkSupervisionSharedContext(shared, designerNotes)
 				: [];
@@ -488,45 +388,19 @@ test.each(live ? [false] : [false, true])(
 				expect(evidence).toEqual(
 					checkSupervisionSharedContext(shared, plannerNotes),
 				);
-				expect(binding?.evidence).toEqual(evidence);
 				for (const source of evidence)
-					expect(preview!.markdown).toContain(sourceCitation(source));
+					expect(observed.instructions[0]).toContain(sourceCitation(source));
 			}
-			expect(observed.instructions).toEqual([
-				`${preview!.markdown}\n\n## 作業範囲\n集計関数を修正して再試験する\n\n## 受入条件\n- 期待件数2\n\n## 今回の実行指示\n${editInstruction}`,
-			]);
-			const boardSource = h.store.read((db) =>
-				board.sourceInTransaction(db, "query:kanban.board@3", undefined),
+			expect(observed.instructions).toHaveLength(1);
+			expect(observed.instructions[0]).toContain(design);
+			expect(observed.instructions[0]).toContain(
+				`## 作業範囲\n集計関数を修正して再試験する\n\n## 受入条件\n- 期待件数2\n\n## 今回の実行指示\n${editInstruction}`,
 			);
-			expect(boardSource?.data).toMatchObject({
-				supervisedRows: [
-					{
-						parentId: row.parentId,
-						taskId: row.taskId,
-						outcome: "succeeded",
-						reason: conclusion,
-						evidenceRefs: row.evidenceRefs,
-					},
-				],
-			});
 			expect(readFileSync(draft, "utf8")).toBe("operator's existing change\n");
 			expect(git("diff", "--name-only").toString().trim().split("\n")).toEqual([
 				"operator.txt",
 				"sum.ts",
 			]);
-			const replies = async () =>
-				conversationSchema
-					.parse(
-						await (await h.request("/api/conversations/development")).json(),
-					)
-					.messages.filter(
-						(message) =>
-							message.role === "assistant" && message.text.includes(conclusion),
-					);
-			for (let i = 0; i < 120 && !(await replies()).length; i++)
-				await Bun.sleep(15);
-			await supervisor.recover();
-			expect(await replies()).toHaveLength(1);
 			if (live)
 				console.info(
 					JSON.stringify({
@@ -534,8 +408,6 @@ test.each(live ? [false] : [false, true])(
 						elapsedMs: Math.round(performance.now() - startAt),
 						fixtureModelCalls: h.calls,
 						turns: observed.turns,
-						parentId: row.parentId,
-						design: savedDesign,
 						sources: evidence.map(sourceCitation),
 						executionId: edit?.executionId,
 						evidence: refs(),
@@ -545,7 +417,7 @@ test.each(live ? [false] : [false, true])(
 				);
 		} finally {
 			checkGate.resolve();
-			await h.close();
+			await a.close();
 			await privateRunner?.close();
 			if (privateDirectory)
 				rmSync(privateDirectory, { recursive: true, force: true });

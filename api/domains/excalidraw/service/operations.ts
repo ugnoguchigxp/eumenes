@@ -74,10 +74,6 @@ type Deps = {
 	inference: InferencePort;
 	capabilities: Capabilities;
 	service: ExcalidrawService;
-	onJob: (db: Database, runId: string, jobId: string) => void;
-	onFinished: (db: Database, runId: string) => void;
-	/** Keeps the conversation run open until `untilMs`; returns the run's deadline, or null if it cannot. */
-	onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
 	clock?: () => number;
 	validateExecutionInTransaction?: (
 		db: Database,
@@ -107,16 +103,13 @@ function enqueueStage(
 		job.id,
 		r.id,
 	);
-	if (!JSON.parse(r.request_json).execution) deps.onJob(db, r.run_id, job.id);
 	return job.id;
 }
-const failOperation = (deps: Deps, db: Database, r: Row, code: string) => {
+const failOperation = (db: Database, r: Row, code: string) =>
 	patch(db, r, { state: "failed", errorCode: code });
-	if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
-};
 /**
  * LARM refused the lease for lack of free memory. The same start is queued again at the planned time;
- * a run whose caller fixed the deadline, or the 30-minute limit, ends it as `larm_capacity_timeout`.
+ * the caller's fixed deadline, or the 30-minute limit, ends it as `larm_capacity_timeout`.
  */
 function waitForCapacity(
 	deps: Deps,
@@ -124,8 +117,6 @@ function waitForCapacity(
 	r: Row,
 	retryAfterMs: number,
 ) {
-	const delegated = !!JSON.parse(r.request_json).execution;
-	const { onWaiting } = deps;
 	settleCapacityWait({
 		domain: "excalidraw",
 		subjectId: r.id,
@@ -133,20 +124,11 @@ function waitForCapacity(
 		previous: view(r).capacityWait,
 		retryAfterMs,
 		budgetMs: START_WAIT_MS,
-		// A delegated task's deadline is fixed by its caller; a conversation run is kept open instead.
-		limitAt: delegated ? r.deadline : null,
-		extend:
-			delegated || !onWaiting
-				? undefined
-				: (deadline) => onWaiting(db, r.run_id, deadline),
-		expire: () => failOperation(deps, db, r, LARM_CAPACITY_TIMEOUT),
+		// The task's deadline is fixed by its caller.
+		limitAt: r.deadline,
+		expire: () => failOperation(db, r, LARM_CAPACITY_TIMEOUT),
 		schedule: (plan) => {
 			patch(db, r, { state: LARM_CAPACITY_WAITING, capacityWait: plan });
-			if (!delegated)
-				db.query("UPDATE excalidraw_operations SET deadline=? WHERE id=?").run(
-					plan.deadline,
-					r.id,
-				);
 			return enqueueStage(deps, db, read(db, r.id)!, "open", plan);
 		},
 	});
@@ -157,7 +139,7 @@ export function registerDrawingOperations(deps: Deps) {
 	const enqueue = (db: Database, r: Row, stage: "plan" | "open") =>
 		enqueueStage(deps, db, r, stage);
 	const fail = (db: Database, r: Row, code: string) =>
-		failOperation(deps, db, r, code);
+		failOperation(db, r, code);
 	const cancel = (db: Database, job: { payload: { id: string } }) => {
 		const r = read(db, job.payload.id);
 		if (r) patch(db, r, { state: "cancelled", errorCode: "cancel_requested" });
@@ -183,7 +165,10 @@ export function registerDrawingOperations(deps: Deps) {
 			const r = read(db, claim.payload.id);
 			if (!r || view(r).state !== "planning")
 				return { status: "stale", reason: "drawing_not_planning" };
-			if (!inference.captureControlInTransaction || !inference.executeControl)
+			if (
+				!inference.captureUserControlInTransaction ||
+				!inference.executeControl
+			)
 				throw new Error("excalidraw_inference_unavailable");
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
@@ -209,8 +194,8 @@ export function registerDrawingOperations(deps: Deps) {
 				"\nOUTPUT_SCHEMA=" +
 				JSON.stringify(outputSchema);
 			const control = { instructions, outputSchema };
-			const execution = JSON.parse(r.request_json).execution;
-			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+			const execution = JSON.parse(r.request_json).execution as ChildExecution;
+			if (!deps.validateExecutionInTransaction?.(db, execution))
 				throw new Error("execution_changed");
 			const capture = {
 				subject: `excalidraw:${r.id}:plan`,
@@ -218,12 +203,10 @@ export function registerDrawingOperations(deps: Deps) {
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
 				maxOutputTokens: 2048,
 			};
-			const requestId = execution
-				? inference.captureUserControlInTransaction!(db, {
-						...capture,
-						subject: `drawing-task:${r.id}-plan`,
-					})
-				: inference.captureControlInTransaction(db, capture);
+			const requestId = inference.captureUserControlInTransaction(db, {
+				...capture,
+				subject: `drawing-task:${r.id}-plan`,
+			});
 			return {
 				status: "ready",
 				input: {
@@ -250,9 +233,7 @@ export function registerDrawingOperations(deps: Deps) {
 				input.messages,
 				signal,
 				input.control,
-				JSON.parse(input.row.request_json).execution
-					? executionCallSession(JSON.parse(input.row.request_json).execution)
-					: undefined,
+				executionCallSession(JSON.parse(input.row.request_json).execution),
 			);
 			return { receipt, plan: drawingPlan.parse(parseLlmJson(receipt.value)) };
 		},
@@ -295,8 +276,6 @@ export function registerDrawingOperations(deps: Deps) {
 				"UPDATE excalidraw_operations SET request_json=? WHERE id=?",
 			).run(JSON.stringify({ ...JSON.parse(r.request_json), ...plan }), r.id);
 			if (opens) enqueue(db, r, "open");
-			else if (!JSON.parse(r.request_json).execution)
-				deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,
@@ -399,7 +378,6 @@ export function registerDrawingOperations(deps: Deps) {
 				url: s.url,
 				title: s.title,
 			});
-			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,
@@ -424,24 +402,15 @@ function drawingOperations(
 				question: string;
 				originalRequest: string;
 				deadline: number;
-				execution?: ChildExecution;
+				execution: ChildExecution;
 			},
 		) {
-			const existing = input.execution
-				? read(db, input.execution.id)
-				: (db
-						.query(
-							"SELECT * FROM excalidraw_operations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
-						)
-						.get(input.runId) as Row | null);
+			const id = input.execution.id;
+			const existing = read(db, id);
 			if (existing) return { id: existing.id, jobId: existing.job_id! };
-			if (
-				input.execution &&
-				!deps.validateExecutionInTransaction?.(db, input.execution)
-			)
+			if (!deps.validateExecutionInTransaction?.(db, input.execution))
 				throw new Error("execution_changed");
-			const id = input.execution?.id ?? crypto.randomUUID(),
-				request = drawingRequest.parse({ question: input.question });
+			const request = drawingRequest.parse({ question: input.question });
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
@@ -468,23 +437,14 @@ function drawingOperations(
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
-					...(input.execution
-						? { execution: input.execution, references: input.execution.refs }
-						: {}),
+					execution: input.execution,
+					references: input.execution.refs,
 				}),
 				JSON.stringify(prepared),
 				input.deadline,
 				null,
 			);
 			return { id, jobId: enqueue(db, read(db, id)!, "plan") };
-		},
-		resultInTransaction(db: Database, runId: string) {
-			const r = db
-				.query(
-					"SELECT * FROM excalidraw_operations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
-				)
-				.get(runId) as Row | null;
-			return r ? view(r) : null;
 		},
 		purgeCallInTransaction(db: Database, id: string) {
 			db.query(

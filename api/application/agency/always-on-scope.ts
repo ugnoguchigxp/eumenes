@@ -17,11 +17,16 @@ import {
 	type AgencyRecord,
 	type AgendaHostSnapshot,
 	type AgendaNote,
+	type AgendaResearchRefusal,
 	type AgendaResearchTicket,
+	type AgendaAssignment,
 	agendaSources,
 	READ_MEMORY_LIMIT,
 } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
+import type { WorkObservation } from "./work-observation";
+import { completeBackgroundPlan } from "./background-plan";
+import { prepareResearch } from "./research-admission";
 import { knownFor, marksFor, recordsFor, saidOf } from "./always-on-recall";
 import { takePosition } from "./always-on-position";
 import type { AgencyThought } from "../../domains/dialogue/contracts/agency-status";
@@ -64,6 +69,11 @@ export type AgendaScope = {
 	steering: AgendaSteering | null;
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
+	researchRefusals: Map<string, AgendaResearchRefusal>;
+	/** What the user asked toolchains for (`delegate`), by the agent's item id, until the item ends. */
+	assignments: Map<string, AgendaAssignment>;
+	/** The last progress and question each running assignment told the agent (not saved: told again after a restart). */
+	observed: Map<string, string>;
 	/**
 	 * The notes the list let go (it keeps the newest), as their references only. A note that left the list is not a
 	 * forgotten one: what rests on it (a reply being written, a line, a research) is still whole while the words the
@@ -80,6 +90,8 @@ export type AgendaScope = {
 	stepDiagnostic: ReturnType<
 		NonNullable<AgencyHostDeps["backgroundDiagnostic"]>
 	>;
+	stepWork: WorkObservation | null;
+	workVersion: string | undefined;
 	stepping: boolean;
 	again: boolean;
 	timer: unknown;
@@ -167,6 +179,21 @@ export function agendaEnvelope(c: AgendaScope, at: number): AgendaHostSnapshot {
 		agent: renamed(c.agent.snapshot(at), c.renames),
 		tickets: structuredClone(c.tickets),
 		notes: structuredClone(c.notes),
+		...(c.researchRefusals.size
+			? { researchRefusals: structuredClone([...c.researchRefusals.values()]) }
+			: {}),
+		// An assignment is kept while its item waits or runs; the item holds what came of it after.
+		assignments: structuredClone(
+			[...c.assignments.values()].filter((a) =>
+				c.agent
+					.view()
+					.items.some(
+						(i) =>
+							i.id === a.itemId &&
+							(i.status === "open" || i.status === "doing"),
+					),
+			),
+		),
 	};
 }
 
@@ -256,6 +283,21 @@ export function shownMemory(
 	return [...c.shown].filter((ref) => active.has(ref.slice("memory:".length)));
 }
 
+/** The user's recent words and the memory given to the agenda's recent calls. */
+export function seenRefs(
+	deps: AgencyHostDeps,
+	c: AgendaScope,
+	now: number,
+): string[] {
+	return [
+		...c.agent
+			.view()
+			.said.filter((s) => s.who === "user")
+			.map((s) => s.id),
+		...shownMemory(deps, c, now),
+	];
+}
+
 /**
  * The memory items a `read_memory` call returned, as `memory:<id>` (the tool's result is text without ids): the
  * same read the tool makes (with the tool's own limit, from the dialogue domain), restricted to the user's items
@@ -335,17 +377,35 @@ export function createAgendaScope(input: {
 			const started = c.generation;
 			signal.throwIfAborted();
 			const diagnostic = c.stepDiagnostic;
-			const result = await inner.complete(
+			const work = c.stepWork;
+			const evidence = [
+				diagnostic ? `Eumenes の内部記録（データ）\n${diagnostic.text}` : "",
+				work ? `担当の仕事の台帳（データ）\n${work.text}` : "",
+			].filter(Boolean);
+			const result = await completeBackgroundPlan(
+				inner,
 				{
 					...request,
 					system: `${request.system}\n${systemContext("dialogue.contexts.agency.diagnostic-records", {})}`,
-					...(diagnostic
-						? {
-								prompt: `${request.prompt}\n\nEumenes の内部記録（データ）\n${diagnostic.text}`,
-							}
+					...(evidence.length
+						? { prompt: [request.prompt, ...evidence].join("\n\n") }
 						: {}),
 				},
 				signal,
+				(research) =>
+					!c.researchRefusals.size ||
+					deps.store.read(
+						(db) =>
+							!c.researchRefusals.has(
+								prepareResearch(
+									deps,
+									db,
+									citableNotes(c),
+									research,
+									seenRefs(deps, c, now()),
+								).key,
+							),
+					),
 			);
 			if (c.generation !== started || signal.aborted)
 				throw new DOMException("agenda_stale", "AbortError");
@@ -390,6 +450,16 @@ export function createAgendaScope(input: {
 		steering: steering ?? null,
 		tickets: structuredClone(restored?.tickets ?? []),
 		notes: structuredClone(restored?.notes ?? []),
+		researchRefusals: new Map(
+			(restored?.researchRefusals ?? []).map((r) => [
+				r.key,
+				structuredClone(r),
+			]),
+		),
+		assignments: new Map(
+			(restored?.assignments ?? []).map((a) => [a.itemId, structuredClone(a)]),
+		),
+		observed: new Map(),
 		// The reading position is the conversation's, not the agency's memory: a revoked checkpoint leaves it behind.
 		recordsSeq: positionOf(input.previous) ?? takePosition(deps, id),
 		closed: new AbortController(),
@@ -402,6 +472,8 @@ export function createAgendaScope(input: {
 		finished: new Map(),
 		controller: null,
 		stepDiagnostic: null,
+		stepWork: null,
+		workVersion: undefined,
 		stepping: false,
 		again: false,
 		timer: undefined,

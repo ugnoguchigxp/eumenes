@@ -1,5 +1,15 @@
 import { expect, test } from "bun:test";
-import { harness } from "../toolchain/toolchain.fixture";
+import { replyWith } from "../agency/always-on.fixture";
+import {
+	ask,
+	assignmentAgenda,
+	card,
+	ended,
+	executions,
+	items,
+	until,
+	userWords,
+} from "../media/assignment.fixture";
 const start = {
 	projectRef: "fixture-project",
 	projectRevision: 1,
@@ -13,103 +23,95 @@ const start = {
 	startMode: "start",
 	sessionRefs: [],
 };
-test("conversation discovers the registered command subagent and stores the real task through the adapter", async () => {
-	const h = await harness({
-		dots: true,
-		routeTool: "delegate_project",
-		command: () =>
-			JSON.stringify({
-				action: "invoke",
-				tool: "dots.work-start",
-				arguments: start,
-			}),
+const text =
+	"登録済みの担当に調査を任せてください。条件の最後まで保持してください。";
+
+test("the registered command subagent is the agent's assignment and stores the real task through the adapter", async () => {
+	const a = await assignmentAgenda({
+		harness: {
+			dots: true,
+			routeTool: "delegate_project",
+			command: () =>
+				JSON.stringify({
+					action: "invoke",
+					tool: "dots.work-start",
+					arguments: start,
+				}),
+		},
 	});
+	const h = a.h;
 	try {
-		const text =
-			"登録済みの担当に調査を任せてください。条件の最後まで保持してください。";
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text,
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-		).toBe("completed");
-		const rows = h.dotsWork!.tasks.list({ conversationId: "main" }).items;
+		await a.start();
+		const { source } = await ask(a, "dots.delegate", text);
+		await until(a, () => ended(a));
+		expect(executions(a)).toMatchObject([{ status: "completed" }]);
+		const rows = h.dotsWork!.tasks.list({ conversationId: "ao" }).items;
 		expect(rows).toHaveLength(1);
 		expect(rows[0]!.state).toBe("queued");
 		expect(rows[0]!.origin).toMatchObject({
-			source: "conversation",
-			messageId: run.inputMessageId,
+			messageId: source.messageId,
 		});
-		expect(h.reported()).toContain("registered_in_eumenes");
+		expect(h.reported("ao")).toContain("registered_in_eumenes");
 		expect(h.commandContexts).toHaveLength(1);
 		expect(h.commandContexts[0]).toContain(text);
 		expect(h.commandContexts[0]).toContain("dots.work-start");
 		expect(h.workerContexts).toHaveLength(0);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
-test("a clarification resumes the same pinned intake with the answer and original request", async () => {
+}, 30_000);
+test("a clarification is the assignment's question, and its answer resumes the same intake with the original request", async () => {
 	let calls = 0;
-	const h = await harness({
-		dots: true,
-		routeTool: "delegate_project",
-		command: () =>
-			++calls === 1
-				? JSON.stringify({
-						action: "clarify",
-						question: "作業先は登録済みの確認用ですか？",
-					})
-				: JSON.stringify({
-						action: "invoke",
-						tool: "dots.work-start",
-						arguments: start,
-					}),
+	const a = await assignmentAgenda({
+		harness: {
+			dots: true,
+			routeTool: "delegate_project",
+			command: () =>
+				++calls === 1
+					? JSON.stringify({
+							action: "clarify",
+							question: "作業先は登録済みの確認用ですか？",
+						})
+					: JSON.stringify({
+							action: "invoke",
+							tool: "dots.work-start",
+							arguments: start,
+						}),
+		},
 	});
+	const h = a.h;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "調査を委任。最後に制約を残してください。",
-		});
-		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
-		const listed = (await (
-			await h.request("/api/toolchain-interactions?conversationId=main")
-		).json()) as Array<{
-			id: string;
-			revision: number;
-			question: { questionId: string };
-		}>;
-		expect(listed).toHaveLength(1);
-		const interaction = listed[0]!,
-			body = {
-				eventId: crypto.randomUUID(),
-				questionId: interaction.question.questionId,
-				expectedRevision: interaction.revision,
-				input: { text: "確認用でお願いします" },
-			};
-		const response = await h.request(
-			`/api/toolchain-interactions/${interaction.id}/answers`,
-			body,
+		await a.start();
+		await ask(a, "dots.delegate", "調査を委任。最後に制約を残してください。");
+		await until(a, () => !!items(a)[0]?.question);
+		const asked = items(a)[0]!;
+		expect(asked.question).toBe("作業先は登録済みの確認用ですか？");
+		expect(h.dotsWork!.tasks.list().items).toHaveLength(0);
+		const answer = await userWords(a, "確認用でお願いします");
+		const { seen } = await replyWith(
+			a,
+			[
+				{
+					name: "assignment",
+					arguments: {
+						id: asked.id,
+						action: "answer",
+						text: "確認用でお願いします",
+					},
+				},
+			],
+			{ runId: "run-answer", messageIds: [answer.messageId] },
 		);
-		expect(response.status).toBe(202);
-		const answer = (await response.json()) as { runId: string };
 		expect(
-			(await h.dialogue.waitForTerminal(answer.runId, { timeoutMs: 8000 }))
-				?.status,
-		).toBe("completed");
+			seen[1]!.filter((m) => m.role === "tool").map((m) => m.content),
+		).toEqual([`answered: ${card(a, "dots.delegate").title}に回答を渡した`]);
+		await until(a, () => ended(a));
 		expect(h.dotsWork!.tasks.list().items).toHaveLength(1);
 		expect(h.commandContexts[1]).toContain("確認用でお願いします");
 		expect(h.commandContexts[1]).toContain("最後に制約を残してください");
-		const replay = await h.request(
-			`/api/toolchain-interactions/${interaction.id}/answers`,
-			body,
-		);
-		expect(replay.status).toBe(200);
-		expect(h.dotsWork!.tasks.list().items).toHaveLength(1);
+		// An ended assignment is no longer an open item.
+		expect(items(a)).toHaveLength(0);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);

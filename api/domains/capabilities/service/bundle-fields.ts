@@ -97,6 +97,7 @@ const controlKinds: Record<
 	select: ["enum", "string"],
 	multiple: ["array"],
 	text: ["string"],
+	color: ["string"],
 };
 
 /** Whether a display-only default fits the schema kind and the field's own limits. */

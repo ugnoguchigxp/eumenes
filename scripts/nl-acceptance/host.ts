@@ -1,10 +1,5 @@
 import { z } from "zod";
-import type {
-	HostInteraction,
-	HostSnapshot,
-	HostTimer,
-	ObservedReceipt,
-} from "./types";
+import type { HostSnapshot, HostTimer, ObservedReceipt } from "./types";
 
 /**
  * Readonly access to the product host for the judge. The reader has no write method and
@@ -14,7 +9,6 @@ const READABLE = [
 	/^\/api\/timers(\?[A-Za-z0-9=&.%_-]*)?$/,
 	/^\/api\/timers\/[0-9a-f-]{36}$/,
 	/^\/api\/timer-actions\/by-run\/[A-Za-z0-9_-]{1,128}$/,
-	/^\/api\/toolchain-interactions(\?[A-Za-z0-9=&.%_-]*)?$/,
 	/^\/api\/toolchain-actions(\?status=unsettled)?$/,
 ];
 
@@ -33,19 +27,9 @@ const timerPage = z.looseObject({
 	items: z.array(timerItem),
 	nextCursor: z.string().nullable().optional(),
 });
-const interactionItem = z.looseObject({
-	id: z.string(),
-	status: z.string(),
-	questionCount: z.number().optional(),
-	receiptRef: z.unknown().optional(),
-});
-
 export type HostReader = {
 	get(path: string): Promise<unknown>;
-	snapshot(
-		seq: number,
-		reads: readonly ("timers" | "interactions")[],
-	): Promise<HostSnapshot>;
+	snapshot(seq: number, reads: readonly "timers"[]): Promise<HostSnapshot>;
 };
 
 export function createHostReader(options: {
@@ -53,7 +37,6 @@ export function createHostReader(options: {
 	token?: string;
 	fetchImpl?: typeof fetch;
 	now?: () => number;
-	conversationId?: string;
 }): HostReader {
 	const send = options.fetchImpl ?? fetch;
 	const now = options.now ?? Date.now;
@@ -98,28 +81,6 @@ export function createHostReader(options: {
 		}
 		return { serverNowMs, items };
 	}
-	async function interactions(): Promise<HostInteraction[] | null> {
-		try {
-			const raw = await get(
-				`/api/toolchain-interactions?conversationId=${options.conversationId ?? "main"}`,
-			);
-			const list = Array.isArray(raw)
-				? raw
-				: ((raw as { items?: unknown[] })?.items ?? null);
-			if (!list) return null;
-			return list.map((x) => {
-				const i = interactionItem.parse(x);
-				return {
-					id: i.id,
-					status: i.status,
-					questionCount: i.questionCount ?? 0,
-					hasReceiptRef: i.receiptRef != null,
-				};
-			});
-		} catch {
-			return null;
-		}
-	}
 	return {
 		get,
 		async snapshot(seq, reads) {
@@ -132,9 +93,6 @@ export function createHostReader(options: {
 				atMs,
 				serverNowMs: t.serverNowMs,
 				timers: t.items,
-				interactions: reads.includes("interactions")
-					? await interactions()
-					: null,
 			};
 		},
 	};

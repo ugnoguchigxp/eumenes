@@ -5,9 +5,6 @@ import { ArtifactLauncher } from "../components/domains/artifact/ArtifactLaunche
 import { ResizableWorkspace } from "../components/domains/artifact/ResizableWorkspace";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { TimerNotifications } from "../components/domains/timers/TimerNotifications";
-import type { TodoNotifications } from "../components/domains/timers/NotificationCenter";
-import { useResourceNotice, useResourceOpener } from "../domains/resources";
-import { useWorkspaceLauncher } from "./usePanelResources";
 import { ChatVisibilityToggle } from "./ChatVisibilityToggle";
 import { ConversationPanel } from "./ConversationPanel";
 import { SpecialistCloseConfirm } from "./SpecialistCloseConfirm";
@@ -42,7 +39,6 @@ export function Workspace({
 		toolchain,
 		timerAudio,
 		kanbanNotices,
-		todoNotices,
 		voice,
 		mute,
 		settings,
@@ -51,25 +47,6 @@ export function Workspace({
 		artifacts,
 		specialist,
 	} = state;
-	// A finished TODO's notice opens what the work made or its toolchain's screen and reads the notice; a refusal
-	// clears itself.
-	const launcher = useWorkspaceLauncher(state);
-	const openNotice = useResourceNotice();
-	const openResource = useResourceOpener({
-		client,
-		launcher,
-		notify: openNotice.show,
-	});
-	const todo: TodoNotifications = {
-		...todoNotices,
-		error: openNotice.notice ?? todoNotices.error,
-		onOpen: (notice, target) => {
-			openNotice.dismiss();
-			if ("uri" in target) void openResource(target.uri);
-			else void toolchain.openById(target.artifactId);
-			if (!notice.read) void todoNotices.onRead(notice);
-		},
-	};
 	// Background mode is a view state only: a reload shows the chat again.
 	const [chatHidden, setChatHidden] = useState(false);
 	const fullscreen =
@@ -181,7 +158,6 @@ export function Workspace({
 				audioReady={timerAudio.ready}
 				prepareAudio={timerAudio.prepare}
 				kanban={kanbanNotices}
-				todo={todo}
 				inputBusy={() => voice.audio()?.isInputBusy?.() ?? false}
 				muted={mute.muted || settings.data?.voice.outputVolume === 0}
 				busy={

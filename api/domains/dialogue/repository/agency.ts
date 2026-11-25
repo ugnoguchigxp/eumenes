@@ -270,6 +270,16 @@ export function revokeAgencyWork(db: Database, id: string) {
 	).run(id);
 }
 
+/**
+ * Whether the agency holds this execution as its work (an assignment or its own research): it tells the user itself when
+ * the work ends, so the execution's owner sends no notice to the conversation.
+ */
+export function agencyHoldsExecution(db: Database, executionId: string) {
+	return !!db
+		.query("SELECT 1 FROM dialogue_agency_work WHERE execution_id=? LIMIT 1")
+		.get(executionId);
+}
+
 /** A separate grant for general actions; old read-only research rows never acquire it. */
 export function autonomousActionSource(
 	db: Database,

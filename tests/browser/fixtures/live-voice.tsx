@@ -52,7 +52,6 @@ const client = {
 		revision: 1,
 		data: { options: [], targets: [] },
 	}),
-	toolchainInteractions: async () => [],
 	unsettledToolchainActions: async () => [],
 } as unknown as EumenesClient;
 const adapters = createWebAdapterRegistry([settingsWebAdapter]);

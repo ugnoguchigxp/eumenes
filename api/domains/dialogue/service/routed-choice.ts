@@ -10,7 +10,6 @@ export type ChoiceCandidate = {
 	title: string;
 	summary?: string;
 	execution?: string;
-	minImpact?: string;
 	general?: true;
 	inputs?: Record<string, unknown>;
 	targets?: Array<{ ref: string; label: string }>;
@@ -142,45 +141,6 @@ export function fillMessages(input: {
 			}),
 		},
 		{ role: "user", content: lines.join("\n") },
-	];
-}
-
-/** The selected work question can require an answer with typed fields. */
-export function answerSchema(inputSchema: Record<string, unknown>): Schema {
-	return {
-		anyOf: [
-			branch({ choice: only("none") }),
-			branch({ choice: only("answer"), answer: inputSchema }),
-		],
-	};
-}
-
-/** The answer fill's input: the records, the question and the shape it asks for, and the words. */
-export function answerMessages(input: {
-	routed: RoutedInput;
-	question: string;
-	inputSchema: Record<string, unknown>;
-	utterance: string;
-}): ChatMessage[] {
-	const { routed } = input;
-	return [
-		{
-			role: "system",
-			content: systemContext(
-				"dialogue.contexts.local.work-answer-arguments",
-				{},
-			),
-		},
-		{
-			role: "user",
-			content: [
-				routed.state,
-				...previousLine(routed),
-				`質問: ${lineText(input.question)}`,
-				`答えの形: ${JSON.stringify(input.inputSchema)}`,
-				`${INPUT_HEADINGS.user}\n${dataText(input.utterance)}`,
-			].join("\n"),
-		},
 	];
 }
 

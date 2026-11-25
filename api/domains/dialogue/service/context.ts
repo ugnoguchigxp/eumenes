@@ -26,20 +26,19 @@ import type {
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
-import type { CommandInteractions } from "./command-interactions";
 import type { ConversationHarness } from "./harness";
 import type { ResourceAccess, ResourceLedger } from "./resource-ledger";
 import type { ChatImage } from "../../inference";
+import type { ToolchainCard } from "../../capabilities";
 export const GENERATE_KIND = "dialogue.generate";
-/** A toolchain's command sub-agent: one typed operation from the conversation's request. */
-export const COMMAND_KIND = "dialogue.toolchain_command";
 /** One turn of a specialist session: the user talks to the toolchain's specialist directly. */
 export const SPECIALIST_KIND = "dialogue.specialist_turn";
-/** The generation job; a command sub-agent's clarifying question travels as data. */
+/** The generation job. */
 export type GeneratePayload = {
 	runId: string;
 	/** The earlier generation of this run committed actions and was not adopted (section 13). */
 	notAdopted?: boolean;
+	/** A host line the generation reads before it answers (a session switch the user must confirm). */
 	commandNote?: string;
 	/**
 	 * Set when a specialist handed the user's request back (out of its scope): the host line the
@@ -83,41 +82,12 @@ export type RoutedInput = {
 	memory: string | null;
 	/** The user's earlier utterances in the talk turn's window, oldest first (cut to their head): what a request may point to. */
 	earlier: string[];
-	/** `## State` of the choice calls: now, the work by its numbers and what is presented. */
+	/** `## State` of the choice calls: now, the session work and what is presented. */
 	state: string;
 	/** The agent's last words, for 「それ」「さっきの」 (cut to their head). */
 	previousReply: string | null;
 	/** The request the agent asked about when that question was the last thing said, shortly before. */
 	asked: { request: string } | null;
-	/** Confirmations not yet answered, and the questions the work asks the user. */
-	pending: {
-		revisions?: Array<{ ref: number; toolchain: string; request: string }>;
-		confirmations: Array<{
-			ref: number;
-			toolchain: string;
-			request: string;
-			/** The name of the saved item it changes, as the confirmation showed it. */
-			target: string | null;
-		}>;
-		questions: Array<{ ref: number; title: string; question: string }>;
-	};
-	/**
-	 * The work the choice may name: the open work, which it may check, correct or cancel, and the finished work
-	 * `## State` shows, which it may only check. The agency's own research is not among them.
-	 */
-	todos: Array<{
-		ref: number;
-		title: string;
-		request?: string;
-		open: boolean;
-		executionRevision?: number;
-		tasks?: ReadonlyArray<
-			Pick<
-				import("../../tool-runtime").ExecutionTaskView,
-				"taskId" | "revision" | "title" | "state" | "reason"
-			>
-		>;
-	}>;
 	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
 	resources: string[];
 	/** Host-issued observations available for a repair request. */
@@ -159,29 +129,21 @@ export interface GenerateInput {
 	/** What a routed turn's choice calls read besides the talk input (the local harness rebuild plan, section 4). */
 	routed?: RoutedInput;
 	final: FinalMessage;
-	/** Why this generation runs (the TODOs that changed, the utterances, a host note). */
+	/** Why this generation runs (the utterances, a host note). */
 	trigger: ReadonlyArray<Record<string, unknown>>;
 	/**
 	 * The sub-agent's answer this generation speaks about, consumed only when the generation is adopted: a report
 	 * whose evidence changed meanwhile (a corrected or withdrawn source) is never adopted.
 	 */
 	agent?: AnswerTicket;
-	/** The TODOs whose result this generation shows (the host notice, and what the work tool read): what a reply may report. */
-	shown: { todos: string[] };
 	/** The memory items `## Memory` shows: a memory read leaves them out. */
 	memoryItemIds: string[];
-	/** The host notice of the works this generation reports, in one line: kept with its reply (section 5.5 #4). */
-	notice?: string;
 	/** Why the recent conversation was cut before this generation (section 6.1.1); null when it was not. */
 	cut: string | null;
 	/** The input's revision as drawn: a forget or a correction of what it shows meanwhile expires the generation. */
 	inputRevision: number;
-	/** The TODOs' revisions as `## State` showed them: the work tool acts on what the model saw. */
-	todoRevisions: Record<string, number>;
-	/** The toolchains this generation may delegate to without a search (`state.retained`). */
-	retained: ReturnType<
-		import("./work-ledger").WorkLedger["retainedInTransaction"]
-	>;
+	/** The toolchain a hand-over waits for the user's word on (a suspended work is unsaved): offered without a search. */
+	switching: ToolchainCard | null;
 	/** Where the adopted history sits; the first `protectedCount` history messages (`## Memory`) are never dropped. */
 	sessionContext: {
 		instructionCount: number;
@@ -209,11 +171,6 @@ export interface Accept {
 	deadlineMs?: number;
 	voiceSubject?: string;
 	transcriptionRequestIds?: string[];
-	/**
-	 * The run resumes an interaction's command sub-agent: its job is the command job, not a
-	 * conversation decision (the toolchain was already chosen when the question was asked).
-	 */
-	resume?: { interactionId: string; toolchainRevisionId: string };
 	/** The saved item the screen shows; kept with the run and shown to the main agent only if issued. */
 	viewing?: RunViewing;
 	/** The addressee the sender saw; checked in the acceptance transaction. */
@@ -232,8 +189,6 @@ export type DialogueDeps = {
 	id: () => string;
 	/** The active short-term memory: the event log (the work results among it) and the notes. */
 	continuity: ContinuityService;
-	/** The conversation's TODOs and confirmations; set by `createDialogueService`. */
-	work?: import("./work-ledger").WorkLedger;
 	/** The resource registry and which kinds a toolchain makes; without it the conversation has no resources. */
 	resources?: ResourceAccess;
 	/** The conversation's resource ledger (`a<n>`); set by `createDialogueService` when `resources` is given. */
@@ -260,7 +215,7 @@ export type DialogueDeps = {
 	diagnostics?: import("../contracts/diagnostics").DiagnosticsPort;
 	/** The operational log file (`config.logFile`) the read tool `read_runs` reads warnings from; absent: none read. */
 	logFile?: () => string | undefined;
-	/** The agency layer: told when a TODO changed (its opportunity to report). */
+	/** The agency layer: its assignments, state and notes. */
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
@@ -273,8 +228,6 @@ export type DialogueDeps = {
 	}>;
 	/** Session toolchains and their domain work; without it no specialist session exists. */
 	specialist?: SpecialistPort;
-	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
-	interactions?: CommandInteractions;
 	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */
 	/** Plays the announcement; resolves with how much was heard (cut short by the user: partial), rejects when nothing was. */
 	deliverAnnouncement?: (

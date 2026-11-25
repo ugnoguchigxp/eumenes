@@ -64,7 +64,6 @@ function fixture(status = "pending", extraPages = false) {
 			note = { ...note, status: "dismissed", revision: 4 };
 		}),
 		archiveKanbanNotices: vi.fn(async () => {}),
-		archiveTodoNotices: vi.fn(async () => {}),
 	};
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },

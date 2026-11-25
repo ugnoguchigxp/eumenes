@@ -436,42 +436,9 @@ export function createRegistryActions(
 	};
 }
 
-/**
- * The timer question source reads dialogue's open interaction lazily: the dialogue service is
- * assembled after the toolchain.
- */
-export type InteractionViews = {
-	viewInTransaction(
-		db: Database,
-		id: string,
-	): { revision: number; status: string; question: unknown } | null;
-};
-export function questionReader(
-	interactions: () => InteractionViews | undefined,
-) {
-	return () => {
-		const current = interactions();
-		return (
-			current && {
-				questionInTransaction(db: Database, id: string) {
-					const view = current.viewInTransaction(db, id);
-					// Only the question part leaves: not the chain, conversation or receipt refs.
-					return view?.question
-						? {
-								revision: view.revision,
-								data: { status: view.status, question: view.question },
-							}
-						: null;
-				},
-			}
-		);
-	};
-}
-
-/** Periodic retention of interaction bodies and UI action acceptances (30 + 30 days). */
+/** Periodic retention of UI action acceptances (30 days). */
 export function toolchainMaintenance(
 	s: {
-		dialogue: { interactions: { maintenance(): Promise<unknown> } };
 		toolchain: {
 			actionRequests: { maintenance(): Promise<unknown> };
 			weather?: { maintain(): Promise<unknown> };
@@ -493,7 +460,6 @@ export function toolchainMaintenance(
 				),
 			);
 	return [
-		run("toolchain_interactions", s.dialogue.interactions),
 		run("toolchain_actions", s.toolchain.actionRequests),
 		// The list of forecast areas: read at startup (the first pass) and again once a day.
 		...(s.toolchain.weather

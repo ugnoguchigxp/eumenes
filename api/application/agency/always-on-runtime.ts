@@ -20,6 +20,7 @@ import {
 } from "./always-on-scope";
 import type { createGoalAgenda } from "./goal-agenda";
 import type { AgencyHostDeps } from "./host-types";
+import { workVersionInTransaction } from "./work-observation";
 
 const log = getLogger("agency");
 
@@ -351,11 +352,16 @@ export function createAgendaPumpScheduler(ctx: {
 	let requested = false;
 	/** What the database held for each conversation when the last pump began (see `commitDue`). */
 	const observed = new Map<string, string>();
-	const dbSignature = (db: Database, c: AgendaScope) =>
+	const dbSignature = (
+		db: Database,
+		c: AgendaScope,
+		work = workVersionInTransaction(ctx.deps, db, c),
+	) =>
 		[
 			ctx.deps.state!.epochInTransaction(db, c.id),
 			ctx.deps.conversationBusy(db, c.id),
 			!!ctx.deps.backgroundPaused?.(db, c.id),
+			work,
 		].join(":");
 	/**
 	 * Whether a commit the host did not make itself may change what a pump does. A pump acts on: the outbox past the
@@ -394,8 +400,13 @@ export function createAgendaPumpScheduler(ctx: {
 	const pump = () => {
 		try {
 			ctx.deps.store.read((db) => {
-				for (const c of ctx.convs.values())
-					observed.set(c.id, dbSignature(db, c));
+				for (const c of ctx.convs.values()) {
+					const version = workVersionInTransaction(ctx.deps, db, c);
+					observed.set(c.id, dbSignature(db, c, version));
+					if (c.workVersion !== undefined && c.workVersion !== version)
+						c.agent.infoChanged(ctx.now());
+					c.workVersion = version;
+				}
 			});
 		} catch {
 			observed.clear();

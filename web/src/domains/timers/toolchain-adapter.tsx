@@ -164,17 +164,6 @@ function useTimerArtifact({
 			if (field) return fieldMessages[field.field];
 			return code ? domainMessages[code] : undefined;
 		},
-		answerInput(question, text) {
-			if (question.inputSchemaRef === "builtin:timerTargetAnswer") {
-				const choice = question.choices?.find((c) => c.label === text);
-				return choice
-					? { ok: true, value: { timerId: choice.ref } }
-					: { ok: false, message: "候補から選んでください。" };
-			}
-			if (question.inputSchemaRef === "builtin:answerText" && text)
-				return { ok: true, value: { text } };
-			return { ok: false, message: "この質問への回答を確認してください。" };
-		},
 	};
 }
 

@@ -2,7 +2,6 @@ import type { Database } from "bun:sqlite";
 import type {
 	ConversationResource,
 	ConversationResourceSource,
-	WorkLink,
 } from "../contracts/resources";
 
 /**
@@ -230,91 +229,36 @@ export function messageResourceUris(
 	).map((row) => ({ messageId: row.messageId, uri: row.uri }));
 }
 
-function parseLinks(text: unknown): WorkLink[] {
-	try {
-		const value = JSON.parse(String(text ?? "[]")) as unknown;
-		return Array.isArray(value) ? (value as WorkLink[]) : [];
-	} catch {
-		return [];
-	}
-}
-
-/** The links of these TODOs (`links_json`), by TODO id. */
-export function workLinksOf(
+/** The ids of the shown resources entered under these works, in the order they were entered. */
+export function resourcesOfWorks(
 	db: Database,
+	conversationId: string,
 	workIds: readonly string[],
-): Map<string, WorkLink[]> {
-	const links = new Map<string, WorkLink[]>();
-	if (workIds.length === 0) return links;
-	const rows = db
-		.query(
-			`SELECT id, links_json FROM dialogue_work WHERE id IN (${workIds.map(() => "?").join(",")})`,
-		)
-		.all(...workIds) as Array<{ id: string; links_json: string }>;
-	for (const row of rows) {
-		const parsed = parseLinks(row.links_json);
-		if (parsed.length) links.set(row.id, parsed);
-	}
-	return links;
-}
-
-export function setWorkLinks(
-	db: Database,
-	workId: string,
-	links: readonly WorkLink[],
-) {
-	db.query("UPDATE dialogue_work SET links_json = ? WHERE id = ?").run(
-		JSON.stringify(links),
-		workId,
-	);
+): string[] {
+	if (workIds.length === 0) return [];
+	return (
+		db
+			.query(
+				`SELECT id FROM dialogue_resources WHERE conversation_id = ? AND source = 'work' AND forgotten_at IS NULL AND work_id IN (${workIds.map(() => "?").join(",")}) ORDER BY ref`,
+			)
+			.all(conversationId, ...workIds) as Array<{ id: string }>
+	).map((row) => row.id);
 }
 
 /**
- * Forgetting reaches the resources of the TODOs that came from a forgotten message (section 4.2): the TODOs' links
- * are emptied and the resources they made are no longer shown (the number stays taken).
+ * Forgetting reaches the resources of the work that came from a forgotten message (section 4.2): the resources it
+ * made are no longer shown (the number stays taken). `works` are the TODO rows the retired ledger left and the
+ * agency's work roots, whichever the resources were entered under.
  */
 export function forgetWorkResources(
 	db: Database,
 	works: ReadonlyArray<{ id: string }>,
 	at: string,
 ) {
-	for (const { id: workId } of works) {
-		db.query("UPDATE dialogue_work SET links_json = '[]' WHERE id = ?").run(
-			workId,
-		);
+	for (const { id: workId } of works)
 		db.query(
 			"UPDATE dialogue_resources SET forgotten_at = COALESCE(forgotten_at, ?) WHERE work_id = ? AND source = 'work'",
 		).run(at, workId);
-	}
-}
-
-export function saveConfirmationRefs(
-	db: Database,
-	confirmationId: string,
-	uris: readonly string[],
-) {
-	db.query("UPDATE dialogue_confirmations SET refs_json = ? WHERE id = ?").run(
-		JSON.stringify(uris),
-		confirmationId,
-	);
-}
-
-/** The resource URIs a confirmation was issued with. */
-export function confirmationResourceUris(
-	db: Database,
-	confirmationId: string,
-): string[] {
-	const row = db
-		.query("SELECT refs_json FROM dialogue_confirmations WHERE id = ?")
-		.get(confirmationId) as { refs_json: string } | null;
-	try {
-		const value = JSON.parse(row?.refs_json ?? "[]") as unknown;
-		return Array.isArray(value)
-			? value.filter((item): item is string => typeof item === "string")
-			: [];
-	} catch {
-		return [];
-	}
 }
 
 export function setRunViewingResource(

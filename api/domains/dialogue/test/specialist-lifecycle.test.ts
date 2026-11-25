@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { agencyOf } from "./generation.fixture";
 import { IMAGE, setup, type Harness } from "./specialist.fixture";
 
 const open: Harness[] = [];
@@ -158,8 +159,9 @@ test("recovery ends every session that was not ended as restarted", async () => 
 	expect(h.state.released).toHaveLength(1);
 });
 
-test("a pinned form submit is the main conversation's: an active session does not take it", async () => {
-	const h = await harness();
+test("a pinned form submit is the main conversation's: an active session does not take it, and the agent is given the work", async () => {
+	const { agency, assigned } = agencyOf();
+	const h = await harness({ agency });
 	await startDirty(h);
 	const session = (await h.session())!;
 	const run = await h.dialogue.submit({
@@ -177,13 +179,19 @@ test("a pinned form submit is the main conversation's: an active session does no
 	)[0];
 	expect(job.kind).not.toBe("dialogue.specialist-turn");
 	expect(JSON.parse(job.payload_json)).toEqual({ runId: run.id });
-	// The submit is handed to the image toolchain: the run waits behind its job, with no model call for it.
+	// The submit is the agent's assignment: the run ends at once with no reply and no model call for it.
 	const modelCalls = h.state.calls.length;
-	await h.until(() => {
-		const now = h.dialogue.get(run.id)!;
-		return now.status === "queued" && now.jobId !== run.jobId;
-	});
+	await h.finished(run.id);
+	expect(h.dialogue.get(run.id)?.status).toBe("completed");
 	expect(h.state.calls).toHaveLength(modelCalls);
+	expect(assigned).toHaveLength(1);
+	expect(assigned[0]).toMatchObject({
+		toolchainId: IMAGE.id,
+		request: "猫を描いて",
+		source: { runId: run.id, conversationId: "main" },
+		// The submit is the user's own action on the screen: its message is given as the user's request explicitly.
+		userMessage: { id: run.inputMessageId, text: "猫を描いて" },
+	});
 	// The session is untouched: no turn was begun for the pinned submit.
 	expect(await h.session()).toMatchObject({
 		id: session.id,
@@ -191,6 +199,24 @@ test("a pinned form submit is the main conversation's: an active session does no
 		activeRunId: null,
 	});
 	expect(h.work()[0]!.holder).toBeNull();
+});
+
+test("a pinned form submit fails with agency_unavailable when the agenda does not serve the conversation", async () => {
+	const { agency, assigned } = agencyOf(false);
+	const h = await harness({ agency });
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "猫を描いて",
+		presentation: "artifact",
+		toolchainId: IMAGE.id,
+	});
+	await h.finished(run.id);
+	expect(h.dialogue.get(run.id)).toMatchObject({
+		status: "failed",
+		error: "agency_unavailable",
+	});
+	expect(assigned).toHaveLength(0);
 });
 
 test("commands: revision guard, idempotent by requestId, return suspends or ends, resume advances the epoch", async () => {

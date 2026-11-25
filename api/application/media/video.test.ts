@@ -1,5 +1,10 @@
-import { harness } from "../toolchain/toolchain.fixture";
-import { handOver } from "./conversation-turn.fixture";
+import {
+	ask,
+	assignmentAgenda,
+	ended,
+	executions,
+	until,
+} from "./assignment.fixture";
 import { expect, test } from "bun:test";
 import { createApp } from "../app";
 import { registerVideo } from "../../domains/video";
@@ -98,32 +103,28 @@ test("auth, Range, metadata, distinct deletion and interactive admission use the
 	}
 });
 
-test("a conversation selects the registered video command and receives a submission receipt while the job is running", async () => {
+test("an assignment of the registered video command receives a submission receipt while the job is running", async () => {
 	const f = fixture();
 	f.state.job = job("running", "generating");
-	const h = await harness({
-		videoPort: f.remote,
-		firstRound: (_tools, _question, messages) =>
-			handOver("video.studio", "動画を依頼します。")(messages),
-		command: () =>
-			JSON.stringify({
-				action: "invoke",
-				tool: "video.generate",
-				arguments: { prompt: "Birds over water", title: "水辺の鳥" },
-			}),
+	const a = await assignmentAgenda({
+		harness: {
+			videoPort: f.remote,
+			command: () =>
+				JSON.stringify({
+					action: "invoke",
+					tool: "video.generate",
+					arguments: { prompt: "Birds over water", title: "水辺の鳥" },
+				}),
+		},
 	});
+	const h = a.h;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "水辺の鳥の動画を作って",
-		});
-		const result = await h.dialogue.waitForTerminal(run.id, {
-			timeoutMs: 8000,
-		});
-		expect(result?.status).toBe("completed");
+		await a.start();
+		await ask(a, "video.studio", "水辺の鳥の動画を作って");
+		await until(a, () => ended(a));
+		expect(executions(a)[0]).toMatchObject({ status: "completed" });
 		expect(h.commandContexts[0]).toContain("video.generate");
-		await waitFor(() => f.accepted.size === 1);
+		await until(a, () => f.accepted.size === 1);
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
 		const registered = await h.request(
 			"/api/toolchain-artifacts/artifact%3Avideo.workspace%402",
@@ -149,9 +150,9 @@ test("a conversation selects the registered video command and receives a submiss
 			},
 			admission: { state: "active" },
 		});
-		expect(h.reported()).toContain("動画生成の送信を開始しました");
+		expect(h.reported("ao")).toContain("動画生成の送信を開始しました");
 	} finally {
-		await h.close();
+		await a.close();
 		f.dispose();
 	}
 }, 15000);

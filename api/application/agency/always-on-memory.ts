@@ -3,6 +3,24 @@ import { NOTES_KEPT } from "./always-on-scope";
 
 const SUMMARY_MAX = 240;
 
+type Source = {
+	url?: unknown;
+	title?: unknown;
+	kind?: unknown;
+	/** An archived document's version and the position of the passage in its original text. */
+	revision?: unknown;
+	start?: unknown;
+	end?: unknown;
+	/** A source inspection's place in the code. */
+	location?: {
+		path?: unknown;
+		symbol?: unknown;
+		commit?: unknown;
+		startLine?: unknown;
+		endLine?: unknown;
+	} | null;
+};
+
 type Result = {
 	status?: unknown;
 	title?: unknown;
@@ -10,13 +28,87 @@ type Result = {
 	answer?: unknown;
 	document?: { title?: unknown } | null;
 	claims?: Array<{ text?: unknown; status?: unknown }>;
-	sources?: Array<{ url?: unknown; title?: unknown }>;
+	sources?: Source[];
 	limitations?: unknown;
+	/** The cited excerpts a source inspection shows: they stand in for the answer in the note. */
+	displayAnswer?: unknown;
+	/** An evidence report (archive research, source inspection): its own claims and sources, as the owner saved them. */
+	report?: {
+		claims?: Array<{ text?: unknown; status?: unknown }>;
+		sources?: Source[];
+		limitations?: unknown;
+	} | null;
 	links?: unknown;
+	/** An assignment's report (a development toolchain): what it did and what is left. */
+	fulfilled?: unknown;
+	missing?: unknown;
 };
+
+const lines = (value: unknown) =>
+	Array.isArray(value) ? value.map(text).filter(Boolean) : [];
+
+/**
+ * The work report an assignment comes back as: the same kind of note as a research, so the agent reads, shows and
+ * tells it the same way. Sections without content are left out.
+ */
+function reportNote(input: {
+	id: string;
+	ticket: AgendaResearchTicket;
+	result: Result | null;
+	summary: string;
+	at: number;
+}): AgendaNote | null {
+	const { result } = input;
+	// The addresses the agent appended for the assignee are not part of what was asked.
+	const request = input.ticket.question
+		.replace(/\n?相手が示したURL:.*$/su, "")
+		.trim();
+	const summary = text(result?.summary) || (result ? "" : input.summary.trim());
+	const fulfilled = lines(result?.fulfilled);
+	const missing = lines(result?.missing);
+	const links = lines(result?.links);
+	if (!summary && !fulfilled.length && !missing.length && !links.length)
+		return null;
+	const title = `作業報告: ${request.replace(/\s+/gu, " ").slice(0, 50)}`;
+	const section = (heading: string, items: string[]) =>
+		items.length ? [`## ${heading}`, ...items.map((x) => `- ${x}`)] : [];
+	const body = [
+		"## 依頼",
+		request,
+		...(summary ? ["## 結果", summary] : []),
+		...section("達成したこと", fulfilled),
+		...section("残ったこと", missing),
+		...section("作ったもの", links),
+	].join("\n\n");
+	return {
+		id: input.id,
+		title,
+		summary: (summary || fulfilled.join(" ") || request)
+			.replace(/\s+/gu, " ")
+			.slice(0, SUMMARY_MAX),
+		markdown: `# ${title}\n\n${body}`,
+		at: input.at,
+		refs: [...input.ticket.refs],
+		ticketId: input.ticket.id,
+		inputs: [...input.ticket.inputs],
+	};
+}
 
 const text = (value: unknown) =>
 	typeof value === "string" ? value.trim() : "";
+
+/** Where a note's claim came from, in words: the page, the archived document's version and position, or the code. */
+function sourceLabel(source: Source): string {
+	if (text(source.kind) === "archive_document")
+		return `保存文書「${text(source.title)}」版 ${text(source.revision)}、原文位置 ${String(source.start)}–${String(source.end)}`;
+	const place = source.location;
+	if (place && text(place.path)) {
+		const symbol = text(place.symbol);
+		const commit = text(place.commit);
+		return `コード ${text(place.path)} ${String(place.startLine)}–${String(place.endLine)}行目${symbol ? `（${symbol}）` : ""}${commit ? ` ${commit.slice(0, 12)}` : ""}`;
+	}
+	return [text(source.title), text(source.url)].filter(Boolean).join(" ");
+}
 
 /**
  * The note a returned work becomes: its title (the document the research saved, or the request), a short summary the
@@ -36,6 +128,7 @@ export function noteFromResult(input: {
 	} catch {
 		result = null;
 	}
+	if (input.ticket.assignment) return reportNote({ ...input, result });
 	// The addresses the agent appended for the researcher are not part of what was asked.
 	const request = input.ticket.question
 		.replace(/\n?相手が示したURL:.*$/su, "")
@@ -45,21 +138,27 @@ export function noteFromResult(input: {
 		text(result?.document?.title) ||
 		request.replace(/\s+/gu, " ").slice(0, 60) ||
 		"調べもの";
+	// The owner's own report holds the claims and sources a result does not repeat at its top.
+	const claims = result?.claims ?? result?.report?.claims ?? [];
+	const sources = result?.sources ?? result?.report?.sources ?? [];
+	const limitations = result?.limitations ?? result?.report?.limitations;
+	// The cited excerpts of a source inspection are what it shows: they stand in for its answer and its claims.
+	const shown = text(result?.displayAnswer);
 	// A note that already names its sources in its text does not get them listed again.
-	const answer = text(result?.answer);
+	const answer = shown || text(result?.answer);
 	const body = result
 		? [
-				text(result.answer) || text(result.summary),
-				...(result.claims ?? [])
+				answer || text(result.summary),
+				...(shown ? [] : claims)
 					.map((x) => text(x.text))
 					.filter(Boolean)
 					.map((x) => `- ${x}`),
-				...(Array.isArray(result.limitations)
-					? result.limitations.map((x) => `- 限界: ${text(x)}`)
+				...(Array.isArray(limitations)
+					? limitations.map((x) => `- 限界: ${text(x)}`)
 					: []),
-				...(result.sources ?? [])
+				...sources
 					.filter((s) => !text(s.url) || !answer.includes(text(s.url)))
-					.map((s) => [text(s.title), text(s.url)].filter(Boolean).join(" "))
+					.map(sourceLabel)
 					.filter(Boolean)
 					.map((x) => `- 出典: ${x}`),
 				...(Array.isArray(result.links)
@@ -71,8 +170,8 @@ export function noteFromResult(input: {
 		: input.summary.trim();
 	// A result with nothing to read (a partial report that only says it could not finish) is no note.
 	const usable = result
-		? !!text(result.answer) ||
-			!!(result.claims ?? []).some((x) => text(x.text)) ||
+		? !!answer ||
+			claims.some((x) => text(x.text)) ||
 			(Array.isArray(result.links) && result.links.length > 0) ||
 			!!text(result.document?.title) ||
 			(text(result.summary) !== "" && result.status === "completed")

@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import "./live-voice.css";
-import { Button } from "../../design-system";
 import type { LiveNotice } from "../../../../api/domains/live-voice/contracts";
 import type { useLiveVoice } from "./useLiveVoice";
 
@@ -11,38 +10,12 @@ function Notice({
 	notice: LiveNotice;
 	onDisplayed: (id: string) => Promise<void>;
 }) {
-	const [error, setError] = useState(false);
-	const [busy, setBusy] = useState(false);
 	useEffect(() => {
-		if (notice.kind === "announcement" && !notice.displayed)
-			void onDisplayed(notice.id).catch(() => {});
-	}, [notice.id, notice.kind, notice.displayed, onDisplayed]);
+		if (!notice.displayed) void onDisplayed(notice.id).catch(() => {});
+	}, [notice.id, notice.displayed, onDisplayed]);
 	return (
 		<div className="conversation-notice">
-			<span>
-				{notice.kind === "confirmation" ? "確認内容: " : "案内: "}
-				{notice.text}
-			</span>
-			{notice.kind === "confirmation" && !notice.displayed && (
-				<Button
-					type="button"
-					disabled={busy}
-					onClick={() => {
-						setBusy(true);
-						setError(false);
-						void onDisplayed(notice.id)
-							.catch(() => setError(true))
-							.finally(() => setBusy(false));
-					}}
-				>
-					内容を確認しました
-				</Button>
-			)}
-			{error && (
-				<span role="alert">
-					確認を記録できませんでした。もう一度お試しください。
-				</span>
-			)}
+			<span>案内: {notice.text}</span>
 		</div>
 	);
 }

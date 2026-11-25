@@ -3,14 +3,15 @@ import { harness } from "../toolchain/toolchain.fixture";
 import {
 	candidatesOf,
 	searchThenDelegate,
+	UNAVAILABLE_TEXT,
 	type Candidate,
 } from "../toolchain/conversation-script.fixture";
 import { softbankSentence, stockFetch } from "./stock.fixture";
 
 const ask = "ソフトバンクの株価を教えて";
-/** The stock toolchain is the instant candidate whose inputs take a query. */
+/** The stock toolchain is the instant candidate the search names. */
 const isStock = (candidate: Candidate) =>
-	candidate.execution === "instant" && candidate.text.includes("query（");
+	candidate.execution === "instant" && candidate.id === "stock.quote";
 
 /** The model's usual path: search for the stock toolchain, then answer instantly with the query it reads. */
 const askStock = (args: Record<string, unknown> = { query: "ソフトバンク" }) =>
@@ -35,7 +36,7 @@ async function stockHarness(
 	return { h, service, candidates };
 }
 
-test("a cold stock request is answered after the router's decision and one fill call: fixed sentence, no TODO, no notice", async () => {
+test("a cold stock request is answered after the router's decision and one fill call: no assignment, no notice", async () => {
 	const { h, service, candidates } = await stockHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -47,10 +48,10 @@ test("a cold stock request is answered after the router's decision and one fill 
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(softbankSentence);
-		// The router decided the quote (the fixture's context judgment reads the script) and the one fill call gave its
-		// query: the host said the answer, and nothing reached a worker, the web, or another model call.
-		expect(candidates.filter(Boolean)).toHaveLength(2);
-		expect(h.calls).toBe(1);
+		// The model reads the search's result, the router's one fill call gives the query, and the model reads the answer:
+		// nothing reached a worker, the web, or another model call.
+		expect(candidates.filter(Boolean)).toHaveLength(3);
+		expect(h.calls).toBe(4);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
 		expect(h.acquisitions).toBe(0);
@@ -77,9 +78,7 @@ test("a cold stock request is answered after the router's decision and one fill 
 				outcome: "completed",
 			},
 		]);
-		expect(
-			h.store.read((db) => h.dialogue.todosInTransaction(db, "main")),
-		).toEqual([]);
+		expect(h.toolchain.agents.executions.list("main")).toEqual([]);
 	} finally {
 		await h.close();
 	}
@@ -96,9 +95,20 @@ test("the search lists the stock toolchain as an instant candidate with a free-t
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		const stock = candidates.find(Boolean)!.find(isStock);
 		expect(stock).toBeDefined();
-		// The inputs read as `name（type、required）description` (section 9): free text, no choices.
-		expect(stock!.text).toContain("query（string、必須）");
-		expect(stock!.text).not.toContain("値は");
+		// The card the search offers carries the typed input the model fills: free text, no choices.
+		const card = h.store.read((db) =>
+			h.routing.catalogInTransaction(db).find((c) => c.id === "stock.quote"),
+		)!;
+		const offered = h.store.read((db) =>
+			h.routing.cardInTransaction(db, card.revisionId),
+		)!;
+		const parameters = offered.instant!.parameters as {
+			required: string[];
+			properties: Record<string, { type: string; enum?: string[] }>;
+		};
+		expect(parameters.required).toEqual(["query"]);
+		expect(parameters.properties.query).toMatchObject({ type: "string" });
+		expect(parameters.properties.query!.enum).toBeUndefined();
 	} finally {
 		await h.close();
 	}
@@ -143,10 +153,9 @@ test("a query that is not text is refused: the host says it could not hand it ov
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
-		// The router's choice is not made again (spec router-package-integration 2026-11-04): the host says it failed.
-		expect(h.dialogue.answerText(run.id)).toBe(
-			"うまく頼めませんでした。もう一度言ってもらえますか。",
-		);
+		// The router's choice is not made again (spec router-package-integration 2026-11-04): the hand-over failed, and the
+		// reply says the request could not be done.
+		expect(h.dialogue.answerText(run.id)).toBe(UNAVAILABLE_TEXT);
 		expect(service.charts()).toHaveLength(0);
 	} finally {
 		await h.close();

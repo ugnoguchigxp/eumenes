@@ -1,2 +1,2 @@
 # Source: api/domains/dialogue/service/routed-talk-work.ts
-text = '''State または検索候補の担当へ作業を頼む。担当は会話を読んでいないため、request に合意済みの対象・作業・条件（訂正時は維持条件と変更点）を単独で通じる指示として書く。対象や作業が不明なら先に確認し、起動・接続・作業場所は担当カードに従う。確認訂正は revises に元の c<n>、不具合修正の初回分析は該当 diagnosticRef（e<n>）を指定。mode=execute、impact は省略可。結果: delegated=受付済み / confirmation=承認待ち / answered=即答(answer) / false=code が理由。'''
+text = '''State または検索候補の担当へ作業を頼む。担当は会話を読んでいないため、request に合意済みの対象・作業・条件（訂正時は維持条件と変更点）を単独で通じる指示として書く。対象や作業が不明なら先に確認し、起動・接続・作業場所は担当カードに従う。不具合修正の初回分析は該当 diagnosticRef（e<n>）を指定。結果: assignment=担当に渡した（状態の assignments に出て、終わると作業報告のメモで届く。利用者への確認は要らない。code=duplicate なら同じ依頼が進行中）/ delegated=受付済み / answered=即答(answer) / false=code が理由（agency_unavailable は今は頼めない）。'''

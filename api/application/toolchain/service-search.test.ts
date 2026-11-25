@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { harness, workerPacket } from "./toolchain.fixture";
+import { workerPacket } from "./toolchain.fixture";
+import { assignmentFixture } from "./assignment.fixture";
 import { createBrowser } from "../../domains/browser";
 import {
 	FakeDriver,
@@ -25,7 +26,7 @@ for (const [blocked, empty, uncollected] of [
 	[false, true, false],
 	[false, false, true],
 ])
-	test(`conversation → browser child → ${uncollected ? "uncollected finish fallback" : empty ? "empty connected browser" : blocked ? "external fallback" : "native candidates"} → saved answer`, async () => {
+	test(`assignment → browser child → ${uncollected ? "uncollected finish fallback" : empty ? "empty connected browser" : blocked ? "external fallback" : "native candidates"} → saved answer`, async () => {
 		const fallback = blocked || uncollected;
 		const driver = new FakeDriver();
 		driver.tabs = empty
@@ -99,8 +100,7 @@ for (const [blocked, empty, uncollected] of [
 		);
 		const queries: string[] = [];
 		let guarded = 0;
-		const h = await harness({
-			routeTool: "service_search",
+		const f = await assignmentFixture({
 			browser: (store, queue, capabilities) => {
 				const service = createBrowser({
 					store,
@@ -188,21 +188,19 @@ for (const [blocked, empty, uncollected] of [
 				};
 			},
 		});
+		const { h } = f;
 		try {
 			await h.toolchain.capabilities.seed();
 			await h.browser!.service.setting.save(fakeBrave(h.dir));
-			const response = await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "service",
-				text: "YouTubeでpython3の入門動画を探して",
-			});
-			expect(response.status).toBe(202);
-			const { id } = await response.json();
-			const run = (await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))!;
-			expect(run.status).toBe("completed");
-			// The agency reports the finished TODO: its result names the candidates and that no page was read.
-			expect(run.answerMessageId).toBeNull();
-			const reported = h.reported("service");
+			const { source } = await f.assign(
+				"YouTubeでpython3の入門動画を探して",
+				"web.service-search",
+			);
+			await f.settled();
+			// Candidates with no page read are a partial result of the execution.
+			expect(f.executions()).toMatchObject([{ status: "partial" }]);
+			// The agent reports the finished research: its result names the candidates and that no page was read.
+			const reported = f.reported();
 			expect(reported).toContain(
 				fallback ? "watch?v=external" : "watch?v=native",
 			);
@@ -210,7 +208,7 @@ for (const [blocked, empty, uncollected] of [
 			expect(queries).toEqual(fallback ? ["python3 youtube.com"] : []);
 			expect(guarded).toBe(fallback ? 0 : 1);
 			const worker = h.toolchain.agents
-				.list(id)
+				.list(source.runId)
 				.find((t) => t.kind === "worker")!;
 			expect(worker.packageRevisionId).toBe("package:web.service-search@4");
 			const report = h.toolchain.agents.report(worker.id);
@@ -221,10 +219,8 @@ for (const [blocked, empty, uncollected] of [
 					h.browser!.service.listTasks(worker.id)[0]!.taskId,
 				),
 			).toEqual([]);
-			expect(Date.parse(run.deadlineAt!) - Date.parse(run.createdAt)).toBe(
-				360000,
-			);
+			await f.until(() => f.notes().length === 1);
 		} finally {
-			await h.close();
+			await f.close();
 		}
 	});

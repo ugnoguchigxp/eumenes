@@ -694,18 +694,12 @@ export function backgroundTaskInTransaction(
 			conversationId,
 			nowMs,
 			lastAt: prefix.lastAt,
-			since: prefix.since,
 			lastAgent:
 				[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null,
 			state: deps.conversation.input.latestStateInTransaction(
 				tx,
 				conversationId,
 			),
-			refs: deps.work?.refsInTransaction(tx, conversationId) ?? {
-				todo: () => null,
-				confirmation: () => null,
-				resource: () => null,
-			},
 		}),
 	);
 	return {

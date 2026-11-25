@@ -99,15 +99,23 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 		const requests = f.requests
 			.filter((r) => r.operation === "generate")
 			.map((r) => JSON.parse(r.body));
-		// Each turn (the local harness's routed turn, no judge saved) is a silent choice, then the talk call: the talk
-		// is a streamed generation on the talk system that offers the read tools only.
-		expect(requests).toHaveLength(4);
+		// Each turn is the talk call: a streamed generation on the talk system (a request for work is the agent's
+		// assignment, not a choice made before the talk).
+		expect(requests).toHaveLength(2);
 		const talks = (r: { messages: Array<{ content: unknown }> }) =>
 			typeof r.messages[0]?.content === "string" &&
 			(r.messages[0].content as string).startsWith("## Role");
 		const generation = requests.filter(talks);
 		expect(generation).toHaveLength(2);
-		const reads = ["read_history", "read_runs", "read_agents"];
+		// The reads, and the tools that hand a request for work to a toolchain.
+		const reads = [
+			"read_history",
+			"read_runs",
+			"read_agents",
+			"find_toolchain",
+			"delegate",
+			"discard_for_pending_switch",
+		];
 		expect(
 			generation.map((r) =>
 				(r.tools ?? []).map(
@@ -116,8 +124,6 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 			),
 		).toEqual([reads, reads]);
 		expect(generation.map((r) => r.stream)).toEqual([true, true]);
-		// The choice reads no images: what it hands over names its resources by number.
-		expect(requests.filter((r) => !talks(r)).flatMap(imagesOf)).toEqual([]);
 		// The attachments are sent while their utterance is unprocessed (the last message); once it is in the log, only
 		// its reference remains and the images are not resent (the spec's section 7.3).
 		expect(imagesOf(generation[0])).toEqual([

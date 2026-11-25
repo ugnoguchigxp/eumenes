@@ -1,15 +1,8 @@
-import type { ExecutionView } from "../../tool-runtime";
-import { reportExecutionInTransaction } from "./result-intake";
 import { clearOffersFromMessage } from "../repository/search-offers";
-import { awaitingWorkConfirmation } from "./confirmation-revisions";
 import {
-	forgetGeneratedImages,
 	registerGeneratedImageObservation,
-	reserveGeneratedImages,
 	type GeneratedImagePort,
 } from "./generated-images";
-import { imageObservationText } from "./generated-image-text";
-import { createToolchainCommandHandler } from "./toolchain-command";
 import {
 	createDebugDiagnostics,
 	type DebugDiagnosticsOptions,
@@ -19,7 +12,6 @@ import { createSpecialistOps } from "./specialist-commands";
 import { activeSpecialistAgentLabel } from "./specialist-intake";
 import { flushCancelled } from "./specialist-core";
 import { createSpecialistTurnHandler } from "./specialist-turn";
-import { createCommandInteractions } from "./command-interactions";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { type AgentRuntime } from "../../agent-runtime";
@@ -55,13 +47,13 @@ import type {
 } from "../contracts";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { byId, interruptUnfinished, listRuns } from "../repository";
-import { workOfRun } from "../repository/work";
+import { dropRunResults, forgetWork } from "../repository/work";
+import { forgetWorkResources } from "../repository/resources";
 import { createAgentSync } from "./agent-sync";
+import { closeRetiredTodosInTransaction } from "./todo-closure";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createCompactionSummaryHandler } from "./compaction-summary";
 import { createGenerationHandler } from "./generation-handler";
-import { createWorkLedger } from "./work-ledger";
-import { createTodoScreenPorts } from "./work-stop";
 import {
 	conversationResources,
 	createResourceLedger,
@@ -75,10 +67,7 @@ import { createResubmit } from "./resubmit";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
-import {
-	confirmedExecutionRequest,
-	executionSourceInTransaction,
-} from "./execution-source";
+import { executionSourceInTransaction } from "./execution-source";
 import { createSpecialistHost } from "./specialist-host";
 import { forgetObservations } from "../repository/specialist-observations";
 import { forgetCollaborationState } from "./collaboration-state";
@@ -123,19 +112,36 @@ function registerCorrectionHook(deps: DialogueDeps) {
 }
 
 /**
- * What follows a change elsewhere: forgetting and deleted reports reach the TODOs and their result slots (section
+ * The TODO rows the retired ledger left still hold the words of the messages they came from: forgetting clears them
+ * (their results leave the log, their resources are no longer shown), and a report deleted at its owner leaves no copy.
+ */
+function forgetRetiredWork(
+	deps: DialogueDeps,
+	db: Database,
+	messageIds: readonly string[],
+) {
+	const at = deps.clock();
+	const forgotten = forgetWork(db, messageIds, at);
+	if (forgotten.length === 0) return;
+	forgetWorkResources(db, forgotten, at);
+	deps.continuity.events.forgetMessagesInTransaction(
+		db,
+		forgotten.map((row) => `work:${row.id}`),
+		at,
+	);
+}
+
+/**
+ * What follows a change elsewhere: forgetting and deleted reports reach what the retired TODO ledger left (section
  * 13); a correction and a forget reach the conversation's input.
  */
-function registerChangeHooks(
-	deps: DialogueDeps,
-	work: NonNullable<DialogueDeps["work"]>,
-) {
+function registerChangeHooks(deps: DialogueDeps) {
 	deps.memory?.registerForgetPurge((db, purge) =>
-		work.forgetInTransaction(db, purge.messageIds),
+		forgetRetiredWork(deps, db, purge.messageIds),
 	);
-	deps.agents?.registerDataDeletion?.((db, runId) =>
-		work.dropRunResultsInTransaction(db, runId),
-	);
+	deps.agents?.registerDataDeletion?.((db, runId) => {
+		dropRunResults(db, runId, deps.clock());
+	});
 	registerCorrectionHook(deps);
 	deps.conversation.addRetractHook?.((db, messageId) => {
 		clearOffersFromMessage(db, messageId, deps.clock());
@@ -171,7 +177,6 @@ function registerHandlers(
 	deps.queue.registerHandler(createGenerationHandler(deps, progress));
 	deps.queue.registerHandler(createTargetsHoldHandler(deps, targets));
 	deps.queue.registerHandler(createCompactionSummaryHandler(deps));
-	deps.queue.registerHandler(createToolchainCommandHandler(deps));
 	deps.queue.registerHandler(createSpecialistTurnHandler(deps));
 }
 
@@ -247,18 +252,6 @@ function createRecentPorts(deps: DialogueDeps) {
 	};
 }
 
-/** A voice interruption ends only a reply whose work has not been handed over. */
-async function stopUnhandedReply(
-	deps: DialogueDeps,
-	runId: string,
-	cancel: (id: string) => Promise<Run | null>,
-) {
-	const handed = deps.store.read((db) =>
-		workOfRun(db, runId).some((row) => row.status !== "done"),
-	);
-	return handed ? deps.store.read((db) => byId(db, runId)) : cancel(runId);
-}
-
 export function createDialogueService({
 	clock = () => new Date().toISOString(),
 	id = () => crypto.randomUUID(),
@@ -266,41 +259,15 @@ export function createDialogueService({
 	...options
 }: DialogueServiceOptions) {
 	const deps: DialogueDeps = { ...options, clock, id };
-	const {
-		agents,
-		conversation,
-		larm,
-		logFile,
-		queue,
-		resources,
-		store,
-		toolchains,
-	} = deps;
+	const { agents, conversation, larm, logFile, queue, resources, store } = deps;
 	if (debugDiagnostics) {
 		deps.contextInputs = createContextInputs(deps, debugDiagnostics);
 		deps.debugDiagnostics = createDebugDiagnostics(deps, debugDiagnostics);
 	}
 	const progress = createProgress(deps);
 	const intake = createIntake(deps);
-	// Handlers read `deps.interactions`, so it exists before any is registered.
-	const interactions = createCommandInteractions(
-		deps,
-		intake.acceptInTransaction,
-	);
-	deps.interactions = interactions;
 	if (resources) deps.resourceLedger = createResourceLedger(deps);
-	deps.work = createWorkLedger(
-		deps,
-		deps.generatedImages
-			? {
-					reserve: (db, work, links) =>
-						reserveGeneratedImages(deps, db, work, links),
-					text: (db, workId) => imageObservationText(deps, db, workId),
-					forget: (db, workId) => forgetGeneratedImages(deps, db, workId),
-				}
-			: undefined,
-	);
-	registerChangeHooks(deps, deps.work);
+	registerChangeHooks(deps);
 	const targets = createTargetsGate();
 	registerHandlers(deps, progress, targets);
 	registerGeneratedImageObservation(deps);
@@ -317,27 +284,18 @@ export function createDialogueService({
 		executionCommands: executionCommands(deps),
 		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */
 		conversationHasActiveRunInTransaction: conversationHasActiveRun,
-		awaitingWorkConfirmationInTransaction: awaitingWorkConfirmation.bind(
-			null,
-			deps,
-		),
 		backgroundDiagnosticInTransaction: (db: Database, conversationId: string) =>
 			backgroundDiagnostic(deps, db, conversationId),
 		executionSourceInTransaction: executionSourceInTransaction.bind(null, deps),
-		confirmedRequestInTransaction: confirmedExecutionRequest.bind(null, deps),
 		notifyInTransaction: intake.notifyInTransaction,
-		reportExecutionInTransaction: (db: Database, view: ExecutionView) =>
-			reportExecutionInTransaction(deps, db, view),
 		revokeExecutionNoticeInTransaction: (db: Database, eventId: string) =>
 			revokeExecutionNotice(deps, db, eventId),
 		...createOperationPorts(deps),
-		interactions,
 		/** `GET /api/conversations/:id/resources`: the resources the conversation has met and each message's chips. */
 		conversationResources: (conversationId: string) =>
 			conversationResources(deps, conversationId),
 		...createRecentPorts(deps),
 		...createTargetPorts(deps, targets),
-		...createTodoScreenPorts(deps),
 		/** The conversation's resource ledger (`a<n>`), for the `resources` tool and the screen receipts. */
 		resourceLedger: deps.resourceLedger,
 		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */
@@ -386,8 +344,15 @@ export function createDialogueService({
 				for (const run of interruptUnfinished(db, clock()))
 					runEndedInTransaction(deps, db, run, "interrupted");
 			});
-			// Questions past their time and interactions whose run ended are closed after a restart.
-			if (toolchains?.bound) await interactions.maintenance();
+			// The TODOs and confirmations the retired ledger left open are closed once, the work cancelled at its owner.
+			const retired = await store.write((db) =>
+				closeRetiredTodosInTransaction(deps, db),
+			);
+			if (retired.closed > 0 || retired.cancelled > 0)
+				log.info("dialogue.retired_todos_closed", {
+					count: retired.closed,
+					outcome: `cancelled:${retired.cancelled}`,
+				});
 		},
 		get(runId: string) {
 			return store.read((db) => byId(db, runId));
@@ -540,12 +505,9 @@ export function createDialogueService({
 				});
 			return store.read((db) => byId(db, runId));
 		},
-		/**
-		 * Stops a run's reply only (a voice turn cut off, muted or given up). A run that handed its work over waits
-		 * for that work, whose lifetime is not the reply's: the run and its open TODO stay. Any other run is cancelled.
-		 */
+		/** Stops a run's reply only (a voice turn cut off, muted or given up): the run is cancelled. */
 		async stopReply(runId: string): Promise<Run | null> {
-			return stopUnhandedReply(deps, runId, service.cancel);
+			return service.cancel(runId);
 		},
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {

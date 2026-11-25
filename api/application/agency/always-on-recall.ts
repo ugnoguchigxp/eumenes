@@ -9,6 +9,7 @@ import { touchesSuppressedTerm } from "../../domains/memory";
 import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
 import type { AgendaScope } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
+import { planReference, planReferenceKind } from "./plan-reference";
 
 /**
  * What the host hands the agenda package to read (spec 2026-11-22 §5.4): the memory that bears on each call
@@ -196,7 +197,7 @@ export function recordsFor(
 			const terms = suppressedTerms(deps, db);
 			const open = deps.continuity.plans.listInTransaction(db);
 			const isConflict = (p: (typeof open)[number]) =>
-				p.kind === "open_question" && p.memoryItemIds.length > 0;
+				planReferenceKind(p) === "conflict";
 			return {
 				terms,
 				slots: slotGoals(deps, db),
@@ -227,19 +228,19 @@ export function recordsFor(
 		return {
 			plans: rank(livePlans, wanted, (p) => p.text)
 				.slice(0, RECORD_LIMITS.topical)
-				.map((p) => ({ ref: p.id, text: p.text, dueAt: p.dueAt })),
+				.map((p) => ({ ref: planReference(p), text: p.text, dueAt: p.dueAt })),
 			goals: rank(goals, wanted, (g) => g.text).slice(0, RECORD_LIMITS.topical),
 		};
 	return {
 		// Soonest date first, as the continuity domain lists them.
 		plans: livePlans
 			.slice(0, RECORD_LIMITS.plans)
-			.map((p) => ({ ref: p.id, text: p.text, dueAt: p.dueAt })),
+			.map((p) => ({ ref: planReference(p), text: p.text, dueAt: p.dueAt })),
 		goals: goals.slice(0, RECORD_LIMITS.goals),
 		conflicts: conflicts
 			.filter((p) => spoken(p.text))
 			.slice(0, RECORD_LIMITS.conflicts)
-			.map((p) => ({ ref: p.id, text: p.text })),
+			.map((p) => ({ ref: planReference(p), text: p.text })),
 		questions: questions.map((q) => ({
 			attribute: q.attribute,
 			state: q.state,
@@ -352,7 +353,10 @@ export function marksFor(
 					.filter((p) =>
 						p.memoryItemIds.some((id) => review.has(`memory:${id}`)),
 					)
-					.map((p) => `plan:${p.id}`),
+					.flatMap((p) => {
+						const kind = planReferenceKind(p);
+						return [`${kind}:${p.id}`, `${kind}:${planReference(p)}`];
+					}),
 			],
 			suppressedRefs: facts.size
 				? deps.memory

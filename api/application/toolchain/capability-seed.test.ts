@@ -247,11 +247,13 @@ test("reopening and seeding preserves disabled toolchains and explicitly publish
 test("upgrading retires the generic Collaboration entry and preserves its saved work", async () => {
 	const retirement = new Set([
 		"capabilities/0013-retire-collaboration-task",
+		"capabilities/0014-retire-agency-todos",
 		"dialogue/0043-retire-collaboration-task",
 		"dialogue/0044-confirmation-revision",
 		"dialogue/0045-consumed-confirmation-run",
 		"dialogue/0046-forget-hidden",
 		"dialogue/0047-memory-refs",
+		"dialogue/0048-assignment-images",
 		"collaboration/0005-retire-task-works",
 	]);
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-retire-"));

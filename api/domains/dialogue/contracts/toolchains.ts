@@ -135,7 +135,6 @@ export interface ToolchainRoutingPort {
 			durationMs?: number;
 		},
 	): string;
-	linkTaskInTransaction(db: Database, runId: string, taskId: string): void;
 	settleSelectionInTransaction(
 		db: Database,
 		runId: string,
@@ -160,8 +159,6 @@ export interface ToolchainRoutingPort {
 				code: string | null;
 		  }
 		| undefined;
-	/** The request text the conversation handed to the toolchain of a run. */
-	requestOfRunInTransaction(db: Database, runId: string): string | undefined;
 }
 
 /**

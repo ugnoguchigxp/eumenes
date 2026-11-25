@@ -9,9 +9,16 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { harness } from "../toolchain/toolchain.fixture";
+import type { harness } from "../toolchain/toolchain.fixture";
+import {
+	ask,
+	assignmentAgenda,
+	items,
+	notes,
+	until,
+	works,
+} from "../media/assignment.fixture";
 import type { HarnessOptions } from "../toolchain/toolchain-harness-options.fixture";
-import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { copySourceSnapshot, resolveSourceCommit } from "./source-snapshot";
 import { sourceResult } from "./source-report";
@@ -19,7 +26,6 @@ import { createCodexSourceInspect } from "./codex-source-inspect";
 import { copySourceWorktree } from "./source-worktree";
 import { sourceExcerpt } from "./source-excerpt";
 import { spokenText } from "../../domains/delivery";
-import { createContinuityService } from "../../domains/continuity";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { sha256Hex } from "../../infrastructure/digest";
 
@@ -45,6 +51,10 @@ async function submitVoice(
 	return { utterance, runId: h.voice.get(utterance)!.runId! };
 }
 
+/**
+ * The user asks the source inspection toolchain (the agent's assignment), the inspection is held until released, and
+ * the user may talk by voice meanwhile. Returns what the inspection returned and the agent's work report note.
+ */
 async function conversation(
 	source: NonNullable<Awaited<ReturnType<typeof createCodexSourceInspect>>>,
 	question = request,
@@ -52,8 +62,9 @@ async function conversation(
 ) {
 	const release = Promise.withResolvers<void>();
 	let calls = 0;
+	let returned: Awaited<ReturnType<typeof source.inspect>> | undefined;
 	const options: HarnessOptions = {
-		voiceText: question,
+		voiceText: followUp,
 		conversationAgent: { ...testConversationAgent, handsWork: () => true },
 		webNote: {
 			inspectSource: {
@@ -64,119 +75,48 @@ async function conversation(
 						source.inspect(input),
 						release.promise,
 					]);
+					returned = result;
 					return result;
 				},
 			},
 		},
-		discoveryTarget: (text) =>
-			text.includes(question) ? "inspect_source" : "service_search",
-		firstRound: (_tools, asked, messages) => {
+		firstRound: (_tools, asked) => {
 			if (asked === followUp) return { text: followUpAnswer };
-			if (asked !== question) return;
-			return searchThenDelegate(
-				(candidate) => candidate.id === "inspect.source",
-				question,
-				{ impact: "none" },
-			)(messages);
 		},
 	};
-	const h = await harness(options);
+	const a = await assignmentAgenda({ harness: options });
+	const h = a.h;
 	try {
+		await a.start();
 		const session = voice ? crypto.randomUUID() : null;
 		if (session) h.voice.start(session, 1);
-		const initial = session ? await submitVoice(h, session, 1) : null;
-		const runId =
-			initial?.runId ??
-			(
-				await h.dialogue.submit({
-					requestId: crypto.randomUUID(),
-					conversationId: "main",
-					text: question,
-				})
-			).id;
-		if (initial) {
-			// An existing voice handover waits for the browser to acknowledge the announcement.
-			await waitFor(
-				() => !!h.voice.get(initial.utterance)?.audioChunks?.length,
-			);
-			expect(calls).toBe(0);
-			await h.voice.played(
-				initial.utterance,
-				h.voice.get(initial.utterance)!.audioChunks![0]!.index,
-			);
-		}
-		expect(
-			await h.dialogue.waitForTerminal(runId, { timeoutMs: 5000 }),
-		).toMatchObject({ status: "completed", announcement: expect.any(String) });
-		await waitFor(() => calls > 0, { timeout: 10_000 });
+		await ask(a, "inspect.source", question);
+		await until(a, () => calls > 0);
+		// The inspection is the agent's open item while it runs; nothing is reported yet.
+		expect(items(a)).toHaveLength(1);
+		expect(notes(a)).toEqual([]);
 		if (session) {
-			options.voiceText = followUp;
-			const next = await submitVoice(h, session, 2);
+			const next = await submitVoice(h, session, 1);
 			await waitFor(() => h.dialogue.get(next.runId)?.status === "completed");
 			expect(h.dialogue.answerText(next.runId)).toBe(followUpAnswer);
 			await waitFor(
 				() => (h.voice.get(next.utterance)?.audioChunks?.length ?? 0) > 0,
 			);
 		}
-		const answers = async () => {
-			const history = (await (
-				await h.request("/api/conversations/main")
-			).json()) as ReturnType<typeof h.conversation.get>;
-			return history.messages.filter(
-				(message) => message.role === "assistant" && message.displayText,
-			);
-		};
-		expect(await answers()).toEqual([]);
 		release.resolve();
-		await waitFor(async () => (await answers()).length > 0, {
-			timeout: 90_000,
-			interval: 50,
-		});
-		await h.toolchain.webNote.recover();
-		const messages = await answers();
+		await until(a, () => notes(a).length === 1);
 		expect(calls).toBe(1);
-		expect(messages).toHaveLength(1);
-		const answer = messages[0]!;
-		expect(
-			(await (await h.request("/api/todo-notices")).json()).notices,
-		).toEqual([]);
-		expect(
-			h.conversation
-				.get("main")
-				.messages.every((message) => message.displayText === undefined),
-		).toBe(true);
-		// Steward reads the said event and its backing message, without the display payload.
-		const { events } = createContinuityService();
-		h.store.read((db) => {
-			const completed = db.query("SELECT id FROM web_note_runs").get() as {
-				id: string;
-			};
-			const storedResult = h.toolchain.webNote.task.viewInTransaction(
-				db,
-				completed.id,
-			)?.result;
-			expect(storedResult?.summary).toBe(answer.text);
-			expect(storedResult?.report).toBeUndefined();
-			const said = events
-				.ofMessageInTransaction(db, answer.id)
-				.find((event) => event.type === "said");
-			expect(JSON.parse(said!.text!)).toMatchObject({ text: answer.text });
-			const message = h.conversation.messageInTransaction(
-				db,
-				answer.id,
-			)!.message;
-			expect(message.text).toBe(answer.text);
-			expect(message.displayText).toBeUndefined();
-		});
-		return answer;
+		expect(items(a)).toHaveLength(0);
+		expect(works(a)).toHaveLength(1);
+		return { result: returned!.result, note: notes(a)[0]!, a };
 	} finally {
 		release.resolve();
-		await h.close();
+		await a.close();
 	}
 }
 
-test("a second voice turn gets a reply while source inspection is pending", async () => {
-	const answer = await conversation(
+test("a second voice turn gets a reply while the source inspection assignment is pending", async () => {
+	const { result, note } = await conversation(
 		{
 			resolveCommit: async () => "a".repeat(40),
 			inspect: async () => ({
@@ -197,7 +137,10 @@ test("a second voice turn gets a reply while source inspection is pending", asyn
 		request,
 		true,
 	);
-	expect(answer.displayText).toContain("api/start.ts");
+	// The agent reports the inspection with a work report note: the request and what it answered.
+	expect(note.markdown).toContain(`## 依頼\n\n${request}`);
+	expect(note.markdown).toContain("初期化を確認しました。");
+	expect(result.displayAnswer).toContain("api/start.ts");
 }, 20_000);
 
 test("diff excerpts are limited to authorized snapshots and stay out of memory input and playback", async () => {
@@ -287,7 +230,7 @@ test("diff excerpts are limited to authorized snapshots and stay out of memory i
 			],
 			limitations: "",
 		});
-		const answer = await conversation({
+		const { result: reported, note } = await conversation({
 			resolveCommit: async () => commit,
 			inspect: async (input) => {
 				expect(input.commit).toBe(commit);
@@ -328,15 +271,20 @@ test("diff excerpts are limited to authorized snapshots and stay out of memory i
 				};
 			},
 		});
-		expect(answer.text).toBe("確認できた初期化");
-		expect(answer.displayText).not.toContain("根拠が無効な主張");
-		expect(answer.displayText).toContain("一部抜粋（表示深度：中）");
-		expect(answer.displayText).toContain("> **ソース：** `api/start.ts`");
-		expect(answer.displayText).toContain("```diff");
-		expect(answer.displayText).toContain("-first");
-		expect(answer.displayText).toContain("+dirty worktree");
-		expect(answer.displayText).not.toContain(commit);
-		expect(spokenText(answer.text)).toBe("確認できた初期化");
+		expect(reported.answer).toBe("確認できた初期化");
+		const display = reported.displayAnswer!;
+		expect(display).not.toContain("根拠が無効な主張");
+		expect(display).toContain("一部抜粋（表示深度：中）");
+		expect(display).toContain("> **ソース：** `api/start.ts`");
+		expect(display).toContain("```diff");
+		expect(display).toContain("-first");
+		expect(display).toContain("+dirty worktree");
+		expect(display).not.toContain(commit);
+		expect(spokenText(reported.answer!)).toBe("確認できた初期化");
+		// The excerpts are for the screen: the agent's note holds the answer and no diff.
+		expect(note.markdown).toContain("確認できた初期化");
+		expect(note.markdown).not.toContain("dirty worktree");
+		expect(note.markdown).not.toContain(commit);
 		expect(await resolveSourceCommit(repository, signal())).toBe(current);
 		expect(await readFile(join(repository, "api", "start.ts"), "utf-8")).toBe(
 			"dirty worktree\n",

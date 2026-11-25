@@ -3,6 +3,7 @@ import { harness } from "../toolchain/toolchain.fixture";
 import {
 	candidatesOf,
 	searchThenDelegate,
+	UNAVAILABLE_TEXT,
 	type Candidate,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -10,9 +11,9 @@ import { tomorrowKamakura, weatherFetch } from "./weather.fixture";
 
 const ask = "明日の鎌倉の天気を教えて";
 const kamakura = { place: "鎌倉", prefecture: "神奈川県", day: "tomorrow" };
-/** The weather toolchain is the instant candidate whose inputs take a place. */
+/** The weather toolchain is the instant candidate the search names. */
 const isWeather = (candidate: Candidate) =>
-	candidate.execution === "instant" && candidate.text.includes("place（");
+	candidate.execution === "instant" && candidate.id === "weather.forecast";
 
 /** The model's usual path: search for the weather toolchain, then answer instantly with the inputs it reads. */
 const askWeather = (args: Record<string, unknown> = kamakura) =>
@@ -37,7 +38,7 @@ async function weatherHarness(
 	return { h, service, candidates };
 }
 
-test("a cold weather request is answered after the router's decision and one fill call: fixed sentence, no TODO, no notice", async () => {
+test("a cold weather request is answered after the router's decision and one fill call: no assignment, no notice", async () => {
 	const { h, service, candidates } = await weatherHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -49,10 +50,10 @@ test("a cold weather request is answered after the router's decision and one fil
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(tomorrowKamakura);
-		// The router decided the weather (the fixture's context judgment reads the script) and the one fill call gave its
-		// inputs: the host said the answer, and nothing reached a worker, the web, or another model call.
-		expect(candidates.filter(Boolean)).toHaveLength(2);
-		expect(h.calls).toBe(1);
+		// The model reads the search's result, the router's one fill call gives the inputs, and the model reads the answer:
+		// nothing reached a worker, the web, or another model call.
+		expect(candidates.filter(Boolean)).toHaveLength(3);
+		expect(h.calls).toBe(4);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
 		expect(h.acquisitions).toBe(0);
@@ -64,7 +65,7 @@ test("a cold weather request is answered after the router's decision and one fil
 		expect(service.urls.at(-1)).toBe(
 			"https://weather.tsukumijima.net/api/forecast/city/140010",
 		);
-		// The instant answer is traced as a selection of the weather toolchain, completed (no TODO was made for it).
+		// The instant answer is traced as a selection of the weather toolchain, completed (no assignment was made for it).
 		const traced = h.store.read((db) =>
 			db
 				.query(
@@ -80,9 +81,7 @@ test("a cold weather request is answered after the router's decision and one fil
 				outcome: "completed",
 			},
 		]);
-		expect(
-			h.store.read((db) => h.dialogue.todosInTransaction(db, "main")),
-		).toEqual([]);
+		expect(h.toolchain.agents.executions.list("main")).toEqual([]);
 	} finally {
 		await h.close();
 	}
@@ -100,12 +99,27 @@ test("the search lists the weather toolchain as an instant candidate with its pl
 		const found = candidates.find(Boolean)!;
 		const weather = found.find(isWeather);
 		expect(weather).toBeDefined();
-		// The inputs read as `name（type、required）description` (section 9). The place is the user's own words; the host finds its area.
-		expect(weather!.text).toContain("place（string、必須）");
-		expect(weather!.text).toContain("prefecture（string、必須）");
-		expect(weather!.text).toContain(
-			"day（string、必須、値は today・tomorrow・day_after）",
-		);
+		// The card the search offers carries the typed inputs the model fills. The place is the user's own words; the host finds its area.
+		const card = h.store.read((db) =>
+			h.routing
+				.catalogInTransaction(db)
+				.find((c) => c.id === "weather.forecast"),
+		)!;
+		const offered = h.store.read((db) =>
+			h.routing.cardInTransaction(db, card.revisionId),
+		)!;
+		const parameters = offered.instant!.parameters as {
+			required: string[];
+			properties: Record<string, { type: string; enum?: string[] }>;
+		};
+		expect(parameters.required).toEqual(["place", "prefecture", "day"]);
+		expect(parameters.properties.place!.type).toBe("string");
+		expect(parameters.properties.prefecture!.type).toBe("string");
+		expect(parameters.properties.day!.enum).toEqual([
+			"today",
+			"tomorrow",
+			"day_after",
+		]);
 	} finally {
 		await h.close();
 	}
@@ -158,10 +172,9 @@ test("instant inputs outside the schema are refused: the host says it could not 
 		});
 		const done = await g.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
-		// The router's choice is not made again (spec router-package-integration 2026-11-04): the host says it failed.
-		expect(g.dialogue.answerText(run.id)).toBe(
-			"うまく頼めませんでした。もう一度言ってもらえますか。",
-		);
+		// The router's choice is not made again (spec router-package-integration 2026-11-04): the hand-over failed, and the
+		// reply says the request could not be done.
+		expect(g.dialogue.answerText(run.id)).toBe(UNAVAILABLE_TEXT);
 		expect(
 			service.urls.filter((u) => u.includes("/api/forecast/")),
 		).toHaveLength(0);

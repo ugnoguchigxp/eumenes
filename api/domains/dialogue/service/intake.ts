@@ -26,7 +26,6 @@ import {
 } from "../repository";
 import {
 	DEFAULT_DEADLINE_MS,
-	COMMAND_KIND,
 	GENERATE_KIND,
 	PROMPT_TARGET_KIND,
 	SPECIALIST_KIND,
@@ -63,8 +62,8 @@ const log = getLogger("dialogue");
 
 /**
  * The input as an event of the conversation (the ContextWindow specification, section 8.2): a user's or a
- * schedule's utterance waits as pending until a generation handles it; one addressed to a specialist or
- * answering a command question is handled where it goes, so it joins the log at once. A host notice is logged
+ * schedule's utterance waits as pending until a generation handles it; one addressed to a specialist is handled
+ * where it goes, so it joins the log at once. A host notice is logged
  * as what happened; its text is the generation's trigger.
  */
 function recordInputInTransaction(
@@ -124,7 +123,7 @@ function recordInputInTransaction(
 			...(toSpecialist ? { to: "specialist" } : {}),
 		},
 		messageIds: [messageId],
-		pending: !toSpecialist && !input.resume,
+		pending: !toSpecialist,
 	});
 }
 
@@ -140,12 +139,6 @@ function generationPayload(
 			...(input.guidanceLanguage
 				? { guidanceLanguage: input.guidanceLanguage }
 				: {}),
-		};
-	if (input.resume)
-		return {
-			runId,
-			toolchainRevisionId: input.resume.toolchainRevisionId,
-			interactionId: input.resume.interactionId,
 		};
 	return { runId };
 }
@@ -189,7 +182,7 @@ export function createIntake(deps: DialogueDeps) {
 		// An active specialist session takes the utterance directly: no main-agent generation at all.
 		// A screen's pinned form submit is the main conversation's: it never goes to a session.
 		const { session: addressee, cancelled } =
-			!isSystemPrompt(input.sourceKind) && !input.resume && !input.toolchainId
+			!isSystemPrompt(input.sourceKind) && !input.toolchainId
 				? addressedSession(deps, db, input.conversationId, now)
 				: { session: null, cancelled: { flush: [], runs: [] } };
 		// What the screen showed when the user sent must still be who listens, or nothing is stored.
@@ -233,16 +226,8 @@ export function createIntake(deps: DialogueDeps) {
 			scope: isSystemPrompt(input.sourceKind)
 				? "dialogue.schedule"
 				: "dialogue",
-			kind: addressee
-				? SPECIALIST_KIND
-				: input.resume
-					? COMMAND_KIND
-					: GENERATE_KIND,
-			dedupeKey: addressee
-				? `specialist-turn:${runId}`
-				: input.resume
-					? `toolchain-command:${runId}`
-					: runId,
+			kind: addressee ? SPECIALIST_KIND : GENERATE_KIND,
+			dedupeKey: addressee ? `specialist-turn:${runId}` : runId,
 			payload: generationPayload(runId, input, addressee?.epoch),
 			subjectRef: runId,
 			lane: isSystemPrompt(input.sourceKind) ? "background" : "interactive",

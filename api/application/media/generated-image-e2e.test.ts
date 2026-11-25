@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import sharp from "sharp";
-import { harness } from "../toolchain/toolchain.fixture";
 import { imageFixture, imageQuestion, png } from "./image.fixture";
 import { imageLarmFixture } from "../../domains/larm/test/chat-input.fixture";
 import {
@@ -8,16 +7,37 @@ import {
 	choiceRound,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
-import { createAgencyStatePort } from "../../domains/dialogue";
+import { replyWith } from "../agency/always-on.fixture";
 import {
-	archiveWork,
-	dropRunResults,
-	insertWork,
-	updateWork,
-} from "../../domains/dialogue/test/store.fixture";
+	assignmentAgenda,
+	ended,
+	plannedBy,
+	reportLine,
+	resources,
+	until,
+	works,
+	type Fixture,
+} from "./assignment.fixture";
 
 const observation = "左上の画素は RGB 235, 130, 110。";
 const followUp = "受け取った画像の特徴は？";
+const answered = "見ています。";
+
+type Observation = {
+	state: string;
+	reason?: string;
+	images: Array<{ uri: string }>;
+};
+/** What the model saw of the images the assignment made, kept under the assignment's work root. */
+const observed = (a: Fixture): Array<Observation & { rootId: string }> =>
+	a.h.store
+		.read((db) =>
+			db.query("SELECT root_id, record FROM dialogue_assignment_images").all(),
+		)
+		.map((row) => {
+			const { root_id, record } = row as { root_id: string; record: string };
+			return { rootId: root_id, ...JSON.parse(record) };
+		});
 
 for (const scenario of [
 	"observed",
@@ -25,160 +45,121 @@ for (const scenario of [
 	"unsupported",
 	"withdrawn",
 ] as const)
-	test(`generated image delivery and native inference input: ${scenario}`, async () => {
-		const imageGate = Promise.withResolvers<void>();
-		const f = imageFixture(
-			"success",
-			scenario === "observed" ? imageGate.promise : undefined,
-		);
+	test(`generated image of the agent's own work and native inference input: ${scenario}`, async () => {
+		const f = imageFixture("success");
 		const gate = Promise.withResolvers<void>();
 		const transport = imageLarmFixture({
 			response: observation,
 			vision: scenario !== "unsupported",
 			generationGate: scenario === "withdrawn" ? gate.promise : undefined,
 		});
-		let followUpContext = "";
+		const planned = plannedBy({ image: f });
+		const followUps: string[] = [];
 		let observedModelCalls = 0;
-		const state = createAgencyStatePort({ now: Date.now });
-		const h = await harness({
-			resources: true,
-			memory: scenario === "observed",
-			agency: {
-				isCurrentInputInTransaction(db, input) {
-					return (
-						(h.memory?.referenceInputs.isCurrentInTransaction(db, input) ??
-							true) &&
-						!state.staleSourcesInTransaction(db, input.sources).length
-					);
-				},
-				workChangedInTransaction() {},
-			},
-			observeGeneratedImages: true,
-			imageGateway: () => {
-				const gateway = f.gateway();
-				if (scenario !== "replaced") return gateway;
-				return {
-					...gateway,
-					images: {
-						...gateway.images,
-						async get(id, signal) {
-							const result = await gateway.images.get(id, signal);
-							const entry = f.images.get(id);
-							if (entry) entry.bytes = png(43, 31);
-							return result;
+		const a = await assignmentAgenda({
+			media: f,
+			harness: {
+				observeGeneratedImages: true,
+				imageGateway: () => {
+					const gateway = f.gateway();
+					if (scenario !== "replaced") return gateway;
+					return {
+						...gateway,
+						images: {
+							...gateway.images,
+							async get(id, signal) {
+								const result = await gateway.images.get(id, signal);
+								const entry = f.images.get(id);
+								if (entry) entry.bytes = png(43, 31);
+								return result;
+							},
 						},
+					};
+				},
+				model: {
+					...transport.p,
+					answerStream: undefined,
+					async answer(messages, signal, options) {
+						if (messages.some((message) => message.images?.length)) {
+							observedModelCalls++;
+							return transport.p.answer(messages, signal, options);
+						}
+						if (
+							messages.some((message) => message.content.includes(followUp))
+						) {
+							const round = options?.jsonSchema ? choiceRound(messages) : null;
+							if (round)
+								return choiceByScript(messages, round, () => ({
+									text: answered,
+								}));
+							followUps.push(messages.map(({ content }) => content).join("\n"));
+							return answered;
+						}
+						return planned.answer(messages, signal, options);
 					},
-				};
-			},
-			model: {
-				...transport.p,
-				answerStream: undefined,
-				async answer(messages, signal, options) {
-					if (messages.some((message) => message.images?.length)) {
-						observedModelCalls++;
-						return transport.p.answer(messages, signal, options);
-					}
-					if (messages.some((message) => message.content.includes(followUp))) {
-						const round = options?.jsonSchema ? choiceRound(messages) : null;
-						if (round)
-							return choiceByScript(messages, round, () => ({
-								text: observation,
-							}));
-						followUpContext = messages.map(({ content }) => content).join("\n");
-						return observation;
-					}
-					return f.model.answer(messages, signal, options);
 				},
 			},
 		});
-		try {
-			const request = {
-				requestId: crypto.randomUUID(),
-				conversationId: "media-origin",
-				text: imageQuestion,
-				presentation: "artifact",
-				...(scenario === "observed" ? {} : { toolchainId: "image.create" }),
-			};
-			const priorRunId = crypto.randomUUID();
-			const priorWork =
-				scenario === "observed"
-					? await h.store.write((db) => {
-							h.memory!.referenceInputs.recordRunInTransaction(db, priorRunId, {
-								sources: [],
-								complete: true,
-							});
-							return insertWork(db, {
-								id: crypto.randomUUID(),
-								conversationId: request.conversationId,
-								runId: priorRunId,
-								toolchainId: "web.note",
-								toolchainRevisionId: "toolchain:web.note@1",
-								execution: "queued",
-								request: "天気を調べて",
-								title: "天気",
-								sourceRef: null,
-								dedupeKey: priorRunId,
-								createdAt: new Date().toISOString(),
-								messageIds: [],
-							});
-						})
-					: undefined;
-			const submission = await h.request("/api/runs", request);
-			expect(submission.status).toBe(202);
-			const { id, inputMessageId } = await submission.json();
-			expect((await (await h.request("/api/runs", request)).json()).id).toBe(
-				id,
-			);
-			if (priorWork) {
-				await waitFor(() =>
-					f.requests.some(
-						({ method, path }) =>
-							method === "POST" && path === "/v1/images/generations",
-					),
-				);
-				const priorRef = `host-work:${JSON.stringify([priorWork.id, priorWork.revision])}`;
-				await h.store.write((db) => {
-					expect(
-						h.memory!.referenceInputs.readRunInTransaction(db, id)?.sources,
-					).toContain(priorRef);
-					const at = new Date().toISOString();
-					expect(
-						updateWork(
-							db,
-							priorWork.id,
-							priorWork.revision,
-							{
-								status: "done",
-								outcome: "succeeded",
-								result: { summary: "晴れ" },
-							},
-							at,
-						),
-					).toBe(true);
-					expect(archiveWork(db, priorWork.id, at)).toBe(true);
-				});
-				imageGate.resolve();
-			}
+		const turn = async () => {
+			const run = await (
+				await a.h.request("/api/runs", {
+					requestId: crypto.randomUUID(),
+					conversationId: "ao",
+					text: followUp,
+				})
+			).json();
 			expect(
-				(await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))?.status,
+				(await a.h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))
+					?.status,
 			).toBe("completed");
-			const notices = async () =>
-				(await (await h.request("/api/todo-notices")).json()).notices;
+		};
+		const watched = () =>
+			a.h.queue.list({ kind: "dialogue.generated-image" }).items[0];
+		try {
+			await a.start();
+			// The user's words, and the preparation the reply asked of the agent (its own work, under its own root).
+			await a.user("user-a", "ao", imageQuestion);
+			await replyWith(
+				a,
+				[
+					{
+						name: "start_preparation",
+						arguments: { request: imageQuestion, askedByUser: true },
+					},
+				],
+				{ messageIds: ["user-a"] },
+			);
+			await until(a, () => ended(a));
+			expect(a.h.image!.list("ao")[0]?.state).toBe("completed");
+			// The agent reports the image, and the observation is not made until the conversation's next turn.
+			await until(a, () => !!reportLine(a));
+			expect((await resources(a)).resources.map((r) => r.kind)).toContain(
+				"image",
+			);
+			expect(observed(a)).toEqual([]);
+			expect(observedModelCalls).toBe(0);
+			// The next turn takes the new image to be looked at once, keyed by the assignment's work root.
+			await turn();
+			expect(observed(a)).toMatchObject([
+				{
+					rootId: works(a)[0]!.root_id,
+					images: [{ uri: "eumenes://image/new-image" }],
+				},
+			]);
 			if (scenario === "withdrawn") {
 				await waitFor(() =>
 					transport.requests.some(({ operation }) => operation === "generate"),
 				);
-				expect((await notices())[0]?.summary).toContain("画像を確認中");
-				await h.conversation.retract({ messageId: inputMessageId });
+				// While it is looked at, the user takes their words back: the assignment is forgotten.
+				await a.h.conversation.retract({ messageId: "user-a" });
 				gate.resolve();
 				await waitFor(
-					() =>
-						!["queued", "running"].includes(
-							h.queue.list({ kind: "dialogue.generated-image" }).items[0]
-								?.state ?? "queued",
-						),
+					() => !["queued", "running"].includes(watched()?.state ?? "queued"),
 				);
-				expect(JSON.stringify(await notices())).not.toContain(observation);
+				await turn();
+				expect(followUps.at(-1)).not.toContain(observation);
+				expect(followUps.at(-1)).not.toContain("画像を確認");
+				expect(observed(a)).toEqual([]);
 				expect(
 					transport.requests.filter(
 						({ operation }) => operation === "generate",
@@ -186,44 +167,17 @@ for (const scenario of [
 				).toHaveLength(1);
 				return;
 			}
+			await waitFor(
+				() => !["queued", "running"].includes(watched()?.state ?? "queued"),
+			);
+			await turn();
 			const expected = {
 				observed: "画像を確認済み",
 				replaced: "原本を確認できません",
-				unsupported: "画像入力を利用できません",
+				unsupported: "現在の接続では画像入力を利用できません",
 			}[scenario];
-			await waitFor(
-				async () =>
-					(await notices()).some((item: { summary: string | null }) =>
-						item.summary?.includes(expected),
-					),
-				{ timeout: 2500 },
-			).catch(async (error) => {
-				throw new Error(
-					`${error.message}: model calls=${observedModelCalls}, wire calls=${transport.requests.length}, notices=${JSON.stringify(await notices())}`,
-				);
-			});
-			const notice = (await notices()).find(
-				(item: { summary: string | null }) => item.summary?.includes(expected),
-			);
-			expect(notice).toMatchObject({
-				conversationId: request.conversationId,
-				outcome: "succeeded",
-				links: [{ kind: "image", uri: "eumenes://image/new-image" }],
-			});
-			expect(
-				(await notices()).filter(
-					(item: { conversationId: string }) =>
-						item.conversationId === request.conversationId,
-				),
-			).toHaveLength(1);
-			const history = await (
-				await h.request(`/api/conversations/${request.conversationId}`)
-			).json();
-			expect(
-				history.messages.filter(
-					(item: { role: string }) => item.role === "user",
-				),
-			).toHaveLength(1);
+			expect(followUps.at(-1)).toContain(expected);
+			const history = await (await a.h.request("/api/conversations/ao")).json();
 			expect(JSON.stringify(history)).not.toContain(observation);
 			const modelRequests = transport.requests.filter(
 				({ operation }) => operation === "generate",
@@ -231,6 +185,8 @@ for (const scenario of [
 			expect(observedModelCalls).toBe(scenario === "replaced" ? 0 : 1);
 			expect(modelRequests).toHaveLength(scenario === "observed" ? 1 : 0);
 			if (scenario !== "observed") return;
+			expect(observed(a)[0]).toMatchObject({ state: "observed" });
+			expect(followUps.at(-1)).toContain(observation);
 			const wire = JSON.parse(modelRequests[0]!.body);
 			const parts = wire.messages.flatMap(
 				({ content }: { content: unknown }) =>
@@ -246,26 +202,13 @@ for (const scenario of [
 				.toBuffer({ resolveWithObject: true });
 			expect(decoded.info).toMatchObject({ width: 121, height: 177 });
 			expect([...decoded.data.subarray(0, 3)]).toEqual([235, 130, 110]);
-			const follow = await (
-				await h.request("/api/runs", {
-					requestId: crypto.randomUUID(),
-					conversationId: request.conversationId,
-					text: followUp,
-				})
-			).json();
-			expect(
-				(await h.dialogue.waitForTerminal(follow.id, { timeoutMs: 5000 }))
-					?.status,
-			).toBe("completed");
-			expect(followUpContext).toContain(observation);
 			expect(observedModelCalls).toBe(1);
-			await h.store.write((db) =>
-				dropRunResults(db, priorRunId, new Date().toISOString()),
-			);
-			expect(JSON.stringify(await notices())).not.toContain(observation);
+			// The observation was made once: the third turn reads it again, and the model is not called again.
+			await turn();
+			expect(followUps.at(-1)).toContain(observation);
+			expect(observedModelCalls).toBe(1);
 		} finally {
-			imageGate.resolve();
 			gate.resolve();
-			await h.close();
+			await a.close();
 		}
-	});
+	}, 30_000);

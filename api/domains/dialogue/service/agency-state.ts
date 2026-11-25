@@ -29,6 +29,11 @@ import {
 } from "../repository/agency";
 import type { MemoryService } from "../../memory";
 import type { AgentRuntime } from "../../agent-runtime";
+import type { ExecutionReference } from "../../tool-runtime";
+import type {
+	AssignmentDetails,
+	AssignmentSource,
+} from "../contracts/agency-always-on";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { agencyObservations } from "../repository/agency-observations";
 
@@ -44,7 +49,7 @@ export function createAgencyStatePort(
 	const forgetting = agencyForgetting(deps);
 	const revoke = (db: Database, id: string) => {
 		for (const w of agencyWorks(db, id, true)) {
-			if (w.execution_id) eraseAgencyActionWork(db, w.execution_id, deps.now());
+			if (w.execution_id) eraseAgencyActionWork(db, w, deps.now());
 			if (w.execution_id) stopAgencyExecution(deps, db, w, true);
 			deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
 		}
@@ -154,8 +159,13 @@ export function createAgencyStatePort(
 		},
 		workActiveInTransaction: (db: Database, rootId: string) =>
 			agencyWorkActive(db, rootId),
+		workReceiptInTransaction(db: Database, rootId: string) {
+			const work = agencyWork(db, rootId);
+			if (!work) return "missing";
+			return work.revoked || work.returned ? "closed" : "accepted";
+		},
 		staleSourcesInTransaction: (db: Database, refs: readonly string[]) =>
-			staleAgencySources(db, refs, () => catalog(db).map((c) => c.revisionId)),
+			staleAgencySources(refs, () => catalog(db).map((c) => c.revisionId)),
 		observationsInTransaction: agencyObservations,
 		refreshDependenciesInTransaction(
 			db: Database,
@@ -183,8 +193,8 @@ export function createAgencyStatePort(
 				conversationId,
 				messageId,
 				agencyWorks(db, conversationId, true)
-					.filter((w) => ticketIds.includes(w.ticket_id))
-					.flatMap((w) => (w.execution_id ? [w.execution_id] : [])),
+					.filter((w) => ticketIds.includes(w.ticket_id) && !!w.execution_id)
+					.map((w) => w.root_id),
 			);
 		},
 		startInTransaction(
@@ -202,9 +212,17 @@ export function createAgencyStatePort(
 				outboundIntervalMs: number;
 				sourceRefs: readonly string[];
 				arguments?: Record<string, unknown>;
+				/** Work the user asked for (`delegate`): the user's request is its authority, not the agency's budget. */
+				assignment?: boolean;
+				references?: readonly ExecutionReference[];
+				/** An assignment's user-message source: the toolchain takes the work as the user's. */
+				source?: AssignmentSource;
+				/** An assignment's other `delegate` fields, as they were given. */
+				details?: AssignmentDetails;
 			},
 		) {
 			if (actions.available()) return actions.start(db, input);
+			if (input.assignment) throw new Error("agency_execution_unavailable");
 			if (!deps.agents || !deps.toolchains)
 				throw new Error("agency_research_unavailable");
 			if (
@@ -260,6 +278,20 @@ export function createAgencyStatePort(
 			return result.taskId;
 		},
 		...agencyResults(deps, actions),
+		/** The running work of an assignment as its owner shows it (progress, question), or null. */
+		assignmentViewInTransaction: (db: Database, rootId: string) =>
+			actions.result(db, rootId),
+		/** Answers or amends an assignment through its owner's own control, as the user's words of `messageId`. */
+		controlAssignmentInTransaction: (
+			db: Database,
+			rootId: string,
+			input: {
+				action: "answer" | "amend";
+				text: string;
+				question?: string | null;
+			},
+			messageId: string,
+		) => actions.control(db, rootId, input, messageId),
 		cancelInTransaction(db: Database, id: string) {
 			actions.cancel(db, id);
 			deps.agents?.deleteTaskDataInTransaction(db, id);

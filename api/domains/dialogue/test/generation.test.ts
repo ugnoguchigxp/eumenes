@@ -3,6 +3,7 @@ import { hostDelivery } from "../../delivery";
 import {
 	IMAGE,
 	INSTANT,
+	agencyOf,
 	choice,
 	reply,
 	setup,
@@ -34,9 +35,6 @@ test("an utterance is answered with plain text: the said events, a full delivery
 		"memory",
 		"find_toolchain",
 		"delegate",
-		"approve_confirmation",
-		"decline_confirmation",
-		"work",
 		"discard_for_pending_switch",
 	]);
 	const log = h.log();
@@ -91,36 +89,40 @@ test("invalid instant arguments leave a rejected selection without handing work 
 	expect(h.dialogue.answerText(run.id)).toBe(
 		"うまく頼めませんでした。もう一度言ってもらえますか。",
 	);
-	expect(h.todos()).toEqual([]);
 	expect(h.state.selections.at(-1)).toMatchObject({ decision: "rejected" });
 });
 
-test("an instant toolchain's answer is the host's answer, and makes no TODO", async () => {
+test("an instant toolchain's answer is the host's answer, and hands nothing to the agent", async () => {
 	h = await setup();
 	h.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
 	const run = await h.say("東京は今何時？");
 	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
-	expect(h.todos()).toEqual([]);
 	expect(h.state.selections.at(-1)).toMatchObject({ decision: "toolchain" });
 });
 
-test("a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and is archived with its notice", async () => {
-	const notified: string[] = [];
-	h = await setup({
-		agency: {
-			workChangedInTransaction: (_db, conversationId) => {
-				notified.push(conversationId);
-			},
-		},
-	});
+test("a delegation is the agent's assignment: no announcement, the run goes on and completes with the reply", async () => {
+	const { agency, assigned } = agencyOf();
+	h = await setup({ agency });
 	h.state.steps.push(
 		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
+		{ text: "猫の絵を頼みました。" },
 	);
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	expect(waiting.announcement).toBe("「画像」に頼みます。");
-	const [todo] = h.todos();
-	// The work keeps the request the conversation agent wrote.
-	expect(todo).toMatchObject({ status: "todo", title: "猫の絵" });
+	const run = await h.say("猫の絵を描いて");
+	expect(run.announcement ?? null).toBeNull();
+	expect(h.dialogue.answerText(run.id)).toBe("猫の絵を頼みました。");
+	// The run's selection record keeps the hand-over: the settled trace is no "answer" without a toolchain.
+	expect(h.state.selections.at(-1)).toMatchObject({
+		decision: "toolchain",
+		toolchainId: IMAGE.id,
+		request: "猫の絵",
+	});
+	// The work keeps the request the conversation agent wrote, and the user's words it came from.
+	expect(assigned).toHaveLength(1);
+	expect(assigned[0]).toMatchObject({
+		toolchainId: IMAGE.id,
+		request: "猫の絵",
+		source: { runId: run.id, request: "猫の絵を描いて" },
+	});
 	const types = h
 		.log()
 		.map((e) => [
@@ -130,51 +132,17 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 		]);
 	expect(types).toEqual([
 		["acted", "agent", "find_toolchain"],
-		["said", "user", null],
-		["said", "agent", "announcement"],
-		["delivered", "host", null],
 		["acted", "agent", "delegate"],
+		["said", "user", null],
+		["said", "agent", null],
+		["delivered", "host", null],
 	]);
-	expect(notified).toEqual([]);
-	const calls = h.state.calls.length;
-	// The result: the TODO is done and archived with its notice, its result is a line of the log; no model call is
-	// made for it, and the agent is told (it asks only what work asks).
-	const done = await h.finishImage(waiting.id, {
-		state: "completed",
-		title: "猫",
-	});
-	expect(done.status).toBe("completed");
-	expect(h.dialogue.answerText(done.id)).toBeNull();
-	expect(h.state.calls).toHaveLength(calls);
-	expect(notified).toEqual(["main"]);
-	expect(h.todos()).toEqual([]);
-	expect(h.archived()[0]).toMatchObject({
-		status: "done",
-		outcome: "succeeded",
-	});
-	expect(h.notices()).toMatchObject({ unread: 1, notices: [{ read: false }] });
-	expect(h.results()).toHaveLength(1);
-	expect(JSON.stringify(h.results())).toContain("猫");
-	// The notice tells the result: nothing was said by the host.
 	expect(
-		h.log().filter((e) => e.by === "agent" && e.type === "said"),
-	).toHaveLength(1);
-});
-
-test("a finished TODO with no agency port ends its run without a generation too", async () => {
-	h = await setup();
-	h.state.steps.push(
-		choice({ choice: IMAGE.id, say: "描きます。", request: "犬の絵" }),
-	);
-	const waiting = await h.say("犬の絵", "queued");
-	const calls = h.state.calls.length;
-	const done = await h.finishImage(waiting.id, {
-		state: "completed",
-		title: "犬",
-	});
-	expect(done.status).toBe("completed");
-	expect(h.state.calls).toHaveLength(calls);
-	expect(h.archived()).toMatchObject([{ status: "done" }]);
+		h
+			.log()
+			.map((e) => h!.fields(e))
+			.find((fields) => fields.action === "delegate"),
+	).toMatchObject({ toolchain: IMAGE.id, assignment: "a1" });
 });
 
 test("an answer delivery uses the emotion of the reply, never judged again", async () => {
@@ -207,42 +175,6 @@ test("an answer delivery uses the emotion of the reply, never judged again", asy
 	});
 	// The feeling came with the reply: no judgment call follows the turn's talk call.
 	expect(h.state.calls).toHaveLength(1);
-});
-
-test("a change needs a confirmation first; the approval executes the saved request", async () => {
-	h = await setup({
-		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
-	});
-	h.state.steps.push(
-		choice({
-			choice: IMAGE.id,
-			say: "差し替えます。",
-			request: "壁紙を差し替える",
-		}),
-	);
-	const asked = await h.say("壁紙を差し替えて");
-	expect(h.dialogue.answerText(asked.id)).toContain("よろしいですか？");
-	// Nothing was handed over before the yes.
-	expect(h.todos()).toEqual([]);
-	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
-	const approved = await h.say("お願い", "queued");
-	expect(h.state.calls.at(-1)!.tools).toEqual(
-		expect.arrayContaining(["approve_confirmation", "decline_confirmation"]),
-	);
-	expect(approved.announcement).toBeTruthy();
-	expect(h.todos()[0]).toMatchObject({
-		title: "壁紙を差し替える",
-		status: "todo",
-	});
-	// A confirmation is used once.
-	expect(
-		h.store.read(
-			(db) =>
-				db.query("SELECT used_at FROM dialogue_confirmations").get() as {
-					used_at: string | null;
-				},
-		).used_at,
-	).not.toBeNull();
 });
 
 test("a goal request goes to the steward with the user's message as its source", async () => {

@@ -143,7 +143,6 @@ function setup(
 					}
 				: { revision: 0, data: rows };
 		}),
-		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: submit,
 		toolchainAction: vi.fn(),
 		unsettledToolchainActions: vi.fn(async () => []),

@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { reportNoticeInTransaction } from "./report-notice";
 import { recordUtteranceInTransaction } from "./utterances";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { byId } from "../repository";
@@ -136,8 +135,7 @@ export function recordUnadoptedSpeechInTransaction(
 
 /**
  * An utterance the agency spoke on its own, with no run: a `said` of the agent (origin `spontaneous`), so the
- * conversation knows later what it said (section 16). The TODOs it cited (`todoRefs`, a sub-agent's question it
- * asks) are shown before it as the host's notice.
+ * conversation knows later what it said (section 16).
  */
 export function recordSpontaneousInTransaction(
 	deps: DialogueDeps,
@@ -147,45 +145,24 @@ export function recordSpontaneousInTransaction(
 		messageId: string;
 		text: string;
 		at: string;
-		todoRefs?: readonly string[];
 	},
 ) {
 	const at = jstSeconds(Date.parse(input.at));
-	const todoRefs = input.todoRefs ?? [];
 	deps.continuity.events.appendInTransaction(db, {
 		conversationId: input.conversationId,
 		at,
 		type: "said",
 		by: "agent",
-		fields: {
-			text: input.text,
-			origin: "spontaneous",
-			...(todoRefs.length ? { todoRefs } : {}),
-		},
+		fields: { text: input.text, origin: "spontaneous" },
 		messageIds: [input.messageId],
 		dedupeKey: `message:${input.messageId}`,
 		deliveryKey: `message:${input.messageId}`,
 	});
-	// A report follows, in the recent conversation, the notice of the works it told.
-	const notice = reportNoticeInTransaction(
-		deps,
-		db,
-		input.conversationId,
-		todoRefs,
-	);
 	recordUtteranceInTransaction(deps, db, {
 		conversationId: input.conversationId,
 		speaker: "agent",
 		text: input.text,
 		messageId: input.messageId,
 		at: input.at,
-		...(notice ? { notice } : {}),
 	});
-	// The report shows the resources of the TODOs it told as chips.
-	deps.resourceLedger?.linkMessageToWorkInTransaction(
-		db,
-		input.conversationId,
-		input.messageId,
-		todoRefs,
-	);
 }

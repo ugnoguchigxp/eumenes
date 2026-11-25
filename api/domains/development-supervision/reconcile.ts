@@ -134,8 +134,7 @@ export function saveWork(
 				parent.source,
 				goalReceipt(parent),
 			);
-	} else if (!parent.forgotten)
-		host?.ledgerInTransaction?.(db, executionView(parent));
+	}
 }
 function isOpen(queue: QueueService, db: Database, id: string | null) {
 	const state = id && queue.getInTransaction(db, id)?.state;
@@ -340,7 +339,6 @@ function erase(parent: Parent) {
 		parent.source.origin === "goal"
 			? { ...parent.source, request: "", expectedObservation: "", digest: "" }
 			: { ...parent.source, request: "", digest: "" };
-	delete parent.confirmation;
 	parent.request = "";
 	parent.reason = "";
 	parent.references = [];

@@ -20,7 +20,7 @@ export interface SeedWiring {
 	conversation: ConversationService;
 	continuity: ContinuityService;
 	memory: MemoryService;
-	/** Moves the clock of the services: items, notes, work and runs carry the time the seed says. */
+	/** Moves the clock of the services: items, notes and runs carry the time the seed says. */
 	setNow(iso: string): void;
 	now(): string;
 	close(): Promise<void>;
@@ -52,8 +52,7 @@ export type Reply = {
 	/** Facts the generation's actions wrote before it spoke (`acted` events). */
 	acted?: Array<{ fields: Record<string, unknown>; by?: "agent" | "host" }>;
 	text?: string;
-	origin?: "reply" | "report" | "announcement" | "confirmation";
-	todoRefs?: string[];
+	origin?: "reply" | "report" | "announcement";
 	about?: string[];
 	heard?: "full" | "partial" | "none";
 	deliveredText?: string;

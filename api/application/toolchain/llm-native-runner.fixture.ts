@@ -1,4 +1,4 @@
-import { harness } from "./toolchain.fixture";
+import { assignmentFixture } from "./assignment.fixture";
 import {
 	fixedAcquisition,
 	compareRequirementResult,
@@ -14,17 +14,18 @@ export async function evaluateRequirements(
 	historyFixture = false,
 ) {
 	const started = performance.now();
-	const h = await harness({
+	const f = await assignmentFixture({
 		model,
 		history: historyFixture,
 		acquire: fixedAcquisition(c.sources),
 	});
+	const { h } = f;
 	try {
 		if (historyFixture)
 			for (const source of c.sources)
 				await h.conversation.append({
 					id: crypto.randomUUID(),
-					conversationId: "evaluation",
+					conversationId: f.conversationId,
 					role: "user",
 					text: source.body,
 					createdAt: source.fetchedAt,
@@ -50,27 +51,20 @@ export async function evaluateRequirements(
 				throw new Error("evaluation_registration_failed");
 			registered.set(p.id, (await response.json()).revisionId);
 		}
-		const response = await h.request("/api/runs", {
-			requestId: crypto.randomUUID(),
-			conversationId: "evaluation",
-			text: c.request,
-		});
-		if (response.status !== 202)
-			throw new Error("evaluation_submission_failed");
-		const run = await response.json();
-		const final = await h.dialogue.waitForTerminal(run.id, {
-			timeoutMs: 190000,
-		});
-		const tasks = h.toolchain.agents.list(run.id);
+		const { source } = await f.assign(c.request, "history.research");
+		await f.settled(1, f.conversationId, 190_000);
+		const execution = f.executions()[0];
+		const tasks = h.toolchain.agents.list(source.runId);
 		const child = tasks.find((t) => t.kind === "worker");
+		const root = tasks.find((t) => t.kind === "coordinator");
 		let report: Report | null = null;
 		try {
-			report = h.toolchain.agents.report(final?.agentTaskId ?? run.agentTaskId);
+			report = h.toolchain.agents.report(root!.id);
 		} catch {}
 		const usage = h.inference.usage();
 		return {
 			caseId: c.id,
-			status: final?.status,
+			status: execution?.status,
 			structureMatched: compareRequirementResult(c, report, registered),
 			semanticChecks: c.expected.semanticAssertions.map((assertion) => ({
 				assertion,
@@ -86,12 +80,12 @@ export async function evaluateRequirements(
 			counts: {
 				conversation: Math.min(
 					1,
-					usage.filter((u) => u.subject === run.id && u.purpose === "llm")
+					usage.filter((u) => u.subject === source.runId && u.purpose === "llm")
 						.length,
 				),
 				parent: Math.max(
 					0,
-					usage.filter((u) => u.subject === run.id && u.purpose === "llm")
+					usage.filter((u) => u.subject === source.runId && u.purpose === "llm")
 						.length - 1,
 				),
 				worker: child?.modelCalls ?? 0,
@@ -112,10 +106,10 @@ export async function evaluateRequirements(
 							.length
 					: 0,
 			elapsedMs: Math.round(performance.now() - started),
-			safeCode: child?.errorCode ?? final?.error ?? null,
+			safeCode: child?.errorCode ?? execution?.result?.code ?? null,
 			report,
 		};
 	} finally {
-		await h.close();
+		await f.close();
 	}
 }

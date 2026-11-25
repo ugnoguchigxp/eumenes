@@ -50,7 +50,6 @@ test("a goal receipt survives restart and cannot project into a conversation or 
 		() => ({ mode: "design", quote: "", reason: "fixture" }),
 		undefined,
 		false,
-		undefined,
 		{
 			authorityInTransaction: (_db, value) =>
 				permitted && hash(value) === hash(source)
@@ -184,7 +183,6 @@ test.skipIf(process.platform !== "darwin")(
 					: { mode: "design", quote: "", reason: "fixture" },
 			undefined,
 			false,
-			undefined,
 			{
 				authorityInTransaction: (_db, origin) =>
 					origin.permitId === permitId
@@ -375,7 +373,6 @@ test("an owned check preserves its witnessed failure after a later execution sup
 		() => ({ mode: "design", quote: "", reason: "fixture" }),
 		undefined,
 		false,
-		undefined,
 		{
 			authorityInTransaction: () => ({
 				scope: {

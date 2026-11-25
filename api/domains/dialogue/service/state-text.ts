@@ -3,11 +3,7 @@ import type { ConversationState, Utterance } from "../../conversation";
 import type { Run } from "../contracts";
 import { liveSession, markReported, unreportedEnded } from "../repository";
 import type { DialogueDeps } from "./context";
-import { agencyWork } from "../repository/agency";
 import { planGoalLines } from "./state-plans";
-import { taskForWork, taskTargets } from "./task-work";
-import { workContextCurrent } from "./work-context-input";
-import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
 import {
 	screenLinesInTransaction,
@@ -20,90 +16,14 @@ import {
 } from "./shared-files";
 
 /** Bounds of the host's fields of `## State` (the conversation input specification, section 7.1). */
-export const STATE_LIMITS = {
+const STATE_LIMITS = {
 	work: 8,
 	presented: 4,
 	/** The conversation's shared files not presented (spec/server-scratch-cache-design-2026-11-07.md §8.1). */
 	shared: SHARED_LINES,
-	/** A TODO archived this long ago is no longer named (its notice told the user it finished). */
-	archivedMs: 2 * 60 * 60 * 1000,
-	/** A TODO's request and a task's reason are told cut to this many characters. */
-	preview: 240,
 	/** A gap this long since the last utterance is said in the `今` line. */
 	gapMs: 30 * 60 * 1000,
 } as const;
-
-const OUTCOMES: Record<string, string> = {
-	partial: "一部のみ",
-	failed: "失敗",
-	interrupted: "中断",
-};
-const IMPACTS: Record<string, string> = {
-	none: "影響なし",
-	create: "作成",
-	modify_existing: "変更",
-	irreversible: "取り消せない",
-};
-
-/** The resources a TODO made, as `a<n>「label」`. */
-export function madeOf(
-	todo: TodoItem,
-	refs: DocumentRefs,
-	visible?: Set<string>,
-): string[] {
-	return (todo.links ?? []).flatMap((link) => {
-		const ref = refs.resource(link.uri);
-		if (!ref) return [];
-		visible?.add(ref);
-		return [`${ref}「${lineText(link.label)}」`];
-	});
-}
-
-function todoLine(todo: TodoItem, made: string[], archived: boolean): string {
-	// Finished work is archived as it finishes and told by a notice on screen; work the user cancelled has none.
-	const status = archived
-		? todo.outcome === "cancelled"
-			? "取消済み"
-			: "通知済み"
-		: todo.status === "waiting"
-			? "質問待ち"
-			: "実行中";
-	const outcome =
-		archived && todo.outcome && OUTCOMES[todo.outcome]
-			? `（${OUTCOMES[todo.outcome]}）`
-			: "";
-	return `- t${todo.ref} ${lineText(todo.title)} ${status}${outcome}${made.length ? ` ${made.join(" ")}` : ""}`;
-}
-
-/**
- * What the `work` tool's schema used to carry per TODO and now names only by `t<n>`: the request, the question the
- * user is asked and the tasks by their taskId. The agency's own research is outside the user's work controls.
- */
-function todoDetail(deps: DialogueDeps, tx: Database, todo: TodoItem): string {
-	const row = deps.work?.workInTransaction(tx, todo.id);
-	if (!row || agencyWork(tx, row.runId)) return "";
-	// A request the title already says is not told twice.
-	const request = lineText(row.request).slice(0, STATE_LIMITS.preview);
-	const said = request === lineText(todo.title);
-	const tasks = taskTargets(deps, tx, row)?.tasks;
-	const detail = {
-		...(request && !said ? { request } : {}),
-		...(todo.status === "waiting" && todo.question
-			? { question: lineText(todo.question) }
-			: {}),
-		...(tasks
-			? {
-					tasks: tasks.map(({ taskId, title, state, reason }) => ({
-						taskId,
-						title,
-						state,
-						reason: lineText(reason).slice(0, STATE_LIMITS.preview),
-					})),
-				}
-			: {}),
-	};
-	return Object.keys(detail).length ? ` ${JSON.stringify(detail)}` : "";
-}
 
 /** What the host knows of a specialist's work: a suspended one, a switch waiting for the user, one that ended. */
 function specialistLines(
@@ -150,14 +70,11 @@ export type StateInput = {
 	nowMs: number;
 	/** When the newest utterance before this input was said. */
 	lastAt: number | null;
-	/** When the recent conversation begins: work finished before it is no part of this input (C4). */
-	since?: number | null;
 	/** The agent's newest utterance in the recent conversation. */
 	lastAgent: Utterance | null;
 	state: ConversationState | null;
 	/** A specialist handed the user's words back (its line names it). */
 	handoff?: string;
-	refs: DocumentRefs;
 };
 
 /** The host's and the model's fields of `## State`, without its heading. */
@@ -175,10 +92,8 @@ export function stateProjectionInTransaction(
 	tx: Database,
 	input: StateInput,
 ) {
-	const { refs } = input;
 	const lines: string[] = [];
 	const resources = new Set<string>();
-	const todos: number[] = [];
 	const gap =
 		input.lastAt !== null && input.nowMs - input.lastAt >= STATE_LIMITS.gapMs
 			? `（前の発言から${gapText(input.nowMs - input.lastAt)}）`
@@ -188,72 +103,10 @@ export function stateProjectionInTransaction(
 	lines.push(
 		...(input.agencyLines ?? agencyStateLines(deps, tx, input.conversationId)),
 	);
-	const ledger = deps.work;
-	const open = (
-		ledger?.todosInTransaction(tx, input.conversationId) ?? []
-	).filter((todo) =>
-		workContextCurrent(deps, tx, input.conversationId, todo.id),
-	);
-	let briefs = 0;
-	const showTodo = (todo: TodoItem, archived: boolean) => {
-		todos.push(todo.ref);
-		const line = `${todoLine(todo, madeOf(todo, refs, resources), archived)}${todoDetail(deps, tx, todo)}`;
-		if (
-			!input.run ||
-			!["manual", "voice"].includes(input.run.sourceKind) ||
-			briefs >= 5 ||
-			!ledger
-		)
-			return line;
-		const row = ledger.workInTransaction(tx, todo.id);
-		const view =
-			row?.execution === "task" && row.sourceRef
-				? taskForWork(deps, tx, row)?.viewInTransaction(tx, row.sourceRef)
-				: null;
-		if (view?.conversationSummary !== "next_turn" || !view.progress)
-			return line;
-		briefs++;
-		const { summary, observedAt } = view.progress;
-		return `${line} ${JSON.stringify({
-			status: view.status,
-			revision: view.revision,
-			observedAt,
-			summary: lineText(summary).slice(0, 320),
-		})}`;
-	};
-	const work = (
-		ledger?.pendingConfirmationsInTransaction(tx, input.conversationId) ?? []
-	).map(
-		(c) =>
-			`- c${c.ref} 確認待ち ${c.toolchain}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}（${IMPACTS[c.impact] ?? c.impact}）`,
-	);
-	work.push(
-		...open
-			.slice(0, Math.max(0, STATE_LIMITS.work - work.length))
-			.map((todo) => showTodo(todo, false)),
+	const work = [
 		...specialistLines(deps, tx, input.conversationId, !!input.run),
 		...(input.handoff ? [`- ${lineText(input.handoff)}`] : []),
-	);
-	const room = STATE_LIMITS.work - work.length;
-	if (ledger && room > 0)
-		work.push(
-			...ledger
-				.recentlyArchivedInTransaction(
-					tx,
-					input.conversationId,
-					new Date(
-						Math.max(
-							input.nowMs - STATE_LIMITS.archivedMs,
-							input.since ?? Number.NEGATIVE_INFINITY,
-						),
-					).toISOString(),
-					room,
-				)
-				.filter((todo) =>
-					workContextCurrent(deps, tx, input.conversationId, todo.id),
-				)
-				.map((todo) => showTodo(todo, true)),
-		);
+	];
 	if (work.length) lines.push("仕事:", ...work.slice(0, STATE_LIMITS.work));
 
 	const appendResources = (heading: string, rows: ResourceContextLine[]) => {
@@ -264,7 +117,7 @@ export function stateProjectionInTransaction(
 			if (row.resource) resources.add(row.resource);
 		}
 	};
-	const presented = presentedLines(deps, tx, input, open).slice(
+	const presented = presentedLines(deps, tx, input).slice(
 		0,
 		STATE_LIMITS.presented,
 	);
@@ -277,7 +130,7 @@ export function stateProjectionInTransaction(
 		);
 	}
 	lines.push(...planGoalLines(deps, tx));
-	return { lines, resources: [...resources], todos };
+	return { lines, resources: [...resources] };
 }
 
 /**
@@ -288,9 +141,7 @@ function presentedLines(
 	deps: DialogueDeps,
 	tx: Database,
 	input: StateInput,
-	open: readonly TodoItem[],
 ): ResourceContextLine[] {
-	const { refs } = input;
 	const lines = input.run
 		? [...(input.screenLines ?? screenLinesInTransaction(deps, tx, input.run))]
 		: [];
@@ -306,7 +157,6 @@ function presentedLines(
 				?.message
 		: undefined;
 	if (!message) return lines;
-	const named = new Set(open.flatMap((todo) => madeOf(todo, refs)));
 	for (const row of deps.resourceLedger?.ofMessageInTransaction(
 		tx,
 		message.id,
@@ -314,10 +164,9 @@ function presentedLines(
 		const ref = `a${row.ref}`;
 		if (shown.has(ref)) continue;
 		shown.add(ref);
-		const full = `${ref}「${lineText(row.label)}」`;
 		lines.push({
 			resource: ref,
-			text: `- ${named.has(full) ? ref : full}（直前の返事で示した）`,
+			text: `- ${ref}「${lineText(row.label)}」（直前の返事で示した）`,
 		});
 	}
 	return lines;

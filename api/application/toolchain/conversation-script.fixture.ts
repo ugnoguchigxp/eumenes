@@ -35,8 +35,8 @@ export const findToolchain = (query: string): Call => ({
 });
 
 /**
- * A delegation that runs now. Without `inputs` it is a TODO: the announcement (required) is saved and the run is
- * handed over. With `inputs` it is an instant answer, which carries no announcement.
+ * A delegation: without `inputs` the request is handed to the toolchain (the agent's assignment when it is not
+ * instant or a session); with `inputs` it is an instant answer.
  */
 export const delegate = (
 	toolchain: string,
@@ -47,37 +47,12 @@ export const delegate = (
 	args: { mode: "execute", toolchain, request, impact: "none", ...args },
 });
 
-/** An instant toolchain: no announcement and no TODO; its answer comes back as the tool result. */
+/** An instant toolchain: its answer comes back as the tool result. */
 export const instantExecute = (
 	toolchain: string,
 	request: string,
 	inputs: Record<string, unknown>,
 ): Call => delegate(toolchain, request, { inputs });
-
-/** A change that needs the user's approval first: the confirmation is shown, nothing runs. */
-export const confirm = (
-	toolchain: string,
-	request: string,
-	args: Record<string, unknown> = {},
-): Call => ({
-	name: "delegate",
-	args: {
-		mode: "confirm",
-		toolchain,
-		request,
-		impact: "modify_existing",
-		...args,
-	},
-});
-
-/** The approval of a confirmation the earlier utterance made (its id is in state.pendingConfirmation). */
-export const approve = (
-	confirmation: string,
-	announcement = "差し替えます。",
-): Call => ({
-	name: "delegate",
-	args: { mode: "approve", confirmation, announcement },
-});
 
 /**
  * One candidate of a `find_toolchain` result (the ids the delegation names). The result is text (section 9): a
@@ -93,6 +68,32 @@ export type Candidate = {
 /** The result's own fields, which are lines of the same form but no candidates. */
 const SEARCH_FIELDS = new Set(["discovery", "code"]);
 
+type InputSchema = {
+	type?: unknown;
+	description?: unknown;
+	enum?: unknown;
+	properties?: Record<string, InputSchema>;
+	required?: unknown;
+};
+
+/** A candidate's inputs as the model reads them: `name（type、required、values）description`, joined by `、`. */
+function inputsText(schema: unknown): string | undefined {
+	const root = schema as InputSchema | undefined;
+	if (!root?.properties) return undefined;
+	const required = new Set(Array.isArray(root.required) ? root.required : []);
+	const parts = Object.entries(root.properties).map(([name, field]) => {
+		const notes = [
+			typeof field.type === "string" ? field.type : null,
+			required.has(name) ? "必須" : null,
+			Array.isArray(field.enum) ? `値は ${field.enum.join("・")}` : null,
+		].filter((note): note is string => !!note);
+		const description =
+			typeof field.description === "string" ? field.description : "";
+		return `${name}（${notes.join("、")}）${description}`;
+	});
+	return parts.length ? `inputs: ${parts.join("、")}` : undefined;
+}
+
 /** The candidates of the generation's search, if the model has searched (its result is the candidate list). */
 export function candidatesOf(
 	messages: ConversationMessage[],
@@ -106,13 +107,16 @@ export function candidatesOf(
 				title?: string;
 				summary?: string;
 				execution?: string;
+				inputs?: unknown;
 			}>;
 		};
-		return (candidates ?? []).map(({ id, title, summary, execution }) => ({
-			id,
-			text: [title, summary].filter(Boolean).join(" "),
-			...(execution ? { execution } : {}),
-		}));
+		return (candidates ?? []).map(
+			({ id, title, summary, execution, inputs }) => ({
+				id,
+				text: [title, summary, inputsText(inputs)].filter(Boolean).join(" "),
+				...(execution ? { execution } : {}),
+			}),
+		);
 	}
 	return search.split("\n").flatMap((line) => {
 		const match = /^- (\S+): (.*)$/.exec(line);
@@ -344,32 +348,6 @@ export async function choiceByScript(
 	return NONE;
 }
 
-/**
- * The answer fill of a question that asks for a structured answer, from a script written for the agent loop: the
- * text of its work answer read as the answer; none when it gives no such answer.
- */
-export async function answerByScript(
-	messages: ConversationMessage[],
-	step: (loop: ConversationMessage[]) => Promise<Step> | Step,
-): Promise<string> {
-	const chosen = JSON.parse(
-		await choiceByScript(messages, "pending", step),
-	) as {
-		choice?: string;
-		text?: unknown;
-	};
-	if (chosen.choice !== "answer" || typeof chosen.text !== "string")
-		return NONE;
-	try {
-		return JSON.stringify({
-			choice: "answer",
-			answer: JSON.parse(chosen.text),
-		});
-	} catch {
-		return NONE;
-	}
-}
-
 /** Answer the conversation's tool loop or the argument fill for its selected toolchain. */
 export function conversationByScript<M>(
 	options: Parameters<LarmPort["answer"]>[2],
@@ -396,19 +374,6 @@ function choiceOf(
 	round: "request" | "pending",
 ): Record<string, unknown> | null {
 	const a = call.args;
-	if (call.name === "work")
-		return a.operation === "answer"
-			? { choice: "answer", todo: a.todo, text: a.text }
-			: round === "request"
-				? {
-						choice: a.todo,
-						operation: a.operation,
-						...(a.text ? { text: a.text } : {}),
-						say: SAY,
-					}
-				: null;
-	if (call.name === "delegate" && a.mode === "approve")
-		return { choice: "approve", confirmation: a.confirmation };
 	if (round === "pending") return null;
 	if (call.name === "memory")
 		return {
@@ -441,22 +406,6 @@ export const CONVERSATION_WINDOW_TOKENS = 262144;
 /** The ids of the calls the step makes, as the model's tool calls (the receipt's shape). */
 export function callsOf(step: Step, id: () => string) {
 	return (step.calls ?? []).map(({ name, args }) => {
-		if (name === "delegate" && args.mode === "approve")
-			return {
-				id: id(),
-				name: "approve_confirmation",
-				arguments: JSON.stringify({ confirmation: args.confirmation }),
-			};
-		if (name === "work")
-			return {
-				id: id(),
-				name,
-				arguments: JSON.stringify({
-					todo: args.todo,
-					operation: args.operation,
-					...(args.target !== undefined ? { target: args.target } : {}),
-				}),
-			};
 		return { id: id(), name, arguments: JSON.stringify(args) };
 	});
 }

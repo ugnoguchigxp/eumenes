@@ -73,8 +73,12 @@ export function ConversationPanel({
 		url: avatarBackdrop.imageId
 			? imageContentUrl(avatarBackdrop.imageId)
 			: null,
+		color: avatarBackdrop.color,
+		busy: avatarBackdrop.busy,
 		onPick: () => setBackdropPicking(true),
 		onClear: () => void avatarBackdrop.select(null),
+		onColor: avatarBackdrop.selectColor,
+		onReset: () => void avatarBackdrop.reset(),
 	};
 	return (
 		<section

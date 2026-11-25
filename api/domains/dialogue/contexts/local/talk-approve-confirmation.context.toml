@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/talk-work-controls.ts
-text = '''State の確認待ち（c<n>）に利用者が明確に同意したとき、この返答中に呼んで受け付ける。曖昧・条件付きなら範囲を確認し、受付と完了を区別する。'''

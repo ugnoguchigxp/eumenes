@@ -8,7 +8,6 @@ import {
 import { goalReplyToolNames } from "eumenes-agency/agenda/runtime";
 import { TOOL_NAMES } from "./generation-tools";
 import { jstNowLine } from "./input-text";
-import type { DocumentRefs } from "./work-items";
 
 /**
  * The tools whose calls and normalized results stay in the working conversation epoch until compaction
@@ -30,9 +29,6 @@ const READ_TOOL_NAMES = new Set<string>([
 ]);
 const LOOKUP_TOOL = "lookup_public_information";
 const WORK_CONTROL_TOOLS = new Set<string>([
-	"approve_confirmation",
-	"decline_confirmation",
-	TOOL_NAMES.work,
 	"discard_for_pending_switch",
 	TOOL_NAMES.memory,
 ]);
@@ -182,8 +178,7 @@ function boundedJson(value: unknown, maxChars: number): string {
 		"code",
 		"reason",
 		"ref",
-		"todo",
-		"confirmation",
+		"assignment",
 		"delegated",
 		"accepted",
 		"answered",
@@ -208,7 +203,6 @@ function boundedJson(value: unknown, maxChars: number): string {
 function carriedSearchOrDelegate(
 	name: string,
 	result: unknown,
-	refs: DocumentRefs,
 ): Record<string, unknown> {
 	const record = recordOf(result);
 	if (record.refused === true) return { refused: true };
@@ -230,13 +224,14 @@ function carriedSearchOrDelegate(
 				};
 			}),
 		};
-	if (typeof record.confirmation === "string")
-		return { confirmation: record.confirmation };
-	if (record.delegated === true) {
-		const todo =
-			typeof record.todo === "string" ? refs.todo(record.todo) : null;
-		return todo ? { todo } : { delegated: true };
-	}
+	// An assignment is the agent's: the reply that follows names it by its id.
+	if (typeof record.assignment === "string")
+		return {
+			delegated: record.delegated === true,
+			assignment: record.assignment,
+			...(typeof record.code === "string" ? { code: record.code } : {}),
+		};
+	if (record.delegated === true) return { delegated: true };
 	if (typeof record.answered === "boolean")
 		return { answered: record.answered };
 	return { delegated: false };
@@ -272,7 +267,6 @@ function carriedArguments(raw: string): string {
 
 function normalizeStepResult(
 	step: ExchangeStep,
-	refs: DocumentRefs,
 	nowMs: number,
 	maxCharsOverride?: number,
 ): string {
@@ -322,7 +316,7 @@ function normalizeStepResult(
 		return boundedJson(parsed ?? {}, cap(RESULT_CHARS.workControl));
 	}
 	return boundedJson(
-		carriedSearchOrDelegate(step.name, step.result, refs),
+		carriedSearchOrDelegate(step.name, step.result),
 		cap(RESULT_CHARS.searchDelegate),
 	);
 }
@@ -330,14 +324,13 @@ function normalizeStepResult(
 /** The exchange of a turn to keep with the agent's utterance that ends it, bounded per-tool and per-turn. */
 export function carriedToolCalls(
 	steps: readonly ExchangeStep[],
-	refs: DocumentRefs,
 	nowMs = Date.now(),
 ): UtteranceToolCall[] {
 	const kept = steps.filter((step) => carriesExchange(step.name));
 	const calls = kept.map((step) => ({
 		name: step.name,
 		arguments: carriedArguments(step.arguments),
-		result: normalizeStepResult(step, refs, nowMs),
+		result: normalizeStepResult(step, nowMs),
 	}));
 	let total = calls.reduce((sum, c) => sum + c.result.length, 0);
 	// Enforce per-turn result cap from the newest steps backwards, preserving valid JSON on JSON tools.
@@ -349,7 +342,7 @@ export function carriedToolCalls(
 		const excess = total - RESULT_CHARS.turnTotal;
 		const current = calls[i]!;
 		const target = Math.max(120, current.result.length - excess);
-		const shrunk = normalizeStepResult(kept[i]!, refs, nowMs, target);
+		const shrunk = normalizeStepResult(kept[i]!, nowMs, target);
 		total -= current.result.length - shrunk.length;
 		current.result = shrunk;
 	}

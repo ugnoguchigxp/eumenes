@@ -219,12 +219,29 @@ test("framing and reset survive destroying and recreating the background", async
 	expect(third.model.render.mock.calls[0]?.[4]).toEqual(defaultAvatarView);
 });
 
-test("the background colour paints only the drawing area, stays apart from framing and survives remounting", async () => {
+function backdropOf(color: string | null = null) {
+	return {
+		url: null as string | null,
+		color,
+		busy: false,
+		onPick: vi.fn(),
+		onClear: vi.fn(),
+		onColor: vi.fn<(color: string | null) => Promise<boolean>>(
+			async () => true,
+		),
+		onReset: vi.fn(),
+	};
+}
+
+test("a picked colour paints only the drawing area at once, is saved once when the picker rests, and the saved colour returns after remounting", async () => {
 	const first = await fixture();
 	const area = () =>
 		document.querySelector<HTMLElement>(".hiyori-avatar-background")!;
 	expect(area().style.background).toBe("");
-	first.view.rerender(<HiyoriAvatarBackground active interactive />);
+	const backdrop = backdropOf();
+	first.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={backdrop} />,
+	);
 	fireEvent.click(screen.getByText("モデルの表示調整"));
 	expect(
 		(screen.getByRole("button", { name: "既定の背景" }) as HTMLButtonElement)
@@ -232,9 +249,9 @@ test("the background colour paints only the drawing area, stays apart from frami
 	).toBe(true);
 	fireEvent.click(screen.getByRole("button", { name: "上半身" }));
 	const renders = first.model.render.mock.calls.length;
-	fireEvent.input(screen.getByLabelText("背景色", { selector: "input" }), {
-		target: { value: "#f0e6d2" },
-	});
+	const picker = screen.getByLabelText("背景色", { selector: "input" });
+	fireEvent.input(picker, { target: { value: "#000000" } });
+	fireEvent.input(picker, { target: { value: "#f0e6d2" } });
 	expect(area().style.background).toBe("rgb(240, 230, 210)");
 	expect(screen.getByText("#f0e6d2")).toBeTruthy();
 	expect(first.model.render.mock.calls.length).toBe(renders);
@@ -243,35 +260,80 @@ test("the background colour paints only the drawing area, stays apart from frami
 		x: 0,
 		y: 0,
 	});
+	await waitFor(() => expect(backdrop.onColor).toHaveBeenCalledTimes(1));
+	expect(backdrop.onColor).toHaveBeenCalledWith("#f0e6d2");
+	const saved = { ...backdrop, color: "#f0e6d2" };
+	first.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={saved} />,
+	);
 	fireEvent.click(screen.getByRole("button", { name: "リセット" }));
 	expect(first.model.render.mock.lastCall?.[4]).toEqual(defaultAvatarView);
 	expect(area().style.background).toBe("rgb(240, 230, 210)");
-	first.view.rerender(<HiyoriAvatarBackground active />);
+	first.view.rerender(<HiyoriAvatarBackground active backdrop={saved} />);
 	expect(area().style.background).toBe("rgb(240, 230, 210)");
 	expect(createHiyori).toHaveBeenCalledTimes(1);
 	first.view.unmount();
+	// The saved colour has nothing left to save on unmount.
+	expect(saved.onColor).toHaveBeenCalledTimes(1);
 
 	const second = await fixture();
+	second.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={saved} />,
+	);
 	expect(area().style.background).toBe("rgb(240, 230, 210)");
-	second.view.rerender(<HiyoriAvatarBackground active interactive />);
 	fireEvent.click(screen.getByText("モデルの表示調整"));
-	fireEvent.click(screen.getByRole("button", { name: "上半身" }));
 	fireEvent.click(screen.getByRole("button", { name: "既定の背景" }));
+	expect(saved.onReset).toHaveBeenCalledTimes(1);
+	second.view.rerender(
+		<HiyoriAvatarBackground
+			active
+			interactive
+			backdrop={{ ...saved, color: null }}
+		/>,
+	);
 	expect(area().style.background).toBe("");
-	expect(second.model.render.mock.lastCall?.[4]).toEqual({
-		zoom: 2.2,
-		x: 0,
-		y: 0,
-	});
-	second.view.unmount();
+});
 
-	const third = await fixture();
-	expect(area().style.background).toBe("");
-	expect(third.model.render.mock.calls[0]?.[4]).toEqual({
-		zoom: 2.2,
-		x: 0,
-		y: 0,
+test("a colour that is not saved falls back to the saved one, and nothing saves while another save is in flight", async () => {
+	const first = await fixture();
+	const area = () =>
+		document.querySelector<HTMLElement>(".hiyori-avatar-background")!;
+	const busy = { ...backdropOf("#123456"), busy: true };
+	busy.onColor.mockResolvedValue(false);
+	first.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={busy} />,
+	);
+	fireEvent.click(screen.getByText("モデルの表示調整"));
+	fireEvent.input(screen.getByLabelText("背景色", { selector: "input" }), {
+		target: { value: "#654321" },
 	});
+	expect(area().style.background).toBe("rgb(101, 67, 33)");
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	expect(busy.onColor).not.toHaveBeenCalled();
+	first.view.rerender(
+		<HiyoriAvatarBackground
+			active
+			interactive
+			backdrop={{ ...busy, busy: false }}
+		/>,
+	);
+	await waitFor(() => expect(busy.onColor).toHaveBeenCalledWith("#654321"));
+	await waitFor(() => expect(area().style.background).toBe("rgb(18, 52, 86)"));
+});
+
+test("a colour picked just before the background is switched away is still saved", async () => {
+	const first = await fixture();
+	const backdrop = backdropOf();
+	first.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={backdrop} />,
+	);
+	fireEvent.click(screen.getByText("モデルの表示調整"));
+	fireEvent.input(screen.getByLabelText("背景色", { selector: "input" }), {
+		target: { value: "#abcdef" },
+	});
+	expect(backdrop.onColor).not.toHaveBeenCalled();
+	first.view.unmount();
+	expect(backdrop.onColor).toHaveBeenCalledExactlyOnceWith("#abcdef");
 });
 
 test("a saved image shows between the area's colour and the model, and is chosen and removed from the background controls", async () => {
@@ -282,7 +344,7 @@ test("a saved image shows between the area's colour and the model, and is chosen
 		document.querySelector<HTMLElement>(".hiyori-avatar-background")!;
 	const button = (name: string) =>
 		screen.getByRole("button", { name }) as HTMLButtonElement;
-	const backdrop = { url: null, onPick: vi.fn(), onClear: vi.fn() };
+	const backdrop = backdropOf();
 	first.view.rerender(
 		<HiyoriAvatarBackground active interactive backdrop={backdrop} />,
 	);
@@ -311,7 +373,8 @@ test("a saved image shows between the area's colour and the model, and is chosen
 	fireEvent.click(button("画像を外す"));
 	expect(chosen.onClear).toHaveBeenCalledTimes(1);
 	fireEvent.click(button("既定の背景"));
-	expect(chosen.onClear).toHaveBeenCalledTimes(2);
+	expect(chosen.onClear).toHaveBeenCalledTimes(1);
+	expect(chosen.onReset).toHaveBeenCalledTimes(1);
 	expect(area().style.background).toBe("");
 
 	// An image alone enables the reset; outside background mode it shows without controls.

@@ -35,20 +35,6 @@ test("a refusal schedules the next try 30 s later with the whole budget after it
 	expect(expired).toBe(0);
 });
 
-test("the run is extended to the planned deadline, and a run that cannot be extended ends the wait", () => {
-	const asked: number[] = [];
-	expect(settle({ extend: (d) => (asked.push(d), d) }).scheduled).toHaveLength(
-		1,
-	);
-	expect(asked).toEqual([331_000]);
-	for (const extend of [() => 331_000 - 1, () => null]) {
-		const r = settle({ extend });
-		expect(r.plan).toBeNull();
-		expect(r.expired).toBe(1);
-		expect(r.scheduled).toHaveLength(0);
-	}
-});
-
 test("the 30-minute limit and a fixed deadline end the wait without scheduling", () => {
 	const late = settle({
 		now: 30 * 60_000,

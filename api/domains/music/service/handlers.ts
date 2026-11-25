@@ -34,11 +34,9 @@ function waitForCapacity(
 	r: Row,
 	retryAfterMs: number | null,
 	ports: {
-		onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
 		enqueue: (
 			db: Database,
 			id: string,
-			runId: string,
 			deadline: number,
 			stage: "generate",
 			wait: { at: number; count: number },
@@ -46,9 +44,7 @@ function waitForCapacity(
 		fail: (db: Database, id: string, code: string) => void;
 	},
 ) {
-	const execution = JSON.parse(r.request_json).execution;
-	const { onWaiting } = ports;
-	// A child execution's deadline is fixed by its caller; a run's deadline is extended or the wait ends.
+	// The execution's deadline is fixed by its caller; the wait ends at it.
 	settleCapacityWait({
 		domain: "music",
 		subjectId: r.id,
@@ -56,22 +52,14 @@ function waitForCapacity(
 		previous: record(r).capacityWait,
 		retryAfterMs,
 		budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
-		limitAt: execution ? r.deadline : null,
-		extend:
-			execution || !onWaiting
-				? undefined
-				: (deadline) => onWaiting(db, r.run_id, deadline),
+		limitAt: r.deadline,
 		expire: () => ports.fail(db, r.id, LARM_CAPACITY_TIMEOUT),
 		schedule(plan) {
-			db.query("UPDATE music_generations SET deadline=? WHERE id=?").run(
-				plan.deadline,
-				r.id,
-			);
 			patch(db, r.id, {
 				phase: LARM_CAPACITY_WAITING,
 				capacityWait: { startedAt: plan.startedAt, count: plan.count },
 			});
-			return ports.enqueue(db, r.id, r.run_id, plan.deadline, "generate", {
+			return ports.enqueue(db, r.id, plan.deadline, "generate", {
 				at: plan.at,
 				count: plan.count,
 			});
@@ -83,7 +71,6 @@ export function registerMusicHandlers(
 		enqueue: (
 			db: Database,
 			id: string,
-			runId: string,
 			deadline: number,
 			stage: "plan" | "generate",
 			wait?: { at: number; count: number },
@@ -97,7 +84,7 @@ export function registerMusicHandlers(
 		id: string;
 		requestId: string;
 		prepared: Prepared;
-		execution?: ChildExecution;
+		execution: ChildExecution;
 		context: ReturnType<typeof musicContext>;
 	};
 	const planHandler: HandlerDefinition<
@@ -114,12 +101,15 @@ export function registerMusicHandlers(
 			const r = row(db, claim.payload.id);
 			if (!r || record(r).state !== "planning")
 				return { status: "stale", reason: "music_not_planning" };
-			if (!inference.captureControlInTransaction || !inference.executeControl)
+			if (
+				!inference.captureUserControlInTransaction ||
+				!inference.executeControl
+			)
 				throw new Error("music_inference_unavailable");
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
-			const execution = JSON.parse(r.request_json).execution;
-			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+			const execution = JSON.parse(r.request_json).execution as ChildExecution;
+			if (!deps.validateExecutionInTransaction?.(db, execution))
 				throw new Error("execution_changed");
 			const capture = {
 				subject: `music:${r.id}:plan`,
@@ -127,12 +117,10 @@ export function registerMusicHandlers(
 				deadline: Math.min(r.deadline - 15000, Date.now() + PLAN_MS),
 				maxOutputTokens: 4096,
 			};
-			const requestId = execution
-				? inference.captureUserControlInTransaction!(db, {
-						...capture,
-						subject: `music-task:${r.id}-plan`,
-					})
-				: inference.captureControlInTransaction(db, capture);
+			const requestId = inference.captureUserControlInTransaction(db, {
+				...capture,
+				subject: `music-task:${r.id}-plan`,
+			});
 			return {
 				status: "ready",
 				input: {
@@ -156,7 +144,7 @@ export function registerMusicHandlers(
 				messages,
 				signal,
 				input.context.control,
-				input.execution ? executionCallSession(input.execution) : undefined,
+				executionCallSession(input.execution),
 			);
 			let value: unknown;
 			try {
@@ -199,7 +187,7 @@ export function registerMusicHandlers(
 				r.id,
 			);
 			patch(db, r.id, { ...plan, state: "generating", phase: "queued" });
-			enqueue(db, r.id, r.run_id, r.deadline, "generate");
+			enqueue(db, r.id, r.deadline, "generate");
 			return "applied";
 		},
 		cancelInTransaction: cancel,
@@ -208,7 +196,6 @@ export function registerMusicHandlers(
 		id: string;
 		plan: GenerationPlan;
 		prepared: Prepared;
-		execution?: ChildExecution;
 	};
 	/** LARM had no free memory: the generate stage waits and is queued again, never sent from here. */
 	type CapacityWait = { capacityWait: number | null };
@@ -311,7 +298,6 @@ export function registerMusicHandlers(
 					return "applied";
 				}
 				waitForCapacity(db, r, outcome.result.capacityWait, {
-					onWaiting: deps.onWaiting,
 					enqueue,
 					fail,
 				});
@@ -348,7 +334,6 @@ export function registerMusicHandlers(
 				...(output.runtime ? { runtime: output.runtime } : {}),
 				actualModel: output.actualModel ?? output.artifact?.actualModel ?? null,
 			});
-			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,

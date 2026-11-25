@@ -21,7 +21,6 @@ export const TOOL_NAMES = {
 	memory: "memory",
 	search: "find_toolchain",
 	delegate: "delegate",
-	work: "work",
 } as const;
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 
@@ -31,7 +30,6 @@ export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
  * per tool, ids without length bounds, and only the limits that change what it writes stated in the description.
  */
 const id = z.string().trim().min(1).max(160);
-const impacts = ["none", "create", "modify_existing", "irreversible"] as const;
 
 /** The words of a record as the model gives them (remember: kind and semanticKey too; correct: the text and polarity). */
 const calendarDay = z
@@ -91,56 +89,23 @@ export const searchArgs = z
 	})
 	.strict();
 
-const announcement = z.string().trim().min(1).max(80);
-
-export const delegateArgs = z.discriminatedUnion("mode", [
-	z
-		.object({
-			mode: z.enum(["execute", "confirm"]),
-			revises: z.number().int().positive().optional(),
-			toolchain: id,
-			/** Asked for by the definition; an instant toolchain answers from its inputs alone, any other refuses it absent. */
-			request: z.string().trim().min(1).max(8000).optional(),
-			announcement: announcement.optional(),
-			/** Asked for by the definition; absent, the host takes it from the target and the toolchain (D7). */
-			impact: z.enum(impacts).optional(),
-			inputs: z.record(z.string(), z.unknown()).optional(),
-			diagnosticRef: diagnosticRef.optional(),
-			target: id.optional(),
-			/** The resources handed over with the request (`a<n>` of the ledger). */
-			refs: z
-				.array(z.string().regex(/^a\d+$/))
-				.max(8)
-				.optional(),
-			resolveUnsaved: z.literal("discard").optional(),
-			/**
-			 * The user's own words behind `request` (the router's hand-overs add the utterance before them to it): the
-			 * TODO's title, and what a confirmation quotes. The host's call only.
-			 */
-			words: z.string().trim().min(1).max(8000).optional(),
-		})
-		.strict(),
-	z
-		.object({
-			mode: z.literal("approve"),
-			confirmation: id,
-			announcement: announcement.optional(),
-			/** Not needed to approve; a call that carries it is not refused. */
-			impact: z.enum(impacts).optional(),
-		})
-		.strict(),
-]);
-export type DelegateArgs = z.infer<typeof delegateArgs>;
-
-export const workArgs = z
+export const delegateArgs = z
 	.object({
-		todo: id,
-		operation: z.enum(["check", "answer", "amend", "cancel"]),
-		target: z.union([z.literal("parent"), z.uuid()]).optional(),
-		text: z.string().trim().min(1).max(8000).optional(),
+		toolchain: id,
+		/** Asked for by the definition; an instant toolchain answers from its inputs alone, any other refuses it absent. */
+		request: z.string().trim().min(1).max(8000).optional(),
+		inputs: z.record(z.string(), z.unknown()).optional(),
+		diagnosticRef: diagnosticRef.optional(),
+		target: id.optional(),
+		/** The resources handed over with the request (`a<n>` of the ledger). */
+		refs: z
+			.array(z.string().regex(/^a\d+$/))
+			.max(8)
+			.optional(),
+		resolveUnsaved: z.literal("discard").optional(),
 	})
 	.strict();
-export type WorkArgs = z.infer<typeof workArgs>;
+export type DelegateArgs = z.infer<typeof delegateArgs>;
 
 export type ParsedCall =
 	| { name: "memory"; call: NativeToolCall; args: MemoryArgs }
@@ -150,7 +115,6 @@ export type ParsedCall =
 			args: z.infer<typeof searchArgs>;
 	  }
 	| { name: "delegate"; call: NativeToolCall; args: DelegateArgs }
-	| { name: "work"; call: NativeToolCall; args: WorkArgs }
 	| { name: ReadToolName; call: NativeToolCall; args: Record<string, unknown> };
 
 /** The fixed tools and the read tools (the talk turn's, spec conversation-read-tools-design 2026-10-31). */
@@ -158,7 +122,6 @@ const schemas: Record<ToolName | ReadToolName, z.ZodType> = {
 	memory: memoryArgs,
 	find_toolchain: searchArgs,
 	delegate: delegateArgs,
-	work: workArgs,
 	...readToolInputs,
 };
 

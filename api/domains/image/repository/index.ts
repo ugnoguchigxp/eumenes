@@ -86,13 +86,6 @@ export function row(db: Database, id: string) {
 		.query("SELECT * FROM image_generations WHERE id=?")
 		.get(id) as Row | null;
 }
-export function byRun(db: Database, id: string) {
-	return db
-		.query(
-			"SELECT * FROM image_generations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
-		)
-		.get(id) as Row | null;
-}
 export function record(r: Row): ImageRecord {
 	return JSON.parse(r.record_json);
 }

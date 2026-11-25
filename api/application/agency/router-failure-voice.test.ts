@@ -95,7 +95,6 @@ test("a voice request reads a saved note and replies without starting work", asy
 			await voice.played(utteranceId, chunk.index);
 		}
 		expect(voice.get(utteranceId)?.status).toBe("played");
-		expect(f.h.todos()).toEqual([]);
 		expect(
 			f.host
 				.inspect("main")!

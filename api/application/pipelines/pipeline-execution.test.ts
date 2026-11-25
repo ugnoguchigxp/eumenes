@@ -1,23 +1,17 @@
 import { expect, test } from "bun:test";
-import { waitFor } from "../../infrastructure/wait-for";
-import { harness } from "../toolchain/toolchain.fixture";
-import {
-	searchThenDelegate,
-	toolResults,
-} from "../toolchain/conversation-script.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
+import { replyWith } from "../agency/always-on.fixture";
 
-// Real seed, dialogue, package, scheduler, queue, child adoption, TODO and notices; model outputs alone are scripted.
-test("the conversation sends the whole request to the planner and two ordered commands complete under one pipeline TODO", async () => {
+// Real seed, agent, package, scheduler, queue, child adoption and report notes; model outputs alone are scripted.
+test("the agent's assignment sends the whole request to the planner and two ordered commands complete under one pipeline execution", async () => {
 	const first = "一つ目のタイマーを作って";
 	const second = "二つ目のタイマーを作って";
 	const request = `${first}、終わったら${second}`;
 	let translations = 0,
 		plans = 0;
-	const h = await harness({
+	const f = await assignmentFixture({
 		pipelines: true,
 		timers: true,
-		discoveryTarget: () => "execute_pipeline",
-		routeTool: "execute_pipeline",
 		compose: (messages) => {
 			plans++;
 			const packet = JSON.parse(messages.at(-1)!.content);
@@ -66,23 +60,11 @@ test("the conversation sends the whole request to the planner and two ordered co
 				},
 			}),
 	});
+	const { h } = f;
 	try {
-		const source = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: request,
-		});
-		await waitFor(() => h.dialogue.get(source.id)?.status === "completed", {
-			timeout: 5000,
-		});
-		expect(h.dialogue.answerText(source.id)).toBe(
-			"「パイプライン」に頼みます。",
-		);
-		await waitFor(
-			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
-			{ timeout: 5000 },
-		);
+		const { result } = await f.assign(request, "pipeline.execute");
+		expect(result).toMatchObject({ status: "accepted" });
+		await f.until(() => f.executions()[0]?.status === "completed");
 		expect(plans).toBe(1);
 		expect(translations).toBe(2);
 		const timers = await (await h.request("/api/timers")).json();
@@ -103,13 +85,15 @@ test("the conversation sends the whole request to the planner and two ordered co
 			packets[1]!.references as Array<{ ref: string; text: string }>
 		).find((item) => item.ref.startsWith("result:"));
 		expect(prior?.text).toContain('"label":"pipeline timer 1"');
-		expect(h.toolchain.agents.executions.list("main")).toHaveLength(1);
-		await waitFor(() => h.reported().length > 0, { timeout: 5000 });
-		expect(h.reported()).toContain("completed");
+		expect(f.executions()).toHaveLength(1);
+		// The agent reports the finished pipeline: its work report is a note, and the assignment is no longer open.
+		await f.until(() => f.notes().length === 1);
+		expect(f.reported()).toContain("completed");
+		expect(f.items()).toHaveLength(0);
 		expect((await h.request("/api/pipelines/publish", {})).status).toBe(404);
 		expect((await h.request("/api/pipelines")).status).toBe(404);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
@@ -118,11 +102,9 @@ test("a failed first pipeline step does not run the dependent step", async () =>
 	const second = "二つ目のタイマーを作って";
 	const request = `${first}、終わったら${second}`;
 	let commands = 0;
-	const h = await harness({
+	const f = await assignmentFixture({
 		pipelines: true,
 		timers: true,
-		discoveryTarget: () => "execute_pipeline",
-		routeTool: "execute_pipeline",
 		compose: (messages) => {
 			const packet = JSON.parse(messages.at(-1)!.content);
 			return {
@@ -158,20 +140,11 @@ test("a failed first pipeline step does not run the dependent step", async () =>
 			});
 		},
 	});
+	const { h } = f;
 	try {
-		const source = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: request,
-		});
-		await waitFor(() => h.dialogue.get(source.id)?.status === "completed", {
-			timeout: 5000,
-		});
-		await waitFor(
-			() => h.toolchain.agents.executions.list("main")[0]?.status === "partial",
-			{ timeout: 5000 },
-		);
-		const parent = h.toolchain.agents.executions.list("main");
+		await f.assign(request, "pipeline.execute");
+		await f.until(() => f.executions()[0]?.status === "partial");
+		const parent = f.executions();
 		expect(parent).toHaveLength(1);
 		expect(parent[0]).toMatchObject({
 			status: "partial",
@@ -192,42 +165,19 @@ test("a failed first pipeline step does not run the dependent step", async () =>
 		const timers = await (await h.request("/api/timers")).json();
 		expect(timers.items).toEqual([]);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
 for (const operation of ["answer", "cancel"] as const) {
-	test(`conversation ${operation} reaches the waiting pipeline owner without creating replacement work`, async () => {
+	test(`the user's ${operation} reaches the waiting pipeline owner through the assignment, without creating replacement work`, async () => {
 		const request = "必要な時間を聞いてからタイマーを作って";
 		const reply = operation === "answer" ? "15秒です" : "その作業を取り消して";
 		let plans = 0,
-			commands = 0,
-			workCalls = 0;
-		const h = await harness({
+			commands = 0;
+		const f = await assignmentFixture({
 			pipelines: true,
 			timers: true,
-			discoveryTarget: () => "execute_pipeline",
-			firstRound: (tools, question, messages) => {
-				if (question !== reply)
-					return searchThenDelegate(
-						(c) => c.id === "pipeline.execute",
-						request,
-						{
-							announcement: "順に進めます。",
-							impact: "create",
-						},
-					)(messages);
-				if (toolResults(messages, "work").length)
-					return {
-						text:
-							operation === "answer"
-								? "回答を伝えました。"
-								: "取り消しました。",
-					};
-				expect(tools.map(({ function: fn }) => fn.name)).toContain("work");
-				workCalls++;
-				return { calls: [{ name: "work", args: { todo: "t1", operation } }] };
-			},
 			compose: (messages) => {
 				const packet = JSON.parse(messages.at(-1)!.content);
 				if (++plans === 1)
@@ -261,54 +211,39 @@ for (const operation of ["answer", "cancel"] as const) {
 			},
 		});
 		try {
-			const page = (state: "active" | "archived") =>
-				h.store.read((db) =>
-					h.dialogue.todoPageInTransaction(db, "main", {
-						state,
-						pageIndex: 0,
-						pageSize: 10,
-					}),
-				).rows;
-			const source = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: request,
-			});
-			await waitFor(
-				() =>
-					h.toolchain.agents.executions.list("main")[0]?.status ===
-					"waiting_user",
-				{ timeout: 5000 },
+			await f.assign(request, "pipeline.execute");
+			await f.until(() => f.executions()[0]?.status === "waiting_user");
+			// The pipeline's question is the assignment's: the agent shows it as waiting for the user.
+			await f.until(() => !!f.items()[0]?.question);
+			const asked = f.items()[0]!;
+			expect(asked.question).toBe("何秒にしますか？");
+			const words = await f.userWords(reply);
+			const { seen } = await replyWith(
+				f.f,
+				[
+					{
+						name: "assignment",
+						arguments:
+							operation === "answer"
+								? { id: asked.id, action: "answer", text: reply }
+								: { id: asked.id, action: "cancel" },
+					},
+				],
+				{ runId: `run-${operation}`, messageIds: [words.messageId] },
 			);
-			const before = page("active").find((row) => row.runId === source.id)!;
-			expect(before).toMatchObject({
-				execution: "pipeline",
-				status: "waiting",
-			});
-			const answered = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: reply,
-			});
-			await h.dialogue.waitForTerminal(answered.id);
-			expect(
-				page("active").find((row) => row.id === before.id)?.status,
-			).not.toBe("waiting");
-			await waitFor(
+			expect(seen[1]!.filter((m) => m.role === "tool")).toHaveLength(1);
+			await f.until(
 				() =>
-					h.toolchain.agents.executions.get(before.sourceRef!)?.status ===
+					f.executions()[0]?.status ===
 					(operation === "answer" ? "completed" : "cancelled"),
-				{ timeout: 5000 },
 			);
-			expect(h.toolchain.agents.executions.list("main")).toHaveLength(1);
-			expect(
-				[...page("active"), ...page("archived")].map((row) => row.id),
-			).toEqual([before.id]);
-			expect(workCalls).toBe(1);
+			// Neither reply made a second execution, and the assignment is closed with its work report note.
+			expect(f.executions()).toHaveLength(1);
+			await f.until(() => f.items().length === 0);
 			expect(commands).toBe(operation === "answer" ? 1 : 0);
 			expect(plans).toBe(operation === "answer" ? 2 : 1);
 		} finally {
-			await h.close();
+			await f.close();
 		}
 	});
 }

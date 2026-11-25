@@ -5,9 +5,7 @@ import { systemContext } from "../../../infrastructure/system-context";
 import type { Message } from "../../conversation/contracts";
 import type { Run } from "../contracts";
 import { runViewingSchema } from "../contracts/specialist";
-import { workLinksOf } from "../repository/resources";
 import { runViewing } from "../repository/specialist";
-import type { WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import { observedFailure, readRunLogs } from "./error-report";
 
@@ -31,18 +29,13 @@ type DebugSource = {
 	run: Run;
 	message: Message;
 	trigger: { message: Message };
-	works: WorkRow[];
 };
 const code = (value: string | null | undefined) =>
 	value && /^[a-z][a-z0-9_]{0,79}$/u.test(value) ? value : undefined;
 function observation(deps: DialogueDeps, tx: Database, source: DebugSource) {
-	const { run, works } = source;
+	const { run } = source;
 	const selection = deps.toolchains?.usageOfRunInTransaction?.(tx, run.id);
 	const job = run.jobId ? deps.queue.getInTransaction(tx, run.jobId) : null;
-	const links = workLinksOf(
-		tx,
-		works.map((w) => w.id),
-	);
 	const viewing = runViewingSchema.safeParse(runViewing(tx, run.id)).data;
 	return {
 		observedAt: deps.clock(),
@@ -66,13 +59,6 @@ function observation(deps: DialogueDeps, tx: Database, source: DebugSource) {
 			outcome: selection.outcome,
 			reason: code(selection.code),
 		},
-		works: works.map((work) => ({
-			id: work.id,
-			toolchain: work.toolchainId,
-			status: work.status,
-			outcome: work.outcome,
-			resourcesLinked: links.get(work.id)?.length ?? 0,
-		})),
 		screenAtInput: viewing?.screen && {
 			phase: viewing.screen.phase,
 			observedAt: viewing.screen.observedAt,
@@ -151,14 +137,6 @@ export function createDebugExplanation(
 						content: JSON.stringify({ records: values, excerpt }),
 					},
 				];
-				while (
-					values.works.length &&
-					(JSON.stringify(values).length > 3000 ||
-						estimateMessageTokens(input()) > 2048)
-				) {
-					values.works.pop();
-					values.omitted = true;
-				}
 				const details = JSON.stringify(values, null, 2);
 				if (
 					estimateMessageTokens(input()) >

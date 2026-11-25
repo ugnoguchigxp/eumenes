@@ -22,7 +22,8 @@ export type SettingsInputField = {
 	id: string;
 	label: string;
 	help?: string;
-	control: "text" | "select" | "toggle" | "range" | "number" | "multiple";
+	control:
+		"text" | "select" | "toggle" | "range" | "number" | "multiple" | "color";
 	multiline?: boolean;
 	presentation?: "segmented" | "cards";
 	value: string;
@@ -388,6 +389,25 @@ function SettingsField({
 								onChange={(e) => change(e.target.value)}
 							/>
 							<output htmlFor={prefix}>{value}</output>
+						</div>
+					) : field.control === "color" ? (
+						<div className="ds-settings-color">
+							<input
+								{...props}
+								type="color"
+								value={value || "#000000"}
+								onChange={(e) => change(e.target.value.toLowerCase())}
+							/>
+							<output htmlFor={prefix}>{field.value || "既定"}</output>
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								disabled={field.disabled || !field.value}
+								onClick={() => change("")}
+							>
+								既定に戻す
+							</Button>
 						</div>
 					) : field.control === "text" &&
 					  field.multiline &&

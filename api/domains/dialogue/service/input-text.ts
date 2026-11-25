@@ -23,8 +23,6 @@ export const INPUT_HEADINGS = {
 
 /** A result or a notice shows at most this much; the rest is named as left out (sections 8.2 and 9). */
 export const RESULT_MAX_TOKENS = 600;
-/** A work check reads a result again, with room for what the notice left out. */
-export const CHECK_MAX_TOKENS = 1500;
 
 /**
  * Text from outside (the user's words, a record, a result) as data: a line can not open with a heading (`#`

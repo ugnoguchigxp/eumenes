@@ -11,7 +11,6 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { Run } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { byId, linkAnswer, transition } from "../repository";
-import { workOfRun } from "../repository/work";
 import {
 	GENERATE_KIND,
 	type DialogueDeps,
@@ -26,7 +25,7 @@ import type {
 import { eventFields, SIDE_EFFECTS } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
-import { consumeAnswer, type ReportedWork } from "./result-intake";
+import { consumeAnswer } from "./result-intake";
 import { acceptRunAnswer, endRun, type RunEndState } from "./run-end";
 import { maybeEnqueueCompactionInTransaction } from "./compaction-summary";
 import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
@@ -42,10 +41,8 @@ export type GenerationResult = {
 	receipt?: Receipt;
 	/** The feeling the agent chose for its reply: the reply's voice tone and motion (never judged again). */
 	emotion?: DeliveryEmotion;
-	/** A delegation ended the generation: the announcement was delivered and the work handed over. */
+	/** A delegation ended the generation: the announcement was delivered and a session took the conversation over. */
 	handover?: Handover;
-	/** The confirmation whose statement the generation speaks (section 6.7). */
-	confirmationId?: string;
 	/** Its searches and hand-overs: kept with the agent's utterance that ends the turn. */
 	exchange?: ExchangeStep[];
 	/** Sources referenced by read tools during this turn, merged into the run's provenance manifest. */
@@ -228,7 +225,7 @@ function fail(
 /**
  * The adoption of a generation in the queue writer transaction (the ContextWindow specification, sections 8 and
  * 11.3): the speech becomes the assistant message and the agent's `said` event, the handled utterances join the
- * log, a told TODO's archive is confirmed by the delivery, and the run ends.
+ * log, and the run ends.
  */
 export function createGenerationSettlement(
 	deps: DialogueDeps,
@@ -241,8 +238,8 @@ export function createGenerationSettlement(
 		if (outcome.type === "success") {
 			const result = outcome.result;
 			if (!input) return "stale";
-			// A handed-over run is queued behind its work already; nothing more is adopted here.
-			if (result.handover?.handed) {
+			// A handed-over run is queued behind its session already; nothing more is adopted here.
+			if (result.handover) {
 				// Words the handing-over reply took are answered by it.
 				if (input.final.kind === "utterances") handleSteered(deps, tx, run);
 				return "applied";
@@ -255,10 +252,7 @@ export function createGenerationSettlement(
 					? "applied"
 					: fail(deps, tx, run, stale, input);
 			// What the agency or read tools gave the reply is gone (forgotten meanwhile): it is written again, not adopted.
-			if (
-				!result.handover &&
-				!recordAgencyInput(deps, tx, run, result.readSources)
-			) {
+			if (!recordAgencyInput(deps, tx, run, result.readSources)) {
 				const retried = retryNotAdopted(
 					deps,
 					tx,
@@ -276,25 +270,16 @@ export function createGenerationSettlement(
 				return retried ? "applied" : fail(deps, tx, run, "memory_stale", input);
 			}
 			// The answer spoke of a report whose evidence changed since (H4/R8): it is not adopted, nor is the report.
-			if (
-				input.agent &&
-				!result.handover &&
-				!consumeAnswer(deps, tx, run, input.agent)
-			)
+			if (input.agent && !consumeAnswer(deps, tx, run, input.agent))
 				return fail(deps, tx, run, "report_invalidated", input);
-			// A handover was this generation's adoption: its receipt and memory were taken there.
-			if (input.memory && memory && !result.handover) {
+			if (input.memory && memory) {
 				const adopted = adoptMemoryWindow(memory, tx, run, input.memory);
 				if (!adopted.ok)
 					return retryNotAdopted(deps, tx, run, input, claim.payload)
 						? "applied"
 						: fail(deps, tx, run, adopted.reason, input);
 			}
-			if (
-				result.receipt &&
-				!result.handover &&
-				!larm.acceptInTransaction?.(tx, result.receipt)
-			) {
+			if (result.receipt && !larm.acceptInTransaction?.(tx, result.receipt)) {
 				memory?.discardUsageInTransaction(tx, run.id);
 				return retryNotAdopted(deps, tx, run, input, claim.payload)
 					? "applied"
@@ -303,11 +288,7 @@ export function createGenerationSettlement(
 			// A turn the host answered itself (its own words, or nothing) has no model answer to accept: its request is
 			// accepted as the host's answer, so what stands on it (the voice turn) goes on as for a model answer. One that
 			// can no longer be accepted only means nothing stands on it: the run still completes.
-			if (
-				!result.receipt &&
-				!result.handover &&
-				!acceptRunAnswer(deps, tx, run)
-			)
+			if (!result.receipt && !acceptRunAnswer(deps, tx, run))
 				log.warn("dialogue.answer_request_not_accepted", {
 					runId: run.id,
 					reason: "permission_revoked",
@@ -316,30 +297,9 @@ export function createGenerationSettlement(
 				events.handleInTransaction(tx, run.conversationId, input.final.seqs);
 				handleSteered(deps, tx, run);
 			}
-			// A task or a pipeline runs on its own: its announcement is the answer of this run.
-			const text =
-				result.handover?.announcement ??
-				result.finishSilentReplyInTransaction?.(tx) ??
-				result.text;
+			const text = result.finishSilentReplyInTransaction?.(tx) ?? result.text;
 			let messageId: string | null = null;
-			const external =
-				deps.externalOutput?.offer(tx, run, text, !!result.confirmationId) ??
-				false;
-			if (external && result.confirmationId) {
-				events.appendInTransaction(tx, {
-					conversationId: run.conversationId,
-					at: jstSeconds(Date.parse(clock())),
-					type: "said",
-					by: "agent",
-					fields: {
-						text,
-						origin: "confirmation",
-						confirmation: result.confirmationId,
-					},
-					messageIds: [run.inputMessageId],
-					deliveryKey: `run:${run.id}`,
-				});
-			}
+			const external = deps.externalOutput?.offer(tx, run, text) ?? false;
 			if (text.trim() && !external) {
 				messageId = id();
 				conversation.appendInTransaction(tx, {
@@ -350,23 +310,20 @@ export function createGenerationSettlement(
 					createdAt: clock(),
 					runId: run.id,
 				});
-				if (!result.handover) {
-					if (result.imageAnswer) {
-						if (
-							result.imageAnswer.requestId !== result.receipt?.requestId ||
-							result.imageAnswer.attemptId !== result.receipt.attemptId
-						)
-							throw new Error("image_answer_receipt_mismatch");
-						conversation.recordImageAnswerInTransaction(
-							tx,
-							messageId,
-							result.imageAnswer,
-							clock(),
-						);
-					}
-					said(deps, tx, run, messageId, text, result, input.notice);
-					linkAnswerResources(deps, tx, run, input, messageId);
+				if (result.imageAnswer) {
+					if (
+						result.imageAnswer.requestId !== result.receipt?.requestId ||
+						result.imageAnswer.attemptId !== result.receipt.attemptId
+					)
+						throw new Error("image_answer_receipt_mismatch");
+					conversation.recordImageAnswerInTransaction(
+						tx,
+						messageId,
+						result.imageAnswer,
+						clock(),
+					);
 				}
+				said(deps, tx, run, messageId, text, result);
 				const delivery = result.emotion
 					? hostDelivery(result.emotion)
 					: result.receipt?.delivery?.version === 2
@@ -407,7 +364,7 @@ export function createGenerationSettlement(
 					run.id,
 					true,
 				);
-			if (done && !result.handover)
+			if (done)
 				maybeEnqueueCompactionInTransaction(
 					deps,
 					tx,
@@ -463,53 +420,10 @@ export function createGenerationSettlement(
 	};
 }
 
-/**
- * The reply shows the resources of the TODOs it answers for as chips (section 4.2 of the resource plan): the work
- * this run handed over and the TODOs whose change triggered it.
- */
-function linkAnswerResources(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	input: GenerateInput,
-	messageId: string,
-) {
-	const triggered = input.trigger.flatMap((trigger) =>
-		trigger.kind === "todo_changed" && Array.isArray(trigger.todos)
-			? (trigger.todos as Array<{ id?: unknown }>).flatMap((todo) =>
-					typeof todo.id === "string" ? [todo.id] : [],
-				)
-			: [],
-	);
-	const ids = new Set([
-		...triggered,
-		...workOfRun(tx, run.id).map((row) => row.id),
-	]);
-	deps.resourceLedger?.linkMessageToWorkInTransaction(
-		tx,
-		run.conversationId,
-		messageId,
-		[...ids],
-	);
-}
-
 /** What later turns see of this turn's searches and hand-overs (the tool-call reliability design, P1). */
-const toolCallsOf = (
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	result: GenerationResult,
-) =>
+const toolCallsOf = (deps: DialogueDeps, result: GenerationResult) =>
 	result.exchange?.length
-		? carriedToolCalls(
-				result.exchange,
-				deps.work?.refsInTransaction(tx, run.conversationId) ?? {
-					todo: () => null,
-					confirmation: () => null,
-					resource: () => null,
-				},
-				Date.parse(deps.clock()),
-			)
+		? carriedToolCalls(result.exchange, Date.parse(deps.clock()))
 		: [];
 
 /**
@@ -522,8 +436,6 @@ function said(
 	messageId: string,
 	text: string,
 	result: GenerationResult,
-	/** The host notice this reply reports. */
-	notice?: string,
 ) {
 	const events = deps.continuity.events;
 	const at = jstSeconds(Date.parse(deps.clock()));
@@ -532,12 +444,7 @@ function said(
 		at,
 		type: "said",
 		by: "agent",
-		fields: {
-			text,
-			...(result.confirmationId
-				? { origin: "confirmation", confirmation: result.confirmationId }
-				: {}),
-		},
+		fields: { text },
 		messageIds: [messageId],
 		deliveryKey: `run:${run.id}`,
 	});
@@ -552,8 +459,7 @@ function said(
 		text,
 		messageId,
 		at: deps.clock(),
-		toolCalls: toolCallsOf(deps, tx, run, result),
-		...(notice ? { notice } : {}),
+		toolCalls: toolCallsOf(deps, result),
 	});
 	if (spoken) return;
 	events.appendInTransaction(tx, {
@@ -564,39 +470,4 @@ function said(
 		fields: { ref: event.id, heard: "full" },
 		dedupeKey: `delivered:${event.id}`,
 	});
-}
-
-/** A registered task can deliver its already formatted answer without a second model call. */
-export function finishReportedWork(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	intake: ReportedWork | null,
-) {
-	const work = intake?.rows[0];
-	const result = work?.result as {
-		replyInConversation?: unknown;
-		answer?: unknown;
-	} | null;
-	const text = intake?.conversationText ?? result?.answer;
-	if (
-		(!intake?.conversationText &&
-			(work?.outcome === "cancelled" ||
-				result?.replyInConversation !== true)) ||
-		typeof text !== "string" ||
-		!text.trim()
-	)
-		return endRun(deps, tx, run, "completed", null);
-	const messageId = deps.id();
-	deps.conversation.appendInTransaction(tx, {
-		id: messageId,
-		conversationId: run.conversationId,
-		role: "assistant",
-		text,
-		displayText: intake?.displayAnswer,
-		createdAt: deps.clock(),
-		runId: run.id,
-	});
-	said(deps, tx, run, messageId, text, { text });
-	return endRun(deps, tx, run, "completed", null, messageId);
 }

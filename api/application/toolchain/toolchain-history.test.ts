@@ -241,7 +241,6 @@ test("a selection is traced from offer to outcome and later offered as reference
 			request: "鎌倉の天気",
 			query: { space, vector: oneHot(0) },
 		});
-		history.linkTaskInTransaction(db, "run-1", "task-1");
 		history.settleSelectionInTransaction(db, "run-1", { outcome: "answered" });
 		// The first terminal result wins.
 		history.settleSelectionInTransaction(db, "run-1", { outcome: "failed" });
@@ -251,7 +250,6 @@ test("a selection is traced from offer to outcome and later offered as reference
 		decision: "toolchain",
 		functionName: "conversation_history",
 		request: "鎌倉の天気",
-		taskId: "task-1",
 		outcome: "answered",
 	});
 	expect(history.listSelections({ runId: "run-1" }).items).toHaveLength(1);

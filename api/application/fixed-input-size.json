@@ -7,8 +7,8 @@
 	},
 	"elements": {
 		"system.alwaysOn": {
-			"chars": 3373,
-			"tokens": 2833
+			"chars": 3651,
+			"tokens": 3028
 		},
 		"system.alwaysOn.Role": {
 			"chars": 1191,
@@ -27,12 +27,12 @@
 			"tokens": 583
 		},
 		"system.alwaysOn.Facts": {
-			"chars": 958,
-			"tokens": 859
+			"chars": 1236,
+			"tokens": 1054
 		},
 		"system.alwaysOnGoal": {
-			"chars": 3714,
-			"tokens": 3045
+			"chars": 3992,
+			"tokens": 3240
 		},
 		"tools.read": {
 			"chars": 2456,
@@ -59,16 +59,16 @@
 			"tokens": 149
 		},
 		"tools.talkWork": {
-			"chars": 1057,
-			"tokens": 531
+			"chars": 1146,
+			"tokens": 589
 		},
 		"tool.find_toolchain": {
 			"chars": 292,
 			"tokens": 161
 		},
 		"tool.delegate": {
-			"chars": 762,
-			"tokens": 369
+			"chars": 851,
+			"tokens": 428
 		},
 		"tools.workControls": {
 			"chars": 1420,
@@ -91,12 +91,12 @@
 			"tokens": 111
 		},
 		"tools.agenda": {
-			"chars": 1357,
-			"tokens": 658
+			"chars": 1809,
+			"tokens": 867
 		},
 		"tool.start_preparation": {
-			"chars": 383,
-			"tokens": 203
+			"chars": 406,
+			"tokens": 216
 		},
 		"tool.read_note": {
 			"chars": 210,
@@ -109,6 +109,10 @@
 		"tool.set_quiet": {
 			"chars": 519,
 			"tokens": 243
+		},
+		"tool.assignment": {
+			"chars": 428,
+			"tokens": 196
 		},
 		"tools.goalReply": {
 			"chars": 1843,
@@ -143,12 +147,12 @@
 			"tokens": 670
 		},
 		"agency.checkSystem": {
-			"chars": 1050,
-			"tokens": 869
+			"chars": 1186,
+			"tokens": 967
 		},
 		"agency.askCheckSystem": {
-			"chars": 1150,
-			"tokens": 903
+			"chars": 1286,
+			"tokens": 1001
 		},
 		"steward.curateMemory.instructions": {
 			"chars": 3784,

@@ -5,7 +5,6 @@ import type { HandlerDefinition } from "../../queue";
 import { getLogger } from "../../../infrastructure/logger";
 import type { DebugDiagnosticDetail } from "../contracts/debug-diagnostics";
 import { byId, recentRuns } from "../repository";
-import { workOfRun } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import {
 	createDebugExplanation,
@@ -94,17 +93,14 @@ export function createDebugDiagnostics(
 		const trigger =
 			runId === triggerId ? target : visible(tx, conversationId, triggerId);
 		if (!target || !trigger) return null;
-		const works = workOfRun(tx, runId).slice(-8);
 		const source = hash([
 			target.run.revision,
 			target.message.text,
 			trigger.message.text,
-			works.map(({ id, revision }) => [id, revision]),
 		]);
 		return {
 			...target,
 			trigger,
-			works,
 			source,
 			origin: hash([target.message.text, trigger.message.text]),
 		};

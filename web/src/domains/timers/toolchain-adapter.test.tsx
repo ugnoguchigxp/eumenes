@@ -30,12 +30,6 @@ const sourceBindings = [
 		query: "query:timers.current@1",
 		target: "required",
 	},
-	{
-		source: "duration-question",
-		adapterRef: "adapter:timers@1",
-		query: "query:timers.question@1",
-		target: "optional",
-	},
 ];
 const local = (eventAction: string, source: string) => ({
 	actionId: `${eventAction}-${source}`,
@@ -53,11 +47,6 @@ const write = (eventAction: string, operationId: string) => ({
 	effect: "write",
 });
 const watch = { view: "timer-workspace", source: "timer-current" };
-const ask = {
-	view: "question",
-	source: "duration-question",
-	title: "対象の確認",
-};
 const artifact = {
 	kind: "artifact",
 	id: "timers.workspace",
@@ -69,11 +58,6 @@ const artifact = {
 			id: "standard",
 			label: "標準",
 			definition: watch,
-			questionDefinition: {
-				view: "layout",
-				direction: "stack",
-				children: [watch, ask],
-			},
 		},
 		{
 			id: "variant-b",
@@ -95,14 +79,6 @@ const artifact = {
 		write("timer-pause", "timers.pause"),
 		write("timer-resume", "timers.resume"),
 		write("timer-cancel", "timers.cancel"),
-		{
-			actionId: "answer",
-			eventAction: "answer",
-			source: "duration-question",
-			answer: true,
-			inputSchemaRef: "builtin:timerTargetAnswer",
-			effect: "write",
-		},
 		local("clock-mode", "timer-setup"),
 		local("clock-mode", "timer-current"),
 		local("stopwatch-start", "timer-current"),
@@ -170,11 +146,9 @@ function makeClient(over: Record<string, unknown> = {}) {
 			digest: "d",
 			scopeRef: "scope:main",
 		})),
-		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: vi.fn(),
 		toolchainAction: vi.fn(),
 		unsettledToolchainActions: vi.fn(async () => []),
-		answerToolchainInteraction: vi.fn(),
 		timer: vi.fn(),
 		timers: vi.fn(async () => ({
 			serverNow: new Date().toISOString(),
@@ -399,51 +373,6 @@ test("stopwatch and mode changes stay local", async () => {
 		).toBeDefined(),
 	);
 	expect(submit).not.toHaveBeenCalled();
-});
-
-test("an open question swaps in the question definition and a chosen target reaches the interactions API", async () => {
-	const answer = vi.fn(async () => ({}));
-	const interaction = {
-		id: "i1",
-		conversationId: "main",
-		status: "waiting_input",
-		revision: 2,
-		chainRevisionId: "toolchain:timers.manage@2",
-		artifactRevisionId: REV,
-		question: {
-			questionId: "40000000-0000-4000-8000-000000000001",
-			prompt: "どのタイマーを止めますか？",
-			inputSchemaRef: "builtin:timerTargetAnswer",
-			choices: [
-				{ ref: "60000000-0000-4000-8000-000000000001", label: "お茶" },
-				{ ref: "60000000-0000-4000-8000-000000000002", label: "パスタ" },
-			],
-			revision: 2,
-			expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-		},
-		questionCount: 1,
-		receiptRef: null,
-		expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	};
-	const client = makeClient({
-		toolchainInteractions: vi.fn(async () => [interaction]),
-		answerToolchainInteraction: answer,
-	});
-	mount(client);
-	await screen.findByText("どのタイマーを止めますか？");
-	fireEvent.click(screen.getByRole("radio", { name: "パスタ" }));
-	fireEvent.click(screen.getByRole("button", { name: "回答する" }));
-	await waitFor(() => expect(answer).toHaveBeenCalledOnce());
-	expect(answer.mock.calls[0]).toEqual([
-		"i1",
-		expect.objectContaining({
-			questionId: "40000000-0000-4000-8000-000000000001",
-			expectedRevision: 2,
-			input: { timerId: "60000000-0000-4000-8000-000000000002" },
-		}),
-	]);
 });
 
 test("the variant is chosen by id; an unknown one is an error, not a silent default", async () => {

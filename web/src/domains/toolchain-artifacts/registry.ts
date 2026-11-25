@@ -16,17 +16,6 @@ import type { DraftView } from "./drafts";
 import { genericWebAdapter } from "./generic-adapter";
 import type { PublicScreenState } from "./screen-observation";
 
-/** An open question of the artifact's chain, as the host read it from the interactions API. */
-export type OpenQuestion = {
-	interactionId: string;
-	questionId: string;
-	revision: number;
-	prompt: string;
-	inputSchemaRef: string;
-	/** Host-issued choices (ref + label); never model text. */
-	choices?: ReadonlyArray<{ ref: string; label: string }>;
-};
-
 export type AdapterHostContext = {
 	conversationId?: string;
 	client: EumenesClient;
@@ -61,9 +50,6 @@ type AdapterPhase =
 
 /** When the request left, measured on the page's clocks, for server-clock binding. */
 type SendTiming = { sent: number; sentAt: number };
-
-export type AnswerInput =
-	{ ok: true; value: Record<string, unknown> } | { ok: false; message: string };
 
 /**
  * What a domain contributes to the common host. The host owns registration lookup, variants,
@@ -126,8 +112,6 @@ export type AdapterState = {
 		code: string | undefined,
 		fieldErrors: ReadonlyArray<{ field: string; message: string }>,
 	): string | undefined;
-	/** Converts the text of an answer into the registered question schema's input. */
-	answerInput?(question: OpenQuestion, text: string): AnswerInput;
 };
 
 export type WebArtifactAdapter = {

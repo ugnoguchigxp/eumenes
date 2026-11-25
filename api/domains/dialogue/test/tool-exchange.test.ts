@@ -4,6 +4,7 @@ import { carriedToolCalls } from "../service/tool-exchange";
 import {
 	IMAGE,
 	INSTANT,
+	agencyOf,
 	choice,
 	setup,
 	type Harness,
@@ -20,12 +21,6 @@ afterEach(async () => {
 	await h?.close();
 	h = undefined;
 });
-
-const NO_REFS = {
-	todo: () => null,
-	confirmation: () => null,
-	resource: () => null,
-};
 
 /** The recent conversation of the newest call: what lies between `## Memory` and the last message. */
 const recent = (): ChatMessage[] =>
@@ -56,16 +51,15 @@ const found = (inputId: string) => ({
 });
 
 test("a hand-over's search and delegation are kept and replayed in the main conversation, while background calls stay text-only without tool roles", async () => {
-	h = await setup();
-	h.state.steps.push(choice({ choice: IMAGE.id }));
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
+	h = await setup({ agency: agencyOf().agency });
+	h.state.steps.push(choice({ choice: IMAGE.id }), { text: "頼みました。" });
+	const asked = await h.say("猫の絵を描いて");
 	h.state.steps.push(choice({ choice: "none" }), {
 		text: "どういたしまして。",
 	});
 	await h.say("ありがとう");
-	const announced = "「画像」に頼みます。";
-	// The main conversation replays the normalized search and delegation tool exchange before the announcement.
+	const said = "頼みました。";
+	// The main conversation replays the normalized search and delegation tool exchange before the reply.
 	const replayed = recent();
 	expect(replayed.map((m) => String(m.role))).toEqual([
 		"assistant",
@@ -73,9 +67,9 @@ test("a hand-over's search and delegation are kept and replayed in the main conv
 		"tool",
 		"assistant",
 	]);
-	expect(replayed.at(-1)).toEqual({ role: "assistant", content: announced });
+	expect(replayed.at(-1)).toEqual({ role: "assistant", content: said });
 	expect(
-		kept(announced).toolCalls.map(({ name, arguments: args, result }) => ({
+		kept(said).toolCalls.map(({ name, arguments: args, result }) => ({
 			name,
 			args: JSON.parse(args),
 			result,
@@ -85,17 +79,12 @@ test("a hand-over's search and delegation are kept and replayed in the main conv
 			// The conversation asked the existing search for candidates.
 			name: "find_toolchain",
 			args: { query: "猫の絵を描いて" },
-			result: JSON.stringify(found(waiting.inputMessageId)),
+			result: JSON.stringify(found(asked.inputMessageId)),
 		},
 		{
 			name: "delegate",
-			args: expect.objectContaining({
-				mode: "execute",
-				toolchain: IMAGE.id,
-				announcement: announced,
-				request: "猫の絵を描いて",
-			}),
-			result: '{"todo":"t1"}',
+			args: { toolchain: IMAGE.id, request: "猫の絵を描いて" },
+			result: '{"delegated":true,"assignment":"a1"}',
 		},
 	]);
 	// Background calls use `backgroundHarness` (words only, no tool roles that `backgroundMessage` would strip).
@@ -105,149 +94,105 @@ test("a hand-over's search and delegation are kept and replayed in the main conv
 	expect(background.messages.some((m) => (m.role as string) === "tool")).toBe(
 		false,
 	);
-	expect(background.messages.some((m) => m.content.includes(announced))).toBe(
-		true,
-	);
+	expect(background.messages.some((m) => m.content.includes(said))).toBe(true);
 });
 
-test("a confirmation's number, a refused call, and a read tool's result are kept as normalized snapshots", async () => {
-	h = await setup({
-		memory: true,
-		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
-	});
+test("an assignment's id and a read tool's result are kept as normalized snapshots", async () => {
+	h = await setup({ memory: true, agency: agencyOf().agency });
 	h.state.steps.push(
 		choice({ choice: "none" }),
 		{ calls: [{ name: "read_memory", args: { query: "壁紙" } }] },
 		{ text: "記憶にはありませんでした。" },
-		// The change of something that exists is refused until confirmed; the host then issues the confirmation.
 		choice({
 			choice: IMAGE.id,
 			say: "差し替えます。",
 			request: "壁紙を差し替える",
 		}),
+		{ text: "差し替えを頼みました。" },
 	);
 	await h.say("壁紙のことを覚えてる？");
-	const statement = await h.say("壁紙を差し替えて");
-	const said = h.dialogue.answerText(statement.id)!;
-	expect(said).toContain("よろしいですか？");
+	const asked = await h.say("壁紙を差し替えて");
+	const said = h.dialogue.answerText(asked.id)!;
+	expect(said).toBe("差し替えを頼みました。");
 	expect(
 		kept("記憶にはありませんでした。").toolCalls.map((c) => c.name),
 	).toEqual(["read_memory"]);
 	const calls = kept(said).toolCalls;
-	expect(calls.map((c) => c.name)).toEqual([
-		"find_toolchain",
-		"delegate",
-		"delegate",
-	]);
+	expect(calls.map((c) => c.name)).toEqual(["find_toolchain", "delegate"]);
 	expect(calls.map((c) => c.result)).toEqual([
-		JSON.stringify(found(statement.inputMessageId)),
-		'{"refused":true}',
-		'{"confirmation":"c1"}',
+		JSON.stringify(found(asked.inputMessageId)),
+		'{"delegated":true,"assignment":"a1"}',
 	]);
 });
 
-test("a result keeps search candidates, host numbers, and work/memory snapshots as valid JSON", () => {
-	const refs = {
-		...NO_REFS,
-		todo: (id: string) => (id === "w1" ? "t4" : null),
-	};
+test("a result keeps search candidates, the assignment, and work/memory snapshots as valid JSON", () => {
 	const step = (name: string, result: unknown) => ({
 		name,
 		arguments: "{}",
 		result,
 	});
 	expect(
-		carriedToolCalls(
-			[
-				step("find_toolchain", {
-					candidates: [
-						{
-							id: "a",
-							title: "A",
-							summary: "s",
-							useWhen: "u",
-							inputs: { x: 1 },
-						},
-					],
-					discovery: "embedding_unavailable",
-				}),
-				step("delegate", { delegated: true, todo: "w1" }),
-				step("delegate", { delegated: true, todo: "w9" }),
-				step("delegate", { delegated: true }),
-				step("delegate", { answered: true, answer: "東京は15時です" }),
-				step("delegate", { delegated: false, code: "toolchain_unavailable" }),
-				step("memory", { accepted: true, requestId: "r1" }),
-				step("work", { ok: true }),
-			],
-			refs,
-		).map((call) => [call.name, call.result]),
+		carriedToolCalls([
+			step("find_toolchain", {
+				candidates: [
+					{
+						id: "a",
+						title: "A",
+						summary: "s",
+						useWhen: "u",
+						inputs: { x: 1 },
+					},
+				],
+				discovery: "embedding_unavailable",
+			}),
+			step("delegate", {
+				delegated: true,
+				assignment: "a7",
+				assignee: "画像を作る",
+				next: "状態の assignments に出る",
+			}),
+			step("delegate", {
+				delegated: false,
+				code: "duplicate",
+				assignment: "a7",
+			}),
+			step("delegate", { delegated: false, code: "agency_unavailable" }),
+			step("delegate", { delegated: true }),
+			step("delegate", { answered: true, answer: "東京は15時です" }),
+			step("delegate", { delegated: false, code: "toolchain_unavailable" }),
+			step("memory", { accepted: true, requestId: "r1" }),
+		]).map((call) => [call.name, call.result]),
 	).toEqual([
 		["find_toolchain", '{"candidates":[{"id":"a","title":"A","summary":"s"}]}'],
-		["delegate", '{"todo":"t4"}'],
-		["delegate", '{"delegated":true}'],
+		["delegate", '{"delegated":true,"assignment":"a7"}'],
+		["delegate", '{"delegated":false,"assignment":"a7","code":"duplicate"}'],
+		["delegate", '{"delegated":false}'],
 		["delegate", '{"delegated":true}'],
 		["delegate", '{"answered":true}'],
 		["delegate", '{"delegated":false}'],
 		["memory", '{"accepted":true,"requestId":"r1"}'],
-		["work", '{"ok":true}'],
 	]);
 });
 
 test("a replayed call's arguments are always a JSON object, each text within its bound", () => {
 	const args = (raw: string) =>
-		carriedToolCalls(
-			[{ name: "delegate", arguments: raw, result: { refused: true } }],
-			NO_REFS,
-		)[0]!.arguments;
+		carriedToolCalls([
+			{ name: "delegate", arguments: raw, result: { refused: true } },
+		])[0]!.arguments;
 	// A call refused for its form, or one that is not an object, replays as an empty object.
-	expect(args('{"mode":"execute",')).toBe("{}");
+	expect(args('{"toolchain":"x",')).toBe("{}");
 	expect(args("")).toBe("{}");
 	expect(args("[1,2]")).toBe("{}");
 	const long = JSON.parse(
 		args(
 			JSON.stringify({
-				mode: "execute",
+				toolchain: "fake.image",
 				request: "あ".repeat(5000),
 				inputs: { prompt: "い".repeat(400) },
 			}),
 		),
-	) as { mode: string; request: string; inputs: { prompt: string } };
-	expect(long.mode).toBe("execute");
+	) as { toolchain: string; request: string; inputs: { prompt: string } };
+	expect(long.toolchain).toBe("fake.image");
 	expect(long.request).toBe(`${"あ".repeat(300)}…`);
 	expect(long.inputs.prompt).toBe(`${"い".repeat(300)}…`);
-});
-
-test("a report keeps the notice of the work it told; the next local turn draws the words alone", async () => {
-	h = await setup();
-	h.state.steps.push(choice({ choice: IMAGE.id }));
-	const waiting = await h.say("猫の絵", "queued");
-	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
-	const [todo] = h.archived();
-	await h.store.write((db) =>
-		h!.dialogue.recordSpontaneousInTransaction(db, {
-			conversationId: "main",
-			messageId: "report-1",
-			text: "猫の絵ができあがりました。",
-			at: new Date().toISOString(),
-			todoRefs: [todo!.id],
-		}),
-	);
-	h.state.steps.push(choice({ choice: "none" }), {
-		text: "どういたしまして。",
-	});
-	await h.say("ありがとう");
-	expect(kept("猫の絵ができあがりました。").notice).toBe(
-		`[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,
-	);
-	const replayed = recent();
-	expect(replayed.map((m) => String(m.role))).toEqual([
-		"assistant",
-		"tool",
-		"tool",
-		"assistant",
-	]);
-	expect(replayed.at(-1)).toEqual({
-		role: "assistant",
-		content: "「画像」に頼みます。\n猫の絵ができあがりました。",
-	});
 });

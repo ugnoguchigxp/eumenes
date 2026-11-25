@@ -20,7 +20,6 @@ import { systemContext } from "../../../infrastructure/system-context";
 import type { Run } from "../contracts";
 import { hiddenMessages, recentRuns } from "../repository";
 import { sessionEventsOfRun } from "../repository/specialist";
-import { recentWorkForRead, type WorkRow } from "../repository/work";
 import type { DialogueDeps, GenerateInput } from "./context";
 import type {
 	ExecutorContext,
@@ -271,9 +270,7 @@ function toolSummaryTag(
 		let extra = "";
 		try {
 			const res = JSON.parse(call.result) as Record<string, unknown>;
-			if (typeof res.todo === "string") extra = `→${res.todo}`;
-			else if (typeof res.confirmation === "string")
-				extra = `→${res.confirmation}`;
+			if (typeof res.assignment === "string") extra = `→${res.assignment}`;
 		} catch {
 			// plain text result
 		}
@@ -437,17 +434,6 @@ async function runsFound(
 const toolName = (revisionId: string) =>
 	/^tool:([^@]+)@/.exec(revisionId)?.[1] ?? revisionId;
 
-function workResultSummary(result: WorkRow["result"]): string | null {
-	if (!result || typeof result !== "object") return null;
-	const rec = result as Record<string, unknown>;
-	for (const key of ["summary", "text", "title", "message"]) {
-		const val = rec[key];
-		if (typeof val === "string" && val.trim())
-			return clip(val, LIMITS.textChars);
-	}
-	return null;
-}
-
 function matchesAgentsFilter(
 	text: string,
 	toolchainId: string | null | undefined,
@@ -501,22 +487,9 @@ function agentsFound(
 					session: sessionEventsOfRun(db, run.id),
 				};
 			});
-		const works = recentWorkForRead(
-			db,
-			input.conversationId,
-			LIMITS.scannedRuns,
-		).filter(
-			(row) =>
-				(row.request.trim() || row.title.trim()) &&
-				!row.messageIds.some((id) => blocked.has(id)),
-		);
-		return { runs, works };
+		return { runs };
 	});
 	if (!loaded) return null;
-	const workByRun = new Map<string, WorkRow>();
-	for (const w of loaded.works)
-		if (!workByRun.has(w.runId)) workByRun.set(w.runId, w);
-	const seenRuns = new Set<string>();
 	type Entry = {
 		at: string;
 		toolchainId: string | null | undefined;
@@ -525,10 +498,8 @@ function agentsFound(
 	};
 	const entries: Entry[] = [];
 	for (const { run, usage, session } of loaded.runs) {
-		seenRuns.add(run.id);
-		const w = workByRun.get(run.id);
 		const tasks = agents.list(run.id);
-		if (!usage && !tasks.length && !session.length && !w) continue;
+		if (!usage && !tasks.length && !session.length) continue;
 		const tools = new Map<string, number>();
 		for (const task of tasks)
 			for (const outcome of task.toolOutcomes) {
@@ -549,16 +520,15 @@ function agentsFound(
 				clip(source.title || source.url || "", LIMITS.sourceChars),
 			)
 			.filter(Boolean);
-		const toolchainId = w?.toolchainId ?? usage?.toolchainId;
-		const requestText =
-			w?.request?.trim() || usage?.request || w?.title?.trim();
-		const summaryText = report?.summary ?? workResultSummary(w?.result ?? null);
+		const toolchainId = usage?.toolchainId;
+		const requestText = usage?.request;
+		const summaryText = report?.summary;
 		const line = [
-			`- ${when(w?.createdAt ?? run.createdAt)}${w ? ` t${w.ref}` : ""} 担当: ${toolchainId ?? "なし"}`,
+			`- ${when(run.createdAt)} 担当: ${toolchainId ?? "なし"}`,
 			...(requestText
 				? [`依頼: ${clip(requestText, LIMITS.workRequestChars)}`]
 				: []),
-			`状態: ${w?.outcome ?? w?.status ?? usage?.outcome ?? root?.status ?? run.status}${codeText(usage?.code ?? root?.errorCode)}`,
+			`状態: ${usage?.outcome ?? root?.status ?? run.status}${codeText(usage?.code ?? root?.errorCode)}`,
 			...(tools.size
 				? [
 						`道具: ${[...tools]
@@ -577,34 +547,11 @@ function agentsFound(
 			...(sources.length ? [`見た所: ${sources.join("、")}`] : []),
 			...(summaryText ? [`報告: ${clip(summaryText, LIMITS.textChars)}`] : []),
 		].join(" ");
-		const msgIds = [
-			...(run.inputMessageId ? [run.inputMessageId] : []),
-			...(w?.messageIds ?? []),
-		];
 		entries.push({
-			at: w?.createdAt ?? run.createdAt,
+			at: run.createdAt,
 			toolchainId,
 			line,
-			messageIds: msgIds,
-		});
-	}
-	for (const w of loaded.works) {
-		if (seenRuns.has(w.runId)) continue;
-		const summaryText = workResultSummary(w.result);
-		const requestText = w.request.trim() || w.title.trim();
-		const line = [
-			`- ${when(w.createdAt)} t${w.ref} 担当: ${w.toolchainId}`,
-			...(requestText
-				? [`依頼: ${clip(requestText, LIMITS.workRequestChars)}`]
-				: []),
-			`状態: ${w.outcome ?? w.status}`,
-			...(summaryText ? [`報告: ${summaryText}`] : []),
-		].join(" ");
-		entries.push({
-			at: w.createdAt,
-			toolchainId: w.toolchainId,
-			line,
-			messageIds: [...w.messageIds],
+			messageIds: run.inputMessageId ? [run.inputMessageId] : [],
 		});
 	}
 	entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));

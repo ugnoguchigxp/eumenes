@@ -508,57 +508,6 @@ register("screen-mentions", {
 	},
 });
 
-register("interaction-lifecycle", {
-	schema: z.strictObject({
-		sequence: z.array(z.string()).min(2),
-		maxQuestions: z.number().int().positive(),
-		requireReceiptRef: z.boolean().default(true),
-		/** The page was reloaded between the first and the last status of `sequence`. */
-		reloadBetween: z.boolean().default(false),
-	}),
-	run(ctx, p) {
-		const series = ctx.ev.hostSeries.filter((s) => s.interactions !== null);
-		if (!series.length)
-			return unknown("interactions_unobserved", undefined, "environment");
-		const ids = new Set(
-			series.flatMap((s) => s.interactions!.map((i) => i.id)),
-		);
-		if (ids.size > 1) return violated("multiple_interactions", `${ids.size}件`);
-		const [id] = [...ids];
-		if (!id) return unmet("no_interaction");
-		const views = series.map((s) => ({
-			atMs: s.atMs,
-			view: s.interactions!.find((i) => i.id === id),
-		}));
-		let next = 0;
-		let firstAt: number | null = null;
-		let lastAt = 0;
-		for (const { atMs, view } of views) {
-			if (view && view.status === p.sequence[next]) {
-				if (next === 0) firstAt = atMs;
-				lastAt = atMs;
-				next++;
-				if (next === p.sequence.length) break;
-			}
-		}
-		if (next < p.sequence.length)
-			return unmet("sequence_not_observed", `${next}/${p.sequence.length}`);
-		const final = views[views.length - 1]!.view!;
-		if (final.questionCount > p.maxQuestions)
-			return violated("question_limit_exceeded", `${final.questionCount}`);
-		if (p.requireReceiptRef && !final.hasReceiptRef)
-			return unmet("receipt_ref_missing");
-		if (
-			p.reloadBetween &&
-			!ctx.ev.reloads.some(
-				(t) => firstAt !== null && t >= firstAt && t <= lastAt,
-			)
-		)
-			return unmet("no_reload_while_waiting");
-		return ok("interaction_completed");
-	},
-});
-
 register("fault-triggered", {
 	schema: z.strictObject({ kind: z.string() }),
 	run(ctx, p) {

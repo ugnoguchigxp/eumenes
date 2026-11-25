@@ -46,7 +46,6 @@ export function assembleAgency(
 		Partial<
 			Pick<
 				DialogueService,
-				| "awaitingWorkConfirmationInTransaction"
 				| "backgroundDiagnosticInTransaction"
 				| "activeSpecialistAgentLabelInTransaction"
 			>
@@ -76,9 +75,6 @@ export function assembleAgency(
 		},
 		conversationBusy: (db, conversationId) =>
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
-		awaitingWorkConfirmation: (db, conversationId) =>
-			dialogue().awaitingWorkConfirmationInTransaction?.(db, conversationId) ??
-			false,
 		backgroundPaused: (db, conversationId) =>
 			dialogue().activeSpecialistAgentLabelInTransaction?.(
 				db,

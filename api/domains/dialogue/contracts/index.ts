@@ -289,6 +289,27 @@ export type WorldRecords = {
  * opportunity when work changes.
  */
 export interface AgencyLayerPort {
+	/**
+	 * Work the user asks a task toolchain for, held by the agent as its own assignment, as a research is (spec
+	 * toolchain-assignment-as-research-2026-11-25.md): accepted with the agent's item id, or refused (a duplicate
+	 * names the item that does it already).
+	 */
+	assign?(input: {
+		toolchainId: string;
+		revisionId: string;
+		title: string;
+		request: string;
+		references: import("../../tool-runtime").ExecutionReference[];
+		source: import("./agency-always-on").AssignmentSource;
+		details?: import("./agency-always-on").AssignmentDetails;
+		/**
+		 * A screen's form submit: its message is not words of the talk (an artifact), yet it is the user's own action
+		 * on the screen, so the agent takes it as the user's request for this assignment only.
+		 */
+		userMessage?: { id: string; text: string };
+	}):
+		| { status: "accepted"; id: string }
+		| { status: "refused"; code: string; id?: string };
 	isCurrentInputInTransaction?(
 		db: Database,
 		input: { sources: readonly string[]; complete: boolean },
@@ -328,8 +349,6 @@ export interface AgencyLayerPort {
 			messageIds: readonly string[];
 		},
 	): void;
-	/** A TODO of the conversation finished or asks the user something: the agent's opportunity to say so. */
-	workChangedInTransaction(db: Database, conversationId: string): void;
 	/**
 	 * The user's messages the reply of this run took into one of its model calls while it was written (words sent
 	 * meanwhile, eumenes-steer): they are answered by that reply and join the log with it, so no run answers them again.
@@ -435,11 +454,9 @@ export interface ConversationAgentPort {
 	}>;
 }
 
-export * from "./command-interactions";
 export * from "./specialist";
 
 export { errorReportSchema } from "./error-report";
-export * from "./todo-notices";
 /** HTTP status of each code the specialist and interaction operations throw. */
 export const errorStatus = {
 	specialist_session_not_found: 404,

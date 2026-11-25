@@ -1,4 +1,3 @@
-import { systemContext } from "../../../infrastructure/system-context";
 import type { ToolchainCard } from "../../capabilities";
 import type { ChatMessage } from "../service/context";
 import type { Step } from "./generation.fixture";
@@ -37,7 +36,6 @@ const call = (name: string, args: Record<string, unknown>): Step => ({
 export function conversationSteps(
 	steps: Step[],
 	cards: readonly ToolchainCard[],
-	confirmationDecisions: Record<string, unknown>[] = [],
 ) {
 	let request = "";
 	const followUp: Array<(messages: ChatMessage[]) => Step | undefined> = [];
@@ -50,12 +48,9 @@ export function conversationSteps(
 			try {
 				const output = JSON.parse(last?.content ?? "");
 				if (output.answered) return { text: output.answer };
-				if (
-					output.ok === false ||
-					output.declined === false ||
-					output.delegated === false
-				)
-					return { text };
+				// An assignment is the agent's: the reply goes on and says it was asked.
+				if (output.assignment) return { text: "頼みました。" };
+				if (output.ok === false || output.delegated === false) return { text };
 			} catch {
 				// When a fixture supplies a normal response, use it.
 			}
@@ -72,16 +67,6 @@ export function conversationSteps(
 			followUp.length = 0;
 			fill = undefined;
 		}
-		if (
-			structured &&
-			messages[0]?.content ===
-				systemContext("dialogue.contexts.local.confirmation-decision", {})
-		)
-			return {
-				text: JSON.stringify(
-					confirmationDecisions.shift() ?? { choice: "reply" },
-				),
-			};
 		if (structured) {
 			const next = fill ?? steps.shift();
 			fill = undefined;
@@ -91,35 +76,11 @@ export function conversationSteps(
 		const step = steps.shift();
 		const value = scriptedChoice(step);
 		if (!value) return step;
-		const {
-			choice,
-			confirmation,
-			todo,
-			operation,
-			resolveUnsaved,
-			say,
-			...fields
-		} = value;
+		const { choice, resolveUnsaved, say, ...fields } = value;
 		if (choice === "none") return steps.shift();
 		if (choice === "ask") return { text: say };
-		if (choice === "approve") {
-			finish("うまく頼めませんでした。もう一度言ってもらえますか。");
-			return call("approve_confirmation", { confirmation });
-		}
-		if (choice === "decline") {
-			finish("わかりました。やめておきます。");
-			return call("decline_confirmation", { confirmation });
-		}
 		if (resolveUnsaved === "discard")
 			return call("discard_for_pending_switch", { request: fields.request });
-		if (choice === "answer") {
-			finish("伝えました。");
-			return call("work", { todo, operation: "answer" });
-		}
-		if (typeof operation === "string") {
-			if (operation !== "check") finish(say ?? "承知しました。");
-			return call("work", { todo: choice, operation });
-		}
 		if (choice === "memory.request") {
 			finish(say ?? "承知しました。");
 			return call("memory", { operation: "request", ...fields });

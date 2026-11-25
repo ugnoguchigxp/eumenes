@@ -84,9 +84,6 @@ test("a retried attempt replaces the decision and the first terminal outcome win
 	expect(
 		store.read((db) => history.usageOfRunInTransaction(db, "missing")),
 	).toBeUndefined();
-	expect(store.read((db) => history.requestOfRunInTransaction(db, "run"))).toBe(
-		"鎌倉市の天気",
-	);
 });
 
 test("past selections are near, current and from other runs only", async () => {

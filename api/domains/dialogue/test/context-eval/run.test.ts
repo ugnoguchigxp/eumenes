@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { loadCases } from "../../eval/context/case-loader";
 import { createFixtureRunner } from "../../eval/context/fixture-lane";
 import {
 	COMPARED_TRAJECTORY,
@@ -9,7 +8,7 @@ import {
 import { prefixStability } from "../../eval/context/prefix-stability";
 import type { RawRow } from "../../eval/context/raw";
 import { executeRun, planJobs } from "../../eval/context/run";
-import { makeCase } from "./case-fixtures";
+import { loadRecordedCases, makeCase } from "./case-fixtures";
 import { openSeedWiring } from "./store-wiring";
 
 const cases = [
@@ -172,11 +171,12 @@ test("the example experiment's cases all prepare within the message invariants",
 		"../../../../../scripts/context-eval/experiments/2026-10-24-context-window",
 		import.meta.url,
 	).pathname;
+	const cases = loadRecordedCases(dir);
 	const jobs = await planJobs({
-		cases: loadCases(dir),
+		cases,
 		trials: 1,
 		openWiring: openSeedWiring,
 		catalog: [],
 	});
-	expect(jobs.length).toBe(loadCases(dir).length);
+	expect(jobs.length).toBe(cases.length);
 }, 30_000);

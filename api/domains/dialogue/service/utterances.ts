@@ -18,8 +18,6 @@ export function recordUtteranceInTransaction(
 		at: string;
 		/** The tool calls of the turn an agent utterance ends. */
 		toolCalls?: readonly UtteranceToolCall[];
-		/** The host notice an agent utterance reports (`reportNoticeInTransaction`). */
-		notice?: string;
 	},
 ): void {
 	if (!input.text.trim()) return;

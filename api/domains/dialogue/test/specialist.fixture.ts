@@ -13,6 +13,7 @@ import { createMemoryService, type MemoryService } from "../../memory";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
 import type {
+	AgencyLayerPort,
 	RejectedDraft,
 	SpecialistPort,
 	SpecialistSet,
@@ -37,12 +38,6 @@ export { IMAGE, type Call, type Step };
 export const choice = (value: Record<string, unknown>): Step => ({
 	text: JSON.stringify(value),
 });
-/** The pending turn's choice that approves the open confirmation `c<ref>` or declines it. */
-export const approve = (ref = 1) =>
-	choice({ choice: "approve", confirmation: `c${ref}` });
-export const decline = (ref = 1) =>
-	choice({ choice: "decline", confirmation: `c${ref}` });
-
 export const REVISION = "toolchain:fake.studio@1";
 export const OTHER_REVISION = "toolchain:fake.other@1";
 export const ADAPTER = "adapter:fake-studio@1";
@@ -88,6 +83,8 @@ export type Options = {
 	limits?: SpecialistSet["timeLimits"];
 	/** The studio's agent settings: a work document makes the host offer doc.* tools. */
 	agent?: SpecialistSet["agent"];
+	/** The agency's assignment port (a pinned screen submit is assigned to it). */
+	agency?: AgencyLayerPort;
 };
 
 /** The fixture document's canonical text: the same value always gives the same text. */
@@ -155,7 +152,6 @@ export async function setup(options: Options = {}) {
 		calledPort: [] as string[],
 		released: [] as string[],
 		runEnds: [] as Array<Parameters<StewardPort["runEndedInTransaction"]>[1]>,
-		images: new Map<string, unknown>(),
 	};
 	const receipt = (requestId: string, step: Step): Receipt => ({
 		requestId,
@@ -517,19 +513,12 @@ export async function setup(options: Options = {}) {
 			specialist.setInTransaction(_db as never, revisionId),
 		recordSelectionInTransaction: () => "selection",
 		settleSelectionInTransaction: () => {},
-		linkTaskInTransaction: () => {},
-		requestOfRunInTransaction: () => undefined,
 		commandSetInTransaction: () => {
 			throw new Error("unexpected_command");
 		},
 	} as unknown as ToolchainRoutingPort;
-	const image: ImagePort = {
-		startInTransaction: (_db, input) => ({
-			id: `image:${input.runId}`,
-			jobId: `image-job:${input.runId}`,
-		}),
-		resultInTransaction: (_db, runId) => state.images.get(runId) ?? null,
-	};
+	// The conversation only needs to know the image service is there; its work starts as an assignment.
+	const image: ImagePort = {};
 	const steward: StewardPort = {
 		runEndedInTransaction: (_db, input) => {
 			state.runEnds.push(input);
@@ -553,6 +542,7 @@ export async function setup(options: Options = {}) {
 		specialist,
 		image,
 		steward,
+		...(options.agency ? { agency: options.agency } : {}),
 		clock: () => new Date(Date.now() + state.offsetMs).toISOString(),
 	});
 	queue.start();

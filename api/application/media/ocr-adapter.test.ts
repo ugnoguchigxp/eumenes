@@ -1,9 +1,16 @@
 import { expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
-import { answerUtterance, handOver } from "./conversation-turn.fixture";
+import { answerUtterance } from "./conversation-turn.fixture";
+import {
+	ask,
+	assignmentAgenda,
+	ended,
+	executions,
+	until,
+} from "./assignment.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
-test("OCR bundle exposes one artifact and the command agent opens it", async () => {
+test("OCR bundle exposes one artifact and the command agent opens it for the assignment", async () => {
 	const model: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
@@ -15,7 +22,7 @@ test("OCR bundle exposes one artifact and the command agent opens it", async () 
 				options,
 				messages,
 				options?.onToolCalls,
-				handOver("ocr.manage", "準備します。", "none"),
+				() => ({ text: "承知しました。" }),
 			);
 			if (turn !== undefined) return turn;
 			if (
@@ -31,34 +38,31 @@ test("OCR bundle exposes one artifact and the command agent opens it", async () 
 			return "文字を読み取る画面を開きました。";
 		},
 	};
-	const h = await harness({
-		model,
-		settingsEnv: { LARM_API_TOKEN: "fixture-shared-token" },
-		ocrFetcher: (async () =>
-			Response.json({
-				kind: "image",
-				model: "fixture",
-				width: 100,
-				height: 100,
-				text: "",
-				lines: [],
-			})) as unknown as typeof fetch,
+	const a = await assignmentAgenda({
+		harness: {
+			model,
+			settingsEnv: { LARM_API_TOKEN: "fixture-shared-token" },
+			ocrFetcher: (async () =>
+				Response.json({
+					kind: "image",
+					model: "fixture",
+					width: 100,
+					height: 100,
+					text: "",
+					lines: [],
+				})) as unknown as typeof fetch,
+		},
 	});
+	const h = a.h;
 	try {
+		await a.start();
 		const artifacts = await (
 			await h.request("/api/toolchain-artifacts")
 		).json();
 		expect(JSON.stringify(artifacts)).toContain("ocr.workspace");
-		const run = (await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: "文字を読み取る画面を開いて",
-			})
-		).json()) as { id: string };
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
+		await ask(a, "ocr.manage", "文字を読み取る画面を開いて");
+		await until(a, () => ended(a));
+		expect(executions(a)).toHaveLength(1);
 		const command = h.store.read(
 			(db) =>
 				db.query("SELECT result_json FROM ocr_commands LIMIT 1").get() as {
@@ -70,9 +74,9 @@ test("OCR bundle exposes one artifact and the command agent opens it", async () 
 			state: "ready_for_input",
 		});
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 test("OCR command read is scoped to the conversation and exposes bounded raw result", async () => {
 	const h = await harness({
 		settingsEnv: { LARM_API_TOKEN: "fixture-shared-token" },

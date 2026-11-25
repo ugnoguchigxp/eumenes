@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claudeRunnerClient } from "../../domains/coding";
 import { conversationSchema } from "../../domains/conversation/contracts";
-import { runSchema, todoNoticesSchema } from "../../domains/dialogue/contracts";
+import { runSchema } from "../../domains/dialogue/contracts";
 import { sha256Hex } from "../../infrastructure/digest";
 import {
 	aggregateTitle,
@@ -489,9 +489,14 @@ test.skipIf(!failureLaunched)(
 				conversationId: "development",
 				text: failureRequest,
 			});
-			const notices = async () =>
-				todoNoticesSchema.parse(await active!.request("/api/todo-notices"))
-					.notices;
+			// The agent reports the finished work on its own: one line of its own in the conversation.
+			const reports = async () =>
+				conversationSchema
+					.parse(await active!.request("/api/conversations/development"))
+					.messages.filter(
+						(message) =>
+							message.role === "assistant" && message.id.startsWith("agency:"),
+					);
 			const compare = (snapshot: ParallelSnapshot, title: string) => {
 				expect(snapshot.parents).toHaveLength(1);
 				const fromConversation = snapshot.parents[0]!.tasks.find(
@@ -547,9 +552,7 @@ test.skipIf(!failureLaunched)(
 				waiting.parents[0]!.tasks.find(({ title }) => title === inputTitle)
 					?.state,
 			).not.toBe("finished");
-			const earlySuccesses = (await notices()).filter(
-				({ outcome }) => outcome === "succeeded",
-			).length;
+			const earlySuccesses = (await reports()).length;
 			expect(earlySuccesses).toBe(0);
 
 			checkpoint = "independent read and no unchanged retry";
@@ -567,9 +570,7 @@ test.skipIf(!failureLaunched)(
 			expect(compare(read, aggregateTitle).reason).toContain(failureReason);
 			expect(read.parents[0]!.result).toBeNull();
 			expect(startsAt(journal)).toHaveLength(2);
-			expect(
-				(await notices()).filter(({ outcome }) => outcome === "succeeded"),
-			).toEqual([]);
+			expect(await reports()).toEqual([]);
 
 			checkpoint =
 				"retry only after the fixture input and authorized condition change";
@@ -612,9 +613,7 @@ test.skipIf(!failureLaunched)(
 				outcome: "succeeded",
 			});
 			expect(independentlyAccepted.parents[0]?.result).toBeNull();
-			expect(
-				(await notices()).filter(({ outcome }) => outcome === "succeeded"),
-			).toEqual([]);
+			expect(await reports()).toEqual([]);
 			writeFileSync(release, "corrected fixture is ready\n");
 			const passed = await until("修正後の合格証跡", async () => {
 				const receipt = await inspect.inspect(retried.id);
@@ -642,9 +641,7 @@ test.skipIf(!failureLaunched)(
 			expect(finished.parents[0]?.result?.refs).not.toContain(failed.proof.ref);
 			expect(startsAt(journal)).toHaveLength(3);
 			const finalNotices = await until("親成功通知", async () => {
-				const current = (await notices()).filter(
-					({ outcome }) => outcome === "succeeded",
-				);
+				const current = await reports();
 				return current.length ? current : null;
 			});
 			expect(finalNotices).toHaveLength(1);

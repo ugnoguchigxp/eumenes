@@ -52,8 +52,6 @@ test("a toolchain with saved items always names its target: new first, then the 
 			state: "## State\n今: 10-31（金）00:21",
 			previousReply: null,
 			asked: null,
-			pending: { confirmations: [], questions: [] },
-			todos: [],
 			resources: [],
 			switching: null,
 		},

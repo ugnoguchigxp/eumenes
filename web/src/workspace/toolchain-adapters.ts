@@ -60,13 +60,6 @@ const loaders: readonly AdapterLoader[] = [
 		],
 	},
 	{
-		match: (ref) => ref === "adapter:task-execution@1",
-		load: async () => [
-			(await import("../domains/agent-runtime/toolchain-adapter"))
-				.todosWebAdapter,
-		],
-	},
-	{
 		match: (ref) => ref === "adapter:google-accounts@1",
 		load: async () => [
 			(await import("../domains/google-accounts/toolchain-adapter"))

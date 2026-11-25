@@ -15,9 +15,12 @@ export function recoverAgendaScope(
 	now: number,
 ) {
 	if (!deps.state) return;
+	const pendingItems = new Set(c.agent.view().items.map((item) => item.id));
 	const alive = deps.store.read((db) =>
-		c.tickets.filter((t) =>
-			deps.state!.workActiveInTransaction(db, workRoot(c, t.id)),
+		c.tickets.filter(
+			(t) =>
+				(t.pendingAdmission && pendingItems.has(t.itemId)) ||
+				deps.state!.workActiveInTransaction(db, workRoot(c, t.id)),
 		),
 	);
 	if (alive.length !== c.tickets.length) {

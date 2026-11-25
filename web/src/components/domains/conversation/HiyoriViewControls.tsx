@@ -13,12 +13,15 @@ export function HiyoriViewControls({
 	onChange,
 	background,
 	onBackgroundChange,
+	onBackgroundReset,
 	backdrop,
 }: {
 	view: AvatarView;
 	onChange: (view: AvatarView) => void;
 	background: AvatarBackground;
 	onBackgroundChange: (background: AvatarBackground) => void;
+	/** Back to the built-in gradient: the colour and the image go together. */
+	onBackgroundReset: () => void;
 	backdrop?: AvatarBackdrop;
 }) {
 	return (
@@ -111,10 +114,7 @@ export function HiyoriViewControls({
 					<button
 						type="button"
 						disabled={background === null && !backdrop?.url}
-						onClick={() => {
-							onBackgroundChange(null);
-							if (backdrop?.url) backdrop.onClear();
-						}}
+						onClick={onBackgroundReset}
 					>
 						既定の背景
 					</button>

@@ -16,7 +16,7 @@ const refused = (path: string, reason: string) =>
  * The resources a `delegate` call hands to the toolchain with its request (spec resource-uri-implementation-plan
  * section 6.2). The model names them `a<n>`; each must be in the conversation's ledger and not forgotten, and its
  * owner must still have it. A number that does not hold is refused with the reason (`unknown_resource`), so the
- * model reads it and corrects the call. Returns the resources' URIs (kept with a confirmation) and the references
+ * model reads it and corrects the call. Returns the resources' URIs and the references
  * the toolchain reads: `ref` is the URI, `preview` the owner's own shortened text of the resource.
  */
 export async function resolveDelegateRefs(
@@ -40,30 +40,6 @@ export async function resolveDelegateRefs(
 		uris,
 		references: await referencesOf(deps, uris, signal, (i) => `refs[${i}]`),
 	};
-}
-
-/** The references of resources named by URI (an approved confirmation's): each must still be there and not forgotten. */
-export async function referencesOfUris(
-	deps: Pick<DialogueDeps, "store" | "resources" | "resourceLedger">,
-	conversationId: string,
-	uris: readonly string[],
-	signal: AbortSignal,
-): Promise<ExecutionReference[] | null> {
-	const { store, resourceLedger: ledger } = deps;
-	if (uris.length === 0) return [];
-	if (!ledger || !deps.resources) return null;
-	const held = store.read((db) =>
-		uris.every((uri) => {
-			const row = ledger.byUriInTransaction(db, conversationId, uri);
-			return !!row && !row.forgottenAt;
-		}),
-	);
-	if (!held) return null;
-	try {
-		return await referencesOf(deps, uris, signal, () => "refs");
-	} catch {
-		return null;
-	}
 }
 
 async function referencesOf(

@@ -44,7 +44,6 @@ import {
 import { useSettings, useVoiceMute } from "../domains/settings";
 import { useWorkspaceLive } from "./useWorkspaceLive";
 import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
-import { useTodoNotices } from "../domains/dialogue";
 import { useClaudeCodeArtifacts } from "../domains/terminals/useClaudeCodeArtifacts";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 
@@ -173,7 +172,6 @@ export function useWorkspace({
 	const chime = timerAudio.chime;
 	useClaudeCodeArtifacts(client, openClaudeCode, chime);
 	const kanbanNotices = useKanbanNotices(client, chime, openById);
-	const todoNotices = useTodoNotices(client, chime);
 	const replay = useReplay(client, settings.data?.voice, {
 		sessionAudio: voice.audio,
 		interruptLive: voice.interrupt,
@@ -320,7 +318,6 @@ export function useWorkspace({
 		voice,
 		timerAudio,
 		kanbanNotices,
-		todoNotices,
 		replay,
 		mute,
 		automaticInput,

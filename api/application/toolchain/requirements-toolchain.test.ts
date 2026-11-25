@@ -1,9 +1,5 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import {
-	conversationByScript,
-	searchThenDelegate,
-} from "./conversation-script.fixture";
 import { workerPacket } from "./toolchain.fixture";
 import { loadEvaluationCases } from "./llm-native-evaluation.fixture";
 import { evaluateRequirements } from "./llm-native-runner.fixture";
@@ -27,16 +23,8 @@ for (const c of cases)
 				close: async () => {},
 				transcribe: async () => "",
 				speak: async () => new Uint8Array(),
-				answer: async (messages, _signal, options) => {
+				answer: async (messages) => {
 					calls++;
-					const conversation = conversationByScript(options, messages, (loop) =>
-						searchThenDelegate(
-							(candidate) => candidate.id === "history.research",
-							c.request,
-							{ announcement: "お調べします。", impact: "none" },
-						)(loop),
-					);
-					if (conversation) return conversation;
 					if (messages[0]!.content.includes("TOOLS=")) {
 						const data = workerPacket(messages);
 						if (data.draftReport)
@@ -98,8 +86,8 @@ for (const c of cases)
 			const result = await evaluateRequirements(c, profiles, model, true);
 			expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(3);
-			// The conversation searches and delegates, then the sub-agent finishes in three calls.
-			expect(calls).toBe(5);
+			// The assignment's sub-agent finishes in three calls; the conversation's own turns are answered in words.
+			expect(calls).toBe(3);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

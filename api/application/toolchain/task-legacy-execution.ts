@@ -55,15 +55,17 @@ export function taskLegacyPorts(dialogue: DialogueService): TaskLegacyPorts {
 				prepared,
 				command,
 			);
-			const completed = ["read", "cancel"].includes(
+			const read = ["read", "cancel"].includes(
 				(receipt as { action?: string } | null)?.action ?? "",
 			);
+			// Opening or offering the screen is the whole command: the user continues there, so it is a success.
 			return {
-				state: completed ? "completed" : "handoff",
+				state: "completed",
 				ref: { kind: "legacy" as const, type: prepared.backend, receipt },
 				output: receipt,
-				summary: JSON.stringify(receipt),
-				...(completed ? {} : { code: "interactive_handoff" }),
+				summary: read
+					? JSON.stringify(receipt)
+					: `物体認識の画面を開き、利用者の操作を案内しました。${JSON.stringify(receipt)}`,
 				modelCalls: (child.usedModelCalls ?? 0) + 1,
 				references: [],
 			};

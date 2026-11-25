@@ -211,10 +211,16 @@ export function createWorldResearchPorts(options: {
 	const documents = createWorldDocuments(store);
 	const now = options.now ?? Date.now;
 
-	/** The Scope of this task: refused unless the task belongs to a conversation run. */
+	/**
+	 * The Scope of this task: refused unless the user's words started it, as a conversation run or as an assignment
+	 * of the agent (its run has ended).
+	 */
 	function scopeOf(db: Database, owner: Owner, stage: "read" | "adopt") {
 		options.runtime().authorizeReadOwnerInTransaction(db, owner, stage);
-		if (!readActionOriginInTransaction(db, owner.rootRunId))
+		if (
+			!options.runtime().executionOriginInTransaction(db, owner) &&
+			!readActionOriginInTransaction(db, owner.rootRunId)
+		)
 			throw new Error("world_scope_unavailable");
 		const ctx = options.context();
 		const scopeKey = ctx.scopeKeys[0];

@@ -94,7 +94,7 @@ export const fixtureSchema = z
 	.readonly();
 export type FixtureDef = z.infer<typeof fixtureSchema>;
 
-const hostReads = ["timers", "interactions"] as const;
+const hostReads = ["timers"] as const;
 export const criteriaSchema = z
 	.strictObject({
 		criteriaId: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -186,19 +186,12 @@ export type HostTimer = {
 	remainingSeconds: number;
 	originRunId: string | null;
 };
-export type HostInteraction = {
-	id: string;
-	status: string;
-	questionCount: number;
-	hasReceiptRef: boolean;
-};
 /** One readonly observation of the host. `atMs` is the runner clock, `serverNowMs` the server's. */
 export type HostSnapshot = {
 	seq: number;
 	atMs: number;
 	serverNowMs: number;
 	timers: HostTimer[];
-	interactions: HostInteraction[] | null;
 };
 /** A timer_action receipt seen passively in an /api response body (never injected, never replayed). */
 export type ObservedReceipt = {

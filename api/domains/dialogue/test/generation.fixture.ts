@@ -69,6 +69,25 @@ export const reply = (text: string): Step[] => [
 	{ text },
 ];
 
+type Assignment = Parameters<NonNullable<AgencyLayerPort["assign"]>>[0];
+
+/** An agency port that gives only what a test reads of it (the rest of the port is the test's to leave out). */
+export const agencyWith = (port: Partial<AgencyLayerPort>) =>
+	port as AgencyLayerPort;
+
+/** The agency's assignment port: accepts what is handed to it and keeps it, or does not serve the conversation. */
+export function agencyOf(serves = true) {
+	const assigned: Assignment[] = [];
+	const agency = {
+		servesRepliesInTransaction: () => serves,
+		assign: (input: Assignment) => {
+			assigned.push(input);
+			return { status: "accepted" as const, id: `a${assigned.length}` };
+		},
+	} as unknown as AgencyLayerPort;
+	return { agency, assigned };
+}
+
 export const IMAGE: ToolchainCard = {
 	revisionId: "toolchain:fake.image@1",
 	id: "fake.image",
@@ -192,14 +211,12 @@ export async function setup(options: SetupOptions = {}) {
 	const state = {
 		offsetMs: 0,
 		steps: [] as Step[],
-		confirmationDecisions: [] as Record<string, unknown>[],
 		calls: [] as Call[],
 		receiptAllowed: true,
 		/** Whether adoption accepts the receipt (permission still held). */
 		acceptAllowed: true,
 		/** When set, each model call waits for it before answering (to observe a run in flight). */
 		gate: null as Promise<void> | null,
-		images: new Map<string, unknown>(),
 		instantAnswer: "東京は12時です。" as string | null,
 		stewardRequests: [] as Array<
 			Parameters<StewardPort["requestInTransaction"]>[1]
@@ -255,11 +272,7 @@ export async function setup(options: SetupOptions = {}) {
 			arguments: JSON.stringify(call.args),
 		})),
 	});
-	const nextModelStep = conversationSteps(
-		state.steps,
-		cards,
-		state.confirmationDecisions,
-	);
+	const nextModelStep = conversationSteps(state.steps, cards);
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		requestFor: (_db: unknown, runId: string) =>
@@ -422,28 +435,13 @@ export async function setup(options: SetupOptions = {}) {
 		) => {
 			state.settled.push({ runId, outcome: result.outcome });
 		},
-		linkTaskInTransaction: () => {},
-		requestOfRunInTransaction: () => undefined,
 		commandSetInTransaction: () => {
 			throw new Error("unexpected_command");
 		},
 	} as unknown as ToolchainRoutingPort;
-	const image: ImagePort = {
-		startInTransaction: (_db, input) => ({
-			id: `image:${input.runId}`,
-			jobId: `image-job:${input.runId}`,
-		}),
-		resultInTransaction: (_db, runId) => state.images.get(runId) ?? null,
-	};
-	const music = options.music
-		? ({
-				startInTransaction: (_db: unknown, input: { runId: string }) => ({
-					id: `music:${input.runId}`,
-					jobId: `music-job:${input.runId}`,
-				}),
-				resultInTransaction: () => null,
-			} as unknown as MusicPort)
-		: undefined;
+	// The conversation only needs to know the image service is there; its work starts as an assignment.
+	const image: ImagePort = {};
+	const music: MusicPort | undefined = options.music ? {} : undefined;
 	const steward: StewardPort | undefined =
 		options.steward === null
 			? undefined
@@ -548,7 +546,7 @@ export async function setup(options: SetupOptions = {}) {
 				text,
 				...extra,
 			});
-			// A handed-over run is queued again, behind its work's job instead of its own generation.
+			// A handed-over run (a session) is queued again, behind its turn's job instead of its own generation.
 			await waitFor(() => {
 				const now = run(accepted.id);
 				return (
@@ -562,49 +560,11 @@ export async function setup(options: SetupOptions = {}) {
 			});
 			return run(accepted.id)!;
 		},
-		/** The image job finished: its result is saved and the waiting run comes back. */
-		async finishImage(runId: string, result: unknown, status = "completed") {
-			state.images.set(runId, result);
-			await store.write((db) =>
-				dialogue.finishOperationInTransaction(db, runId),
-			);
-			await waitFor(() => run(runId)?.status === status);
-			return run(runId)!;
-		},
 		log(): ConversationEvent[] {
 			return store.read((db) => continuity.events.logInTransaction(db, "main"));
 		},
 		fields(event: ConversationEvent) {
 			return JSON.parse(event.text ?? "{}") as Record<string, unknown>;
-		},
-		todos() {
-			return store.read((db) => dialogue.todosInTransaction(db, "main"));
-		},
-		/** The archived TODOs, newest first: finished work is archived as it finishes. */
-		archived() {
-			return store.read(
-				(db) =>
-					dialogue.todoPageInTransaction(db, "main", {
-						state: "archived",
-						pageIndex: 0,
-						pageSize: 50,
-					}).rows,
-			);
-		},
-		/** The finished TODOs' notices, newest first, and the unread count. */
-		notices() {
-			return dialogue.todoNotices(50);
-		},
-		/** The work results the log holds (`work.result` events), in log order: what the owners reported. */
-		results(): ConversationEvent[] {
-			return store
-				.read((db) => continuity.events.logInTransaction(db, "main"))
-				.filter(
-					(e) =>
-						e.type === "acted" &&
-						(JSON.parse(e.text ?? "{}") as Record<string, unknown>).action ===
-							"work.result",
-				);
 		},
 		async close() {
 			await dialogue.close();

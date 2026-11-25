@@ -3,8 +3,6 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { KanbanNoticeView } from "../../../api/domains/kanban/contracts";
-import type { TodoNotice } from "../../../api/domains/dialogue/contracts";
-import { useTodoNotices } from "../domains/dialogue";
 import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
 import { settingsFixture } from "../domains/settings/sections/fixture";
 import { queryRoots } from "../queryKeys";
@@ -57,18 +55,6 @@ test("real notice hooks append the saved voice after the tone only for successfu
 			createdAt: "2026-10-31T00:00:00Z",
 		},
 	];
-	let todo: TodoNotice[] = [
-		{
-			id: "loaded",
-			conversationId: "main",
-			title: "以前",
-			outcome: "succeeded",
-			summary: null,
-			links: [],
-			read: true,
-			createdAt: "2026-10-31T00:00:00Z",
-		},
-	];
 	const client = {
 		identity: "completion-integration",
 		kanbanNotices: vi.fn(async () => ({
@@ -76,11 +62,6 @@ test("real notice hooks append the saved voice after the tone only for successfu
 			unread: board.filter((n) => !n.read).length,
 		})),
 		readKanbanNotice: vi.fn(async () => {}),
-		todoNotices: vi.fn(async () => ({
-			notices: todo,
-			unread: todo.filter((n) => !n.read).length,
-		})),
-		readTodoNotice: vi.fn(async () => {}),
 	};
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -96,15 +77,13 @@ test("real notice hooks append the saved voice after the tone only for successfu
 		() => {
 			const audio = useNotificationAudio(settings, undefined, liveSpeech);
 			const kanban = useKanbanNotices(client, audio.chime, async () => true);
-			const todos = useTodoNotices(client, audio.chime);
-			return { audio, kanban, todos };
+			return { audio, kanban };
 		},
 		{ wrapper },
 	);
-	await waitFor(() => {
-		expect(hook.result.current.kanban.notices).toHaveLength(1);
-		expect(hook.result.current.todos.notices).toHaveLength(1);
-	});
+	await waitFor(() =>
+		expect(hook.result.current.kanban.notices).toHaveLength(1),
+	);
 	expect(output.play).not.toHaveBeenCalled();
 	board = [
 		{ ...board[0]!, id: "question", kind: "waiting", read: false },
@@ -115,9 +94,9 @@ test("real notice hooks append the saved voice after the tone only for successfu
 	});
 	await waitFor(() => expect(output.play).toHaveBeenCalledTimes(1));
 	expect(output.play.mock.calls[0]?.[0][44]).toBe(1);
-	todo = [{ ...todo[0]!, id: "finished", read: false }, ...todo];
+	board = [{ ...board[0]!, id: "done", kind: "done" }, ...board];
 	await act(async () => {
-		await cache.invalidateQueries({ queryKey: [queryRoots.dialogue] });
+		await cache.invalidateQueries({ queryKey: [queryRoots.kanban] });
 	});
 	await waitFor(() => expect(output.play).toHaveBeenCalledTimes(3));
 	await waitFor(() => expect(trace).toHaveBeenCalledTimes(6));
@@ -139,24 +118,19 @@ test("real notice hooks append the saved voice after the tone only for successfu
 		"stage",
 	]);
 	expect(traces()[0]).toMatchObject({
-		noticeSource: "todo",
-		noticeIds: ["finished"],
+		noticeSource: "kanban",
+		noticeIds: ["done"],
 	});
 	expect(output.play.mock.calls.map((call) => call[0][44])).toEqual([1, 1, 2]);
 	await act(async () => {
-		await cache.invalidateQueries({ queryKey: [queryRoots.dialogue] });
-	});
-	expect(output.play).toHaveBeenCalledTimes(3);
-	board = [{ ...board[0]!, id: "done", kind: "done" }, ...board];
-	await act(async () => {
 		await cache.invalidateQueries({ queryKey: [queryRoots.kanban] });
 	});
-	await waitFor(() => expect(output.play).toHaveBeenCalledTimes(5));
+	expect(output.play).toHaveBeenCalledTimes(3);
 	await act(async () => {
 		await hook.result.current.audio.play(new AbortController().signal);
 	});
 	expect(output.play.mock.calls.map((call) => call[0][44])).toEqual([
-		1, 1, 2, 1, 2, 1,
+		1, 1, 2, 1,
 	]);
 	expect(liveSpeech).not.toHaveBeenCalled();
 	cache.clear();

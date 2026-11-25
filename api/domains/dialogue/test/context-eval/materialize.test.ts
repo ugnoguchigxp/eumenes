@@ -95,7 +95,11 @@ const fullCase = caseSchema.parse({
 			{
 				type: "acted",
 				at: T(11),
-				fields: { action: "delegate", toolchain: "web_research", todo: "@w1" },
+				fields: {
+					action: "delegate",
+					toolchain: "web_research",
+					assignment: "a1",
+				},
 			},
 			agent(12, "調べますね。", { origin: "announcement" }),
 			agent(30, "そういえば、紅葉が見頃です。夜は", {
@@ -105,36 +109,6 @@ const fullCase = caseSchema.parse({
 				about: ["@ask"],
 			}),
 			agent(31, "いま話しているところ", { heard: null, speaking: true }),
-		],
-		work: [
-			{
-				key: "w1",
-				toolchain: "web_research",
-				request: "宿の候補を調べる",
-				at: T(11),
-				updatedAt: T(20),
-				status: "done",
-				outcome: "succeeded",
-				result: { claims: [{ text: "三件見つかった" }] },
-			},
-			{
-				key: "w2",
-				toolchain: "image_studio",
-				request: "海の絵を描く",
-				at: T(11),
-				updatedAt: T(21),
-				status: "done",
-				outcome: "succeeded",
-				result: { claims: [] },
-				archived: true,
-			},
-		],
-		confirmations: [
-			{
-				toolchain: "code_workspace",
-				request: "設定を書き換える",
-				impact: "modify_existing",
-			},
 		],
 		pending: [{ at: T(40), text: "もう一つ" }],
 		goals: [{ text: "来週までに資料を作る", priority: 70 }],
@@ -190,36 +164,17 @@ test("the recent conversation is what reached the user: a partial delivery as he
 	expect(m.input.messages[1]!.content).toEndWith("## Earlier\n\n宿を調べて");
 });
 
-test("TODOs and confirmations come from the work ledger as lines of `## State`", async () => {
+test("the agent's own work has no line of `## State`: its assignments are the agency's to tell", async () => {
 	const m = await prepared(fullCase);
 	const state = sect(m, "State");
-	// Finished work is archived as it finishes: the state names it as notified.
-	expect(state).toContain("- t1 宿の候補を調べる 通知済み");
-	expect(state).toContain(
-		"- c1 確認待ち code_workspace「設定を書き換える」（変更）",
-	);
-	expect(state).toContain("- t2 海の絵を描く 通知済み");
-	// No result is shown in this input: nothing it shows may be reported with its sources.
-	expect(m.input.shown.todos).toEqual([]);
+	expect(state.some((line) => /^- [tc]\d+ /.test(line))).toBe(false);
+	expect(state).not.toContain("仕事:");
 });
 
-test("a generation without an utterance answers a host notice, with the TODO in `## State`", async () => {
+test("a generation without an utterance answers a host notice", async () => {
 	const testCase = makeCase("ctx-f12-dev-01", null, {
-		seed: {
-			events: [user(0, "調べて", "ask")],
-			work: [
-				{
-					key: "w1",
-					toolchain: "web_research",
-					request: "調べる",
-					at: T(1),
-					status: "done",
-					outcome: "succeeded",
-					result: {},
-				},
-			],
-		} as never,
-		trigger: { kind: "todo_changed", todos: [{ id: "@w1", status: "done" }] },
+		seed: { events: [user(0, "調べて", "ask")] } as never,
+		trigger: { kind: "notice", text: "調べものが終わりました" },
 		expect: {
 			checks: [{ kind: "speaks" }],
 			rubric: [{ axis: "speech_judgment", condition: "x" }],
@@ -227,9 +182,12 @@ test("a generation without an utterance answers a host notice, with the TODO in 
 	});
 	const m = await prepared(testCase);
 	expect(m.input.final).toEqual({ kind: "fixed" });
-	expect(sect(m, "Host notice")).toEqual(["- kind: todo_changed"]);
+	expect(sect(m, "Host notice")).toEqual([
+		"- kind: notice",
+		"- text: 調べものが終わりました",
+	]);
 	expect(sect(m, "User")).toEqual([]);
-	// A notice generation only talks: the work is in its host notice, and no choice calls read the state.
+	// A notice generation only talks: no choice calls read the state.
 	expect(sect(m, "State")).toHaveLength(1);
 	expect(m.input.routed).toBeUndefined();
 });

@@ -63,33 +63,6 @@ const definition = {
 	],
 	actionBindings: [],
 };
-const interaction = {
-	id: "i1",
-	conversationId: "main",
-	status: "waiting_input",
-	revision: 1,
-	chainRevisionId: "toolchain:timers.manage@2",
-	artifactRevisionId: event.artifactRevisionId,
-	question: {
-		questionId: "20000000-0000-4000-8000-000000000001",
-		prompt: "何分ですか？",
-		inputSchemaRef: "builtin:timerDurationAnswer",
-		revision: 1,
-		expiresAt: "2026-10-14T12:00:00.000Z",
-	},
-	questionCount: 1,
-	receiptRef: null,
-	expiresAt: "2026-10-14T12:00:00.000Z",
-	createdAt: t0,
-	updatedAt: t0,
-};
-const answer = {
-	eventId: "30000000-0000-4000-8000-000000000001",
-	questionId: interaction.question.questionId,
-	expectedRevision: 1,
-	input: { durationSeconds: 180 },
-};
-
 contracts("toolchain actions client", [
 	{
 		name: "toolchainAction",
@@ -184,25 +157,6 @@ contracts("toolchain actions client", [
 		method: "GET",
 		path: "/api/toolchain-artifacts/artifact%3Asettings.records%401/sources/settings-records?params=%7B%22pageIndex%22%3A%221%22%2C%22desc%22%3Atrue%7D",
 		response: { revision: 0, data: { items: [] } },
-	},
-	{
-		name: "toolchainInteractions",
-		call: (c) =>
-			c.toolchainInteractions({
-				conversationId: "main",
-				status: "waiting_input",
-			}),
-		method: "GET",
-		path: "/api/toolchain-interactions?conversationId=main&status=waiting_input",
-		response: [interaction],
-	},
-	{
-		name: "answerToolchainInteraction",
-		call: (c) => c.answerToolchainInteraction("i1", answer),
-		method: "POST",
-		path: "/api/toolchain-interactions/i1/answers",
-		body: answer,
-		response: { interaction, runId: "r1", replay: false },
 	},
 ]);
 

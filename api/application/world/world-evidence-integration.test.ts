@@ -238,8 +238,8 @@ test("the registered research route exposes a long claim's final condition and p
 			},
 		},
 	);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("completed");
 	expect(h.reported()).toContain("world_claim");
 });
 
@@ -295,5 +295,6 @@ test("whole-claim byte limits still mark an overfull research result as partial"
 			},
 		},
 	);
-	expect((await h.ask(QUESTION)).done?.status).toBe("completed");
+	// A research that could not read everything is a partial result of the execution.
+	expect((await h.ask(QUESTION)).execution.status).toBe("partial");
 });

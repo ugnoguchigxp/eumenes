@@ -4,7 +4,6 @@ import {
 	routeConversation,
 	type DialogueService,
 } from "../../domains/dialogue";
-import type { ContinuityService } from "../../domains/continuity";
 import type { MemoryService } from "../../domains/memory";
 import type { ExternalOutputPort } from "../../domains/dialogue/contracts/external-output";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
@@ -20,9 +19,8 @@ export function createLiveBridge() {
 			liveVoice?.externalOutput.reattach(tx, id, conv, input),
 		owns: (tx, id) => liveVoice?.externalOutput.owns(tx, id) ?? false,
 		assertCurrent: (tx, id) => liveVoice?.externalOutput.assertCurrent(tx, id),
-		offer: (tx, run, text, confirmation) =>
-			liveVoice?.externalOutput.offer(tx, run, text, confirmation) ?? false,
-		report: (tx, input) => liveVoice?.externalOutput.report(tx, input) ?? false,
+		offer: (tx, run, text) =>
+			liveVoice?.externalOutput.offer(tx, run, text) ?? false,
 		announce: async (run, text, signal) => {
 			if (!liveVoice) throw new Error("live_session_inactive");
 			return liveVoice.externalOutput.announce(run, text, signal);
@@ -42,7 +40,6 @@ export function createLiveBridge() {
 			inference,
 			queue,
 			dialogue,
-			continuity,
 			memory,
 			agency,
 			serviceTests,
@@ -56,7 +53,6 @@ export function createLiveBridge() {
 			| "serviceTests"
 		> & {
 			dialogue: DialogueService;
-			continuity: ContinuityService;
 			memory: MemoryService;
 			agency?: AgencyLayerPort;
 		}) {
@@ -86,7 +82,6 @@ export function createLiveBridge() {
 				store,
 				settings,
 				conversation,
-				continuity,
 				dialogue,
 				memory,
 				agency,

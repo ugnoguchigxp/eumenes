@@ -3,9 +3,6 @@ import type { DialogueDeps } from "./context";
 import type { ConversationPrefix } from "./conversation-input";
 import type { ReferenceInput } from "../../memory";
 import { liveSession } from "../repository";
-import { STATE_LIMITS } from "./state-text";
-import { sha256Hex } from "../../../infrastructure/digest";
-import { workContextCurrent, workContextInput } from "./work-context-input";
 
 /** Same records as the background State renderer. No interpretation of formatted text. */
 export function backgroundInput(
@@ -28,42 +25,6 @@ export function backgroundInput(
 		for (const ref of input.sources) sources.add(ref);
 		complete &&= input.complete;
 	};
-	const open = (deps.work?.todosInTransaction(db, id) ?? []).filter((item) =>
-		workContextCurrent(deps, db, id, item.id),
-	);
-	const confirmations =
-		deps.work?.pendingConfirmationsInTransaction(db, id) ?? [];
-	const work = [
-		...open,
-		...(
-			deps.work?.recentlyArchivedInTransaction(
-				db,
-				id,
-				new Date(
-					Math.max(
-						Date.parse(deps.clock()) - STATE_LIMITS.archivedMs,
-						prefix.since ?? -Infinity,
-					),
-				).toISOString(),
-				Math.max(0, STATE_LIMITS.work - open.length - confirmations.length),
-			) ?? []
-		).filter((item) => workContextCurrent(deps, db, id, item.id)),
-	];
-	for (const item of work.slice(0, STATE_LIMITS.work)) {
-		include(workContextInput(deps, db, item.id));
-	}
-	for (const item of confirmations) {
-		const row = deps.work?.confirmationByRefInTransaction(db, id, item.ref);
-		if (!row) {
-			complete = false;
-			continue;
-		}
-		messages.push(...(row.messageIds ?? []));
-		if (!row.messageIds) complete = false;
-		sources.add(
-			`host-confirmation:${JSON.stringify([row.id, sha256Hex(JSON.stringify(row))])}`,
-		);
-	}
 	for (const ref of prefix.summarySourceRefs ?? []) sources.add(ref);
 	const window = deps.memory?.storedWindowInTransaction(db, id);
 	const itemRevisions = Object.fromEntries(

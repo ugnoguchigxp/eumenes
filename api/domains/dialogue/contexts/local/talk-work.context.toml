@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/talk-work-controls.ts
-text = '''State の仕事（t<n>）を操作する（check=確認 / answer=質問回答 / amend=変更 / cancel=取消）。個別タスクの変更・取消は target に parent または taskId を指定（answer は不要）。対象・操作が不明なら確認する。'''

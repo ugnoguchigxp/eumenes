@@ -13,7 +13,6 @@ const ICONS: Record<string, string> = {
 		"M4 8h4l2-3h4l2 3h4v11H4z M12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z",
 	flow: "M4 5h6v4H4z M14 15h6v4h-6z M7 9v4a2 2 0 0 0 2 2h5",
 	code: "M9 8l-5 4 5 4 M15 8l5 4-5 4 M13.5 5l-3 14",
-	list: "M9 6h11 M9 12h11 M9 18h11 M4.5 6h.01 M4.5 12h.01 M4.5 18h.01",
 	chat: "M4 5h16v11H9l-5 4z",
 	file: "M6 3h9l4 4v14H6z M14 3v5h5",
 };
@@ -31,17 +30,11 @@ const ICON_OF_KIND: Record<string, keyof typeof ICONS> = {
 	document: "document",
 	pipeline: "flow",
 	"code.task": "code",
-	todo: "list",
 	event: "chat",
 };
 
 export function KindIcon({ kind }: { kind: string }) {
 	return <PathIcon path={ICONS[ICON_OF_KIND[kind] ?? "file"]!} />;
-}
-
-/** A registered screen (an artifact) as a launcher icon. */
-export function ArtifactIcon() {
-	return <PathIcon path={ICONS.screen!} />;
 }
 
 function PathIcon({ path }: { path: string }) {

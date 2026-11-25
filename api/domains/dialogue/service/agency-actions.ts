@@ -1,8 +1,12 @@
 import type { Database } from "bun:sqlite";
 import { hash } from "../../capabilities";
 import type { AgentRuntime } from "../../agent-runtime";
-import type { ToolchainExecutionPort } from "../../tool-runtime";
+import type {
+	ExecutionReference,
+	ToolchainExecutionPort,
+} from "../../tool-runtime";
 import type { ResourceRegistry } from "../../resources";
+import type { QueueService } from "../../queue";
 import { canonicalJson } from "../../../infrastructure/digest";
 import { executionNoticeResult } from "../../tool-runtime";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
@@ -18,6 +22,8 @@ import {
 } from "../repository/agency";
 import { agencyActionWork, eraseAgencyActionWork } from "./agency-action-work";
 import {
+	type AssignmentDetails,
+	type AssignmentSource,
 	isAgendaSnapshot,
 	agendaTicketInput,
 	type AgendaHostSnapshot,
@@ -42,6 +48,8 @@ export type AgencyActionDeps = {
 	resources?: ResourceRegistry;
 	producesInTransaction?(db: Database, toolchainId: string): string[];
 	memory?: Pick<import("../../memory").MemoryService, "referenceInputs">;
+	/** Aborts the jobs a stop cancelled (the owner cancels them in the stop's transaction; LARM is told on abort). */
+	queue?: Pick<QueueService, "list" | "flushCancellations">;
 	now(): number;
 };
 export function createAgencyActions(deps: AgencyActionDeps) {
@@ -96,6 +104,13 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				outboundIntervalMs: number;
 				sourceRefs: readonly string[];
 				arguments?: Record<string, unknown>;
+				/** Work the user asked for (`delegate`): the user's request is its authority, not the agency's budget. */
+				assignment?: boolean;
+				references?: readonly ExecutionReference[];
+				/** An assignment's user-message source: the toolchain takes the work as the user's. */
+				source?: AssignmentSource;
+				/** An assignment's other `delegate` fields, as they were given. */
+				details?: AssignmentDetails;
 			},
 		) {
 			const port = deps.execution?.();
@@ -113,7 +128,7 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				return existing.execution_id;
 			}
 			const card = catalog(db).find((c) => c.revisionId === input.revisionId);
-			if (!card || card.requiresApproval)
+			if (!card || (card.requiresApproval && !input.assignment))
 				throw new Error("agency_approval_required");
 			const policy = limits(db);
 			const now = deps.now();
@@ -143,7 +158,7 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 			// The agenda's own research is the agent's to pace (it keeps one at a time, and the user sets no
 			// budget on the agency's thinking): the count limits apply only to a record that is not an agenda. Approval stays.
 			if (
-				!policy.enabled ||
+				(!policy.enabled && !input.assignment) ||
 				(!agenda &&
 					(active.length >= policy.maxConcurrent || daily >= policy.dailyLimit))
 			)
@@ -203,8 +218,23 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				},
 				now,
 			);
-			const source = autonomousActionSource(db, input.rootId, now);
-			if (!source) throw new Error("agency_origin_stale");
+			// The agency's work is checked as its own (the authority above); an assignment runs as the user's words.
+			const own = autonomousActionSource(db, input.rootId, now);
+			if (!own) throw new Error("agency_origin_stale");
+			// An assignment runs as the user's words, in the shape the conversation issues it (owners digest the source
+			// as it is laid out, so the field order is the conversation's).
+			const source =
+				input.assignment && input.source
+					? {
+							conversationId: input.source.conversationId,
+							messageId: input.source.messageId,
+							runId: input.source.runId,
+							request: input.source.request,
+							digest: input.source.digest,
+						}
+					: own;
+			if (input.assignment && !input.source)
+				throw new Error("agency_origin_stale");
 			const provenance = agenda
 				? agendaTicketInput(agenda, input.ticketId)
 				: (
@@ -227,11 +257,12 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				entry.runtime.execution === "task"
 					? deps.toolchains!.taskInTransaction?.(db, input.revisionId)
 					: undefined;
+			const references = [...(input.references ?? [])];
 			const view = owner
 				? owner.startInTransaction(db, {
 						source,
 						request: input.question,
-						references: [],
+						references,
 						toolchainRevisionId: input.revisionId,
 						bindingRevisionId: entry.runtime.binding?.bindingRevisionId,
 						deadline: input.deadline,
@@ -241,20 +272,22 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 							source,
 							toolchainRevisionId: input.revisionId,
 							deadline: input.deadline,
+							references,
+							...(input.details?.routedSteps
+								? { routedSteps: input.details.routedSteps }
+								: {}),
+							startKey: input.rootId,
 						})
 					: deps.agents.executions.startSelectedInTransaction(db, {
 							source,
 							chainRevisionId: input.revisionId,
 							request: input.question,
 							arguments: input.arguments,
-							references: [],
+							references,
 							deadline: input.deadline,
+							startKey: input.rootId,
 						});
 			linkAgencyExecution(db, input.rootId, view.id);
-			work.start(db, agencyWork(db, input.rootId)!, view, {
-				id: deps.toolchains!.cardInTransaction(db, input.revisionId)!.id,
-				title: card.title,
-			});
 			return view.id;
 		},
 		result(db: Database, root: string) {
@@ -299,27 +332,126 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				stopAgencyExecution(deps, db, w, false);
 				const view = this.result(db, root);
 				if (view?.status === "cancelled" || view?.status === "interrupted")
-					work.sync(db, view);
+					work.sync(db, view, root);
 			}
 		},
 		discard(db: Database, root: string) {
 			const w = agencyWork(db, root);
 			if (!w?.execution_id) return;
-			eraseAgencyActionWork(db, w.execution_id, deps.now());
+			eraseAgencyActionWork(db, w, deps.now());
 			stopAgencyExecution(deps, db, w, true);
 		},
+		control: (
+			db: Database,
+			root: string,
+			input: AssignmentControl,
+			messageId: string,
+		) => controlAgencyAssignment(deps, db, root, input, messageId),
 		synchronize: work.sync,
 		link: work.link,
 	};
 }
 
-export function stopAgencyExecution(
+type AssignmentControl = {
+	action: "answer" | "amend";
+	text: string;
+	/** The question the user answered, as the agent showed it: an answer never goes to another one. */
+	question?: string | null;
+};
+
+/**
+ * Answers or amends an assignment through its owner's control, as the user's words of `messageId` (the owner checks
+ * the conversation and the revision). A task owner takes it; other work goes to the selected-execution control, which
+ * refuses what a fixed run cannot take (an amendment).
+ */
+function controlAgencyAssignment(
 	deps: Pick<AgencyActionDeps, "agents" | "toolchains">,
+	db: Database,
+	root: string,
+	input: AssignmentControl,
+	messageId: string,
+) {
+	const w = agencyWork(db, root);
+	const owner = w
+		? deps.toolchains?.taskInTransaction?.(db, w.toolchain_revision_id)
+		: undefined;
+	const view = w?.execution_id
+		? owner
+			? owner.viewInTransaction(db, w.execution_id)
+			: deps.agents?.executions.viewInTransaction(db, w.execution_id)
+		: null;
+	if (!w || !view || (!owner && !deps.agents))
+		throw new Error("control_unsupported");
+	if (
+		input.action === "answer" &&
+		(!view.question || view.question.prompt !== input.question)
+	)
+		throw new Error("question_changed");
+	// A question that asks for a structured answer (its input schema is not a plain string) takes the text as JSON; an
+	// answer that is not JSON is refused with the shape it needs, so the agent can answer again.
+	const schema = view.question?.inputSchema;
+	let answer: unknown = input.text;
+	if (input.action === "answer" && schema && schema.type !== "string") {
+		try {
+			answer = JSON.parse(input.text);
+		} catch {
+			throw new AssignmentAnswerInvalid(schema);
+		}
+	}
+	const control = {
+		workRef: view.id,
+		expectedRevision: view.revision,
+		action: input.action,
+		...(input.action === "answer"
+			? {
+					input: answer,
+					...(view.question ? { questionRef: view.question.id } : {}),
+				}
+			: { request: input.text }),
+	};
+	try {
+		return owner
+			? owner.controlInTransaction(db, w.conversation_id, control, messageId)
+			: deps.agents!.executions.controlInTransaction(
+					db,
+					w.conversation_id,
+					control,
+					messageId,
+				);
+	} catch (error) {
+		// An answer of the wrong shape is told the shape it needs, so it can be answered again.
+		if (
+			schema &&
+			error instanceof Error &&
+			error.message === "invalid_answer" &&
+			!(error instanceof AssignmentAnswerInvalid)
+		)
+			throw new AssignmentAnswerInvalid(schema);
+		throw error;
+	}
+}
+
+/** An answer the question cannot take: `inputSchema` is the shape it asks for. */
+export class AssignmentAnswerInvalid extends Error {
+	constructor(readonly inputSchema: Record<string, unknown>) {
+		super("invalid_answer");
+	}
+}
+
+/**
+ * Stops the executions a work holds, and aborts the jobs that stop cancelled once it commits: an owner marks its
+ * running job cancelled inside the transaction, but only an abort reaches the provider (LARM's DELETE). A stop that
+ * rolls back left no job cancelled, so the flush finds nothing to abort.
+ */
+export function stopAgencyExecution(
+	deps: Pick<AgencyActionDeps, "agents" | "toolchains" | "queue">,
 	db: Database,
 	work: import("../repository/agency").AgencyWorkRow,
 	forget: boolean,
 ) {
 	if (!work.execution_id) return;
+	const queue = deps.queue;
+	if (queue) queueMicrotask(() => flushCancelledJobs(queue));
 	const owner = deps.toolchains?.taskInTransaction?.(
 		db,
 		work.toolchain_revision_id,
@@ -337,6 +469,17 @@ export function stopAgencyExecution(
 		);
 }
 
+function flushCancelledJobs(queue: NonNullable<AgencyActionDeps["queue"]>) {
+	try {
+		const jobs = queue
+			.list({ state: "cancel_requested" }, null, 100)
+			.items.map((job) => job.id);
+		if (jobs.length) queue.flushCancellations(jobs);
+	} catch {
+		// The abort is best effort: the job is cancelled in the queue, the runner stops it at its next check.
+	}
+}
+
 /** The work must be the research ticket the host saved before it started; nothing else authorizes it. */
 function assertAgendaTicket(
 	agenda: AgendaHostSnapshot,
@@ -346,6 +489,9 @@ function assertAgendaTicket(
 		question: string;
 		arguments?: Record<string, unknown>;
 		sourceRefs: readonly string[];
+		assignment?: boolean;
+		references?: readonly ExecutionReference[];
+		details?: AssignmentDetails;
 	},
 ) {
 	const digest = (value: unknown) =>
@@ -355,6 +501,9 @@ function assertAgendaTicket(
 		!own ||
 		own.revisionId !== input.revisionId ||
 		own.question !== input.question ||
+		!!own.assignment !== !!input.assignment ||
+		digest(own.references ?? []) !== digest(input.references ?? []) ||
+		digest(own.details ?? {}) !== digest(input.details ?? {}) ||
 		input.arguments !== undefined ||
 		digest([...own.inputs].sort()) !== digest([...input.sourceRefs].sort())
 	)

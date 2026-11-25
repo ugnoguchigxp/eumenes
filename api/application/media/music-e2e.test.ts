@@ -1,58 +1,27 @@
 import { expect, test } from "bun:test";
-import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { imageFixture, imageQuestion } from "./image.fixture";
-import { waitFor } from "../../infrastructure/wait-for";
-import { isUtteranceRound } from "../toolchain/conversation-script.fixture";
+import {
+	ask,
+	assignmentAgenda,
+	cancelAssignment,
+	ended,
+	executions,
+	items,
+	notes,
+	plannedBy,
+	reportLine,
+	resources,
+	until,
+	works,
+} from "./assignment.fixture";
 
-test("the choice that hands music over says nothing of its own: only the announcement shows until music completes", async () => {
-	const f = musicFixture("success");
-	let chosen = 0;
-	let release!: () => void;
-	const paused = new Promise<void>((resolve) => (release = resolve));
-	const visible: string[] = [];
-	const model = {
-		...f.model,
-		answer: async (...args: Parameters<typeof f.model.answer>) => {
-			const [messages, signal, options] = args;
-			// The routed turn's silent choice: held until the progress is watched.
-			if (options?.jsonSchema) {
-				await paused;
-				chosen++;
-			}
-			return f.model.answer(messages, signal, options);
-		},
-	};
-	const h = await harness({ model, musicGateway: f.gateway });
-	let unsubscribe = () => {};
-	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		unsubscribe = h.dialogue.subscribeProgress(submitted.id, (progress) =>
-			visible.push(progress.text),
-		);
-		release();
-		const run = await h.dialogue.waitForTerminal(submitted.id, {
-			timeoutMs: 5000,
-		});
-		expect(run?.status).toBe("completed");
-		expect(chosen).toBe(1);
-		expect(h.music!.list("main")[0]?.state).toBe("completed");
-		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
-		expect(
-			visible.filter(Boolean).every((text) => text === "準備します。"),
-		).toBe(true);
-	} finally {
-		release();
-		unsubscribe();
-		await h.close();
-	}
-});
+const tracks = (f: ReturnType<typeof musicFixture>) =>
+	f.requests.filter((r) => r.method === "POST");
+const agenda = (f: ReturnType<typeof musicFixture>) =>
+	assignmentAgenda({
+		harness: { model: plannedBy({ music: f }), musicGateway: f.gateway },
+	});
 
 for (const mode of [
 	"success",
@@ -60,32 +29,26 @@ for (const mode of [
 	"invalid-plan",
 	"correctable-plan",
 ] as const)
-	test(`music pipeline ${mode}: conversation, worker, API, result, audio`, async () => {
+	test(`music pipeline ${mode}: assignment, worker, API, result, audio`, async () => {
 		const f = musicFixture(mode);
-		const h = await harness({ model: f.model, musicGateway: f.gateway });
+		const a = await agenda(f);
 		try {
-			const r = await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			});
-			expect(r.status).toBe(202);
-			const submitted = await r.json();
-			const run = await h.dialogue.waitForTerminal(submitted.id, {
-				timeoutMs: 5000,
-			});
-			expect(run?.status).toBe("completed");
+			await a.start();
+			await ask(a, "music.create", musicQuestion);
+			await until(a, () => ended(a));
+			expect(executions(a)).toHaveLength(1);
+			expect(works(a)[0]!.execution_id).toBe(executions(a)[0]!.id);
 			const records = await (
-				await h.request("/api/music?conversationId=main")
+				await a.h.request("/api/music?conversationId=ao")
 			).json();
 			expect(records).toHaveLength(1);
 			const music = records[0];
 			const success = mode === "success" || mode === "correctable-plan";
 			expect(music.state).toBe(success ? "completed" : "failed");
-			const posts = f.requests.filter((r) => r.method === "POST");
+			const posts = tracks(f);
 			expect(posts).toHaveLength(mode === "invalid-plan" ? 0 : 1);
-			expect(f.stages).toEqual(["route", "plan"]);
-			const response = await h.request(`/api/music/${music.id}/audio`);
+			expect(f.stages).toEqual(["plan"]);
+			const response = await a.h.request(`/api/music/${music.id}/audio`);
 			if (success) {
 				expect(posts[0]!.body).toMatchObject({
 					prompt: musicTestPlan.prompt,
@@ -98,8 +61,10 @@ for (const mode of [
 				expect(response.status).toBe(200);
 				expect(response.headers.get("content-type")).toBe("audio/ogg");
 				expect(new Uint8Array(await response.arrayBuffer())).toEqual(f.audio);
-				// The finished work is reported by the agency, not by a conversation reply of this run.
-				expect(h.dialogue.answerText(submitted.id)).toBeNull();
+				// The agent reports the finished work: a note, and a line that carries the track.
+				await until(a, () => !!reportLine(a));
+				expect(notes(a)).toHaveLength(1);
+				expect(items(a)).toHaveLength(0);
 			} else {
 				expect(response.status).toBe(404);
 				expect(music.errorCode).toBe(
@@ -109,32 +74,31 @@ for (const mode of [
 				);
 			}
 		} finally {
-			await h.close();
+			await a.close();
 		}
-	});
-test("cancel music while the provider is running, send DELETE and never adopt audio", async () => {
+	}, 30_000);
+test("cancelling the assignment while the provider is running cancels the track and never adopts audio", async () => {
 	const f = musicFixture("cancel");
-	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const a = await agenda(f);
 	try {
-		const r = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		await waitFor(() => !!h.music!.list("main")[0]?.jobId);
-		expect(h.music!.list("main")[0]?.jobId).toBe("track");
-		await h.dialogue.cancel(r.id);
-		await waitFor(() => f.requests.some((r) => r.method === "DELETE"));
-		expect(f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
-		expect(h.music!.list("main")[0]?.state).toBe("cancelled");
-		expect(h.dialogue.get(r.id)?.status).toBe("cancelled");
-		expect(f.stages).toEqual(["route", "plan"]);
+		await a.start();
+		const { id } = await ask(a, "music.create", musicQuestion);
+		await until(a, () => !!a.h.music!.list("ao")[0]?.jobId);
+		expect(a.h.music!.list("ao")[0]?.jobId).toBe("track");
+		await cancelAssignment(a, id);
+		await until(a, () => a.h.music!.list("ao")[0]?.state === "cancelled");
+		expect(
+			(await a.h.request(`/api/music/${a.h.music!.list("ao")[0]!.id}/audio`))
+				.status,
+		).toBe(404);
+		expect(tracks(f)).toHaveLength(1);
+		expect(executions(a)[0]).toMatchObject({ status: "cancelled" });
+		expect(items(a)).toHaveLength(0);
+		expect(f.stages).toEqual(["plan"]);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 test("vocal orchestral music forwards the worker's voice description, exact lyrics and language through the authenticated API", async () => {
 	const lyrics = "[Verse]\n朝の光が窓を照らす\n新しい一日が始まる";
 	const question =
@@ -148,17 +112,12 @@ test("vocal orchestral music forwards the worker's voice description, exact lyri
 		language: "ja",
 	};
 	const f = musicFixture("success", { plan });
-	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const a = await agenda(f);
 	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: question,
-			})
-		).json();
-		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-		const music = h.music!.list("main")[0]!;
+		await a.start();
+		await ask(a, "music.create", question);
+		await until(a, () => ended(a));
+		const music = a.h.music!.list("ao")[0]!;
 		expect(music.state).toBe("completed");
 		expect(music).toMatchObject({
 			instrumental: false,
@@ -184,22 +143,18 @@ test("vocal orchestral music forwards the worker's voice description, exact lyri
 			f.requests.some((request) => request.path.includes("/images/")),
 		).toBe(false);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 test("artwork is generated on request from the completed track's prompt at 256×256 and can be regenerated", async () => {
 	const f = musicFixture("success");
-	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const a = await agenda(f);
+	const h = a.h;
 	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-		const music = h.music!.list("main")[0]!;
+		await a.start();
+		await ask(a, "music.create", musicQuestion);
+		await until(a, () => ended(a));
+		const music = h.music!.list("ao")[0]!;
 		expect(music.state).toBe("completed");
 		expect(music.artwork).toBeUndefined();
 		expect(f.requests.some((r) => r.path === "/v1/images/generations")).toBe(
@@ -219,7 +174,8 @@ test("artwork is generated on request from the completed track's prompt at 256×
 				revision,
 				errorCode: null,
 			});
-			await waitFor(
+			await until(
+				a,
 				() => h.music!.get(music.id)?.artwork?.state !== "generating",
 			);
 			expect(h.music!.get(music.id)?.artwork).toEqual({
@@ -234,7 +190,8 @@ test("artwork is generated on request from the completed track's prompt at 256×
 		expect((await h.request(`/api/music/${music.id}/artwork`, {})).status).toBe(
 			409,
 		);
-		await waitFor(
+		await until(
+			a,
 			() => h.music!.get(music.id)?.artwork?.state !== "generating",
 		);
 		const image = f.requests.find((r) => r.path === "/v1/images/generations")!;
@@ -270,143 +227,107 @@ test("artwork is generated on request from the completed track's prompt at 256×
 			),
 		).toHaveLength(3);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 test("artwork is refused for an unfinished track and a provider failure is recorded", async () => {
 	const f = musicFixture("failure");
-	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const a = await agenda(f);
 	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-		const music = h.music!.list("main")[0]!;
+		await a.start();
+		await ask(a, "music.create", musicQuestion);
+		await until(a, () => ended(a));
+		const music = a.h.music!.list("ao")[0]!;
 		expect(music.state).toBe("failed");
-		const refused = await h.request(`/api/music/${music.id}/artwork`, {});
+		const refused = await a.h.request(`/api/music/${music.id}/artwork`, {});
 		expect(refused.status).toBe(409);
 		expect(await refused.json()).toEqual({ error: "music_not_completed" });
 	} finally {
-		await h.close();
+		await a.close();
 	}
 	const ok = musicFixture("success", { artworkFailure: true });
-	const g = await harness({ model: ok.model, musicGateway: ok.gateway });
+	const g = await agenda(ok);
 	try {
-		const submitted = await (
-			await g.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		await g.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-		const music = g.music!.list("main")[0]!;
-		expect((await g.request(`/api/music/${music.id}/artwork`, {})).status).toBe(
-			202,
+		await g.start();
+		await ask(g, "music.create", musicQuestion);
+		await until(g, () => ended(g));
+		const music = g.h.music!.list("ao")[0]!;
+		expect(
+			(await g.h.request(`/api/music/${music.id}/artwork`, {})).status,
+		).toBe(202);
+		await until(
+			g,
+			() => g.h.music!.get(music.id)?.artwork?.state !== "generating",
 		);
-		await waitFor(
-			() => g.music!.get(music.id)?.artwork?.state !== "generating",
-		);
-		expect(g.music!.get(music.id)?.artwork).toMatchObject({
+		expect(g.h.music!.get(music.id)?.artwork).toMatchObject({
 			state: "failed",
 			revision: 1,
 		});
-		expect(g.music!.get(music.id)?.artwork?.errorCode).toMatch(/^[a-z_0-9]+$/);
-		expect((await g.request(`/api/music/${music.id}/artwork`)).status).toBe(
+		expect(g.h.music!.get(music.id)?.artwork?.errorCode).toMatch(
+			/^[a-z_0-9]+$/,
+		);
+		expect((await g.h.request(`/api/music/${music.id}/artwork`)).status).toBe(
 			404,
 		);
 	} finally {
 		await g.close();
 	}
-});
+}, 30_000);
 
-test("a music screen submit generates a track though the conversation earlier used only another toolchain", async () => {
+test("a music assignment starts though the conversation earlier used only another toolchain", async () => {
 	const music = musicFixture("success");
 	const image = imageFixture("success");
-	let phase: "image" | "screen" = "image";
-	let screenAnalysis = 0;
-	const model = {
-		...music.model,
-		answer: async (...args: Parameters<typeof music.model.answer>) => {
-			if (phase === "image") return image.model.answer(...args);
-			if (isUtteranceRound(args[2])) screenAnalysis++;
-			return music.model.answer(...args);
+	const a = await assignmentAgenda({
+		media: image,
+		harness: {
+			model: plannedBy({ image, music }),
+			musicGateway: music.gateway,
 		},
-	};
-	const h = await harness({
-		model,
-		musicGateway: music.gateway,
-		imageGateway: image.gateway,
+		catalog: (id) =>
+			id.startsWith("toolchain:image.create@") ||
+			id.startsWith("toolchain:music.create@"),
 	});
 	try {
-		const earlier = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: imageQuestion,
-			})
-		).json();
-		expect(
-			(await h.dialogue.waitForTerminal(earlier.id, { timeoutMs: 5000 }))
-				?.status,
-		).toBe("completed");
-		expect(h.image!.list("main")).toHaveLength(1);
-		phase = "screen";
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-				presentation: "artifact",
-				toolchainId: "music.create",
-			})
-		).json();
-		expect(submitted.pinnedToolchainId).toBe("music.create");
-		expect(
-			(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 }))
-				?.status,
-		).toBe("completed");
-		expect(h.music!.list("main")).toHaveLength(1);
-		expect(h.music!.list("main")[0]!.state).toBe("completed");
-		// The screen's own toolchain took the request: no selection round, and no image was made for it.
-		expect(screenAnalysis).toBe(0);
+		await a.start();
+		await ask(a, "image.create", imageQuestion);
+		await until(a, () => ended(a));
+		expect(a.h.image!.list("ao")).toHaveLength(1);
+		await ask(a, "music.create", musicQuestion);
+		await until(a, () => ended(a, 2));
+		expect(a.h.music!.list("ao")).toHaveLength(1);
+		expect(a.h.music!.list("ao")[0]!.state).toBe("completed");
+		// Each assignment started its own toolchain: no second image was made for the track.
 		expect(music.stages).toEqual(["plan"]);
-		expect(h.image!.list("main")).toHaveLength(1);
-		expect(music.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		expect(a.h.image!.list("ao")).toHaveLength(1);
+		expect(tracks(music)).toHaveLength(1);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 
-test("LARM's free-memory refusal puts the music into a wait: one POST, run kept open, cancel stops it", async () => {
+test("LARM's free-memory refusal puts the music into a wait: one POST, assignment kept open, cancel stops it", async () => {
 	const f = musicFixture("success", { capacityRefusal: true });
-	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const a = await agenda(f);
 	const posts = () =>
 		f.requests.filter(
 			(r) => r.method === "POST" && r.path === "/v1/music/generations",
 		);
 	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		await waitFor(() => h.music!.list("main")[0]?.phase === "waiting_capacity");
-		const record = h.music!.list("main")[0]!;
+		await a.start();
+		const { id } = await ask(a, "music.create", musicQuestion);
+		await until(
+			a,
+			() => a.h.music!.list("ao")[0]?.phase === "waiting_capacity",
+		);
+		const record = a.h.music!.list("ao")[0]!;
 		expect(record).toMatchObject({ state: "generating", jobId: null });
 		expect(record.capacityWait?.count).toBe(1);
 		expect(posts()).toHaveLength(1);
-		expect(["queued", "running"]).toContain(
-			h.dialogue.get(submitted.id)?.status ?? "",
-		);
-		await h.dialogue.cancel(submitted.id);
-		await waitFor(() => h.music!.list("main")[0]!.state === "cancelled");
+		// The assignment stays open while the track waits: still an item of the agent, not ended at its owner.
+		expect(items(a)).toHaveLength(1);
+		expect(ended(a)).toBe(false);
+		await cancelAssignment(a, id);
+		await until(a, () => a.h.music!.list("ao")[0]!.state === "cancelled");
 		await Bun.sleep(50);
 		expect(posts()).toHaveLength(1);
 		// No job was accepted by LARM, so there is nothing to DELETE there.
@@ -416,49 +337,39 @@ test("LARM's free-memory refusal puts the music into a wait: one POST, run kept 
 			),
 		).toBe(false);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 
-test("the generated Ogg Opus track is delivered once to its originating conversation", async () => {
+test("the generated Ogg Opus track is reported once, with the track as the report's resource, in its originating conversation only", async () => {
 	const f = musicFixture("success");
-	const h = await harness({
-		model: f.model,
-		musicGateway: f.gateway,
-		resources: true,
+	const a = await assignmentAgenda({
+		harness: { model: plannedBy({ music: f }), musicGateway: f.gateway },
 	});
 	try {
-		const request = {
-			requestId: crypto.randomUUID(),
-			conversationId: "music-origin",
-			text: musicQuestion,
-		};
-		const submit = async () =>
-			(await (await h.request("/api/runs", request)).json()).id;
-		const id = await submit();
-		expect(await submit()).toBe(id);
-		expect(
-			(await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
-		const { notices } = await (await h.request("/api/todo-notices")).json();
-		expect(notices).toMatchObject([
-			{
-				conversationId: request.conversationId,
-				outcome: "succeeded",
-				links: [{ kind: "music.track", uri: "eumenes://music.track/track" }],
-			},
+		await a.start();
+		await ask(a, "music.create", musicQuestion);
+		await until(a, () => ended(a));
+		await until(a, () => !!reportLine(a));
+		expect(notes(a)).toHaveLength(1);
+		const made = await resources(a);
+		expect(made.resources).toMatchObject([
+			{ kind: "music.track", uri: "eumenes://music.track/track" },
 		]);
+		expect(made.messages).toContainEqual(
+			expect.objectContaining({ messageId: reportLine(a)!.id }),
+		);
 		const unrelated = await (
-			await h.request("/api/conversations/main/resources")
+			await a.h.request("/api/conversations/main/resources")
 		).json();
 		expect(unrelated.resources).toEqual([]);
-		const audio = await h.request(
-			`/api/music/${h.music!.list(request.conversationId)[0]!.id}/audio`,
+		const audio = await a.h.request(
+			`/api/music/${a.h.music!.list("ao")[0]!.id}/audio`,
 		);
 		expect(audio.headers.get("content-type")).toBe("audio/ogg");
 		expect(new Uint8Array(await audio.arrayBuffer())).toEqual(f.audio);
-		expect(f.stages).toEqual(["route", "plan"]);
+		expect(f.stages).toEqual(["plan"]);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);

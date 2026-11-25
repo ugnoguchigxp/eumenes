@@ -11,7 +11,7 @@ import {
 } from "./world-research.fixture";
 import { fit, sourceOf, summaryOf } from "./world-research-readings";
 
-/** Whether the TODOs' results carry the saved report's projection: a source object of the `world_claim` kind. */
+/** Whether the executions' results carry the saved report's projection: a source object of the `world_claim` kind. */
 const projectsWorldClaim = (reported: string) =>
 	reported.includes('"kind":"world_claim"');
 
@@ -22,9 +22,8 @@ test("a World question delegates to route world: the sub-agent finds the target,
 			h.routing.catalogInTransaction(db).map((c) => c.runtime.route),
 		),
 	).toContain("world");
-	const { run, done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
-	expect(h.offered.join("")).toContain("world.query");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("completed");
 	// The worker input is only the question, the detail and the original request: no URL.
 	const first = h.packets[0]!;
 	expect(Object.keys(first.task).sort()).toEqual(["detail", "question"]);
@@ -51,17 +50,16 @@ test("a World question delegates to route world: the sub-agent finds the target,
 		mode: "snapshot",
 		completeness: "complete",
 	});
-	// The agency is given the projection of the saved report, not the reading.
+	// The agent is given the projection of the saved report, not the reading.
 	const projected = h.reported();
 	expect(projectsWorldClaim(projected)).toBe(true);
-	// Only the source id, kind and origin cross to the agency: no claim id or revision.
+	// Only the source id, kind and origin cross to the agent: no claim id or revision.
 	expect(projected).toContain("sourceId");
 	expect(projected).toContain("user_report");
 	expect(projected).not.toContain("claim-1");
 	expect(projected).not.toContain("sourceRef");
 	expect(projected).not.toContain("svc-1");
 	expect(projected).not.toContain("launch_month");
-	expect(h.dialogue.answerText(run.id)).toBeNull();
 	const report = h.store.read(
 		(db) =>
 			db.query("SELECT report_json FROM agent_reports").get() as {
@@ -87,14 +85,14 @@ test("a claim retracted while the research ran keeps the report from being adopt
 			return report;
 		},
 	]);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("failed");
 	expect(
 		h.store.read((db) =>
 			db.query("SELECT error_code FROM agent_tasks WHERE kind='worker'").get(),
 		),
 	).toEqual({ error_code: "evidence_invalidated" });
-	// No accepted report: the agency is never given the projection.
+	// No accepted report: the agent is never given the projection.
 	expect(projectsWorldClaim(h.reported())).toBe(false);
 	expect(
 		h.store.read(
@@ -124,8 +122,8 @@ test("a target World does not know is reported as not found, with no readings", 
 			};
 		},
 	]);
-	const { done } = await h.ask("存在しない対象について教えて");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("存在しない対象について教えて");
+	expect(execution.status).toBe("partial");
 	expect(h.packets[1]!.observations).toEqual([]);
 });
 
@@ -156,8 +154,8 @@ test("a query the World refuses comes back as a machine failure code, not as a r
 			};
 		},
 	]);
-	const { done } = await h.ask("謎の対象に関係の深いものは？");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("謎の対象に関係の深いものは？");
+	expect(execution.status).toBe("failed");
 	expect(h.packets[1]!.observations).toEqual([]);
 });
 
@@ -169,8 +167,8 @@ test("a snapshot given one entityId (the live mistake) reads that single start p
 			return finish(packet, CLAIM_TEXT);
 		},
 	]);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("completed");
 	expect(
 		h.packets[1]!.observations.some((o) => o.basis === "world"),
 	).toBeTrue();
@@ -195,8 +193,8 @@ test("an input that does not fit the mode comes back as invalid_input with the f
 			};
 		},
 	]);
-	const { done } = await h.ask("音声サービスを変えると何に影響する？");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("音声サービスを変えると何に影響する？");
+	expect(execution.status).toBe("partial");
 	expect(h.packets[1]!.observations).toEqual([]);
 });
 
@@ -229,8 +227,8 @@ test("a finish whose claims omit evidence is rejected and repaired: the referenc
 			return finish(packet, CLAIM_TEXT);
 		},
 	]);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("completed");
 	// The readings were offered as references the claim could cite.
 	expect(offered).toMatchObject({ references: ["e1"] });
 	// The rejection names the missing field, and the repair step is accepted with the reference.
@@ -293,8 +291,8 @@ test("a query that returns no readings: the sub-agent has no references and fini
 			},
 		},
 	);
-	const { done } = await h.ask("静かな機器について何が分かっている？");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("静かな機器について何が分かっている？");
+	expect(execution.status).toBe("partial");
 	expect(workerError(h)).toEqual({ error_code: null });
 	expect(h.packets[2]!.operations[1]!.notes).toMatchObject({
 		mode: "snapshot",
@@ -327,8 +325,8 @@ test("a claim revised (disputed) while the research ran keeps the report from be
 			return report;
 		},
 	]);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("failed");
 	expect(workerError(h)).toEqual({ error_code: "evidence_invalidated" });
 	expect(projectsWorldClaim(h.reported())).toBe(false);
 });
@@ -348,8 +346,8 @@ test("a source forgotten while the research ran keeps the report from being adop
 		],
 		{ feed: false },
 	);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("failed");
 	expect(workerError(h)).toEqual({ error_code: "evidence_invalidated" });
 	expect(projectsWorldClaim(h.reported())).toBe(false);
 });
@@ -367,8 +365,8 @@ test("a forgotten source whose World tombstone is already written keeps the repo
 		],
 		{ feed: false },
 	);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("failed");
 	expect(workerError(h)).toEqual({ error_code: "evidence_invalidated" });
 });
 
@@ -413,8 +411,8 @@ test("a snapshot cut by World's own budget: the readings stay within the cap, ev
 			},
 		},
 	);
-	const { done } = await h.ask(QUESTION);
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask(QUESTION);
+	expect(execution.status).toBe("partial");
 	const report = readReport(h);
 	expect(report.coverage).toBe("partial");
 	expect(report.sources.every((s) => s.acquisitionTruncated === true)).toBe(
@@ -465,8 +463,8 @@ test("more than 20 matching targets: world.find lists a few within its byte budg
 			},
 		},
 	);
-	const { done } = await h.ask("音声機器について教えて");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("音声機器について教えて");
+	expect(execution.status).toBe("partial");
 });
 
 test("a one-character name identifies nothing: world.find lists no target for it", async () => {
@@ -485,8 +483,8 @@ test("a one-character name identifies nothing: world.find lists no target for it
 			};
 		},
 	]);
-	const { done } = await h.ask("音について教えて");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("音について教えて");
+	expect(execution.status).toBe("partial");
 });
 
 // --- the readings, without the assembly -----------------------------------

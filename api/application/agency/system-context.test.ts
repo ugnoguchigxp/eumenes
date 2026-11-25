@@ -21,7 +21,6 @@ test("the real dialogue composes Eumenes-owned reply parts and keeps user text o
 		settings,
 		cards: [],
 		agency: {
-			workChangedInTransaction() {},
 			stateForContextInTransaction: () => [
 				"AGENCY_STATE_SENTINEL: work result",
 			],

@@ -61,8 +61,7 @@ export function bindOutputs({
 						);
 						continue;
 					}
-					// Settled work may outlive its input turn; normal reply drafts still need that version.
-					if (out.run_id && out.kind !== "report") {
+					if (out.run_id) {
 						try {
 							store.read((db) => delivery.assertCurrent(db, out.run_id!));
 						} catch {

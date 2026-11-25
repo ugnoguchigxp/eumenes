@@ -25,8 +25,8 @@ const KIND = "report";
 /** The kind is shared with other owners; this domain's ids carry this prefix (`agent:<taskId>`). */
 export const AGENT_REPORT_RESOURCE_PREFIX = "agent";
 const ID_PREFIX = `${AGENT_REPORT_RESOURCE_PREFIX}:`;
-/** The screen that lists the agent tasks' results (the TODO workspace). */
-const TODO_SCREEN_ADAPTER_REF = "adapter:task-execution@1";
+/** The report has no screen of its own; the ref only names the owner, as the web research reports do. */
+const AGENT_REPORT_ADAPTER_REF = "adapter:agent-runtime@1";
 /** A search reads at most this many stored reports, newest first. */
 const SEARCH_WINDOW = 300;
 const READ_BUDGET_TOKENS = 560;
@@ -97,7 +97,7 @@ const haystackOf = ({ report, request }: Parsed) =>
 		.toLowerCase();
 
 /**
- * What the TODO's result stored for this report: the exact projection the parent was given, which is kept
+ * What the task's result stored for this report: the exact projection the parent was given, which is kept
  * beside the report when the research was guided, and otherwise derived from the report itself.
  */
 function projectionOf({ row, report }: Parsed) {
@@ -126,7 +126,7 @@ export function createAgentReportResourceAdapter(deps: {
 	return {
 		kind: KIND,
 		/**
-		 * The finished TODO's result of a research toolchain is the projection of the report to the parent
+		 * The finished task's result of a research toolchain is the projection of the report to the parent
 		 * (`{ summary, claims: [{ text, sourceIds }], sources, … }`); it carries no task id. The report is found by its
 		 * summary and confirmed by the projection being exactly the one stored for (or derived from) that report. A
 		 * failure result (`{ code }`) and any other shape have no report.
@@ -144,9 +144,9 @@ export function createAgentReportResourceAdapter(deps: {
 			if (!parsed) return null;
 			const view: ResourceView = {
 				...refOf(parsed),
-				adapterRef: TODO_SCREEN_ADAPTER_REF,
+				adapterRef: AGENT_REPORT_ADAPTER_REF,
 				targetRef: parsed.row.task_id,
-				actions: ["read", "open"],
+				actions: ["read"],
 				...(parsed.request
 					? { preview: parsed.request.slice(0, PREVIEW_CHARS) }
 					: {}),

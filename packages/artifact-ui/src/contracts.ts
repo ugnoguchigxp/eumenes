@@ -32,8 +32,6 @@ export type { ImageWorkspaceResource } from "./image-components";
 export type { Model3dWorkspaceResource } from "./model3d-components";
 export type { BrowserWorkspaceResource } from "./browser-components";
 import type { RecordsResource } from "./records-components";
-import type { TodoResource } from "./todo-components";
-export type { TodoResource } from "./todo-components";
 import type { Model3dWorkspaceResource } from "./model3d-components";
 import type { BrowserWorkspaceResource } from "./browser-components";
 import type { VideoWorkspaceResource } from "./video-components";
@@ -353,7 +351,6 @@ export type Resource =
 	| ComputeWorkspaceResource
 	| BrowserWorkspaceResource
 	| RecordsResource
-	| TodoResource
 	| SubtitlePreviewResource
 	| SettingsSectionResource
 	| SettingsNavigationResource

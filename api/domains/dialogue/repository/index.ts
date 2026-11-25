@@ -1,6 +1,9 @@
 import { forgetHiddenMigration } from "./forget-hidden";
 import { memoryRefsMigration } from "./memory-refs";
-import { generatedImagesMigration } from "./generated-images";
+import {
+	assignmentImagesMigration,
+	generatedImagesMigration,
+} from "./generated-images";
 import {
 	agencyMigration,
 	dispatchClockMigration,
@@ -104,21 +107,6 @@ export function saveAnnouncement(
 export * from "./specialist";
 export * from "./forget-hidden";
 export * from "./memory-refs";
-export function linkAgent(
-	db: Database,
-	runId: string,
-	taskId: string,
-	jobId: string,
-) {
-	if (
-		db
-			.query(
-				"UPDATE dialogue_runs SET agent_task_id=?,job_id=? WHERE id=? AND status IN ('queued','running')",
-			)
-			.run(taskId, jobId, runId).changes !== 1
-	)
-		throw new Error("run_changed");
-}
 export function linkAnswer(db: Database, runId: string, jobId: string) {
 	if (
 		db
@@ -527,6 +515,7 @@ CREATE TABLE dialogue_search_offers (
 	},
 	forgetHiddenMigration,
 	memoryRefsMigration,
+	assignmentImagesMigration,
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

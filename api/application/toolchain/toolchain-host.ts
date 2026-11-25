@@ -1,4 +1,3 @@
-import type { TodoLedgerPort } from "./task-execution-adapter";
 import type { ConversationService } from "../../domains/conversation";
 import type { InferencePort } from "../../domains/inference";
 import type { QueueService } from "../../domains/queue";
@@ -21,7 +20,6 @@ import type { MemoryAdapterPorts } from "../world/memory-adapter";
 import type { RecordsPorts } from "../settings/records-adapter";
 import type { ServiceTestsPorts } from "../settings/service-tests-adapter";
 import type { SettingsAdapterPorts } from "../settings/settings-adapter";
-import { questionReader, type InteractionViews } from "./toolchain-adapters";
 import type { TtsDictionaryPorts } from "../settings/tts-dictionary-adapter";
 import { createWorldResearchPorts } from "../world/world-research-ports";
 import type { WorldAdapterPorts } from "../world/world-adapter";
@@ -69,9 +67,7 @@ export function createToolchainHostLinks(services: {
 	};
 }) {
 	const { settings, inference, world } = services;
-	let interactions: InteractionViews | undefined;
 	let sessionLive: SessionLive | undefined;
-	let todos: TodoLedgerPort | undefined;
 	const worldPorts: WorldAdapterPorts | undefined = world && {
 		claims: world.claims,
 		documents: world.documents,
@@ -112,26 +108,14 @@ export function createToolchainHostLinks(services: {
 				diagnostics: settings.diagnostics,
 			},
 			secretKey: () => settings.derivedKey("tool-runtime.action-digest"),
-			interactions: questionReader(() => interactions),
 			// Until dialogue is attached no specialist session exists, so none is live.
 			specialistSessionLive: (tx: Database, sessionId: string) =>
 				sessionLive?.(tx, sessionId) ?? false,
-			// The TODO screen reads and archives the conversation's TODOs once dialogue is attached.
-			todos: () => todos,
 		},
-		attachDialogue(
-			dialogue: {
-				interactions: InteractionViews;
-				specialistSessionLiveInTransaction: SessionLive;
-			} & TodoLedgerPort,
-		) {
-			interactions = dialogue.interactions;
+		attachDialogue(dialogue: {
+			specialistSessionLiveInTransaction: SessionLive;
+		}) {
 			sessionLive = dialogue.specialistSessionLiveInTransaction;
-			todos = {
-				todoPageInTransaction: dialogue.todoPageInTransaction,
-				archiveTodoInTransaction: dialogue.archiveTodoInTransaction,
-				flushTodoCancellations: dialogue.flushTodoCancellations,
-			};
 		},
 	};
 }

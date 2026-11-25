@@ -65,11 +65,28 @@ afterEach(async () => {
 });
 const idle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const execution = (deadline: number) =>
+	({
+		id: "call-1",
+		executionId: "exec-1",
+		revision: 1,
+		step: 0,
+		chainRevisionId: "toolchain:music.create@1",
+		request: "雨の曲を作って",
+		refs: [],
+		source: {
+			conversationId: "main",
+			messageId: "m1",
+			runId: "run-1",
+			request: "雨の曲を作って",
+			digest: "d",
+		},
+		deadline,
+		modelCalls: 6,
+	}) as unknown as ChildExecution;
+
 /** A fake LARM: each request takes the next scripted step, the last one repeating. */
-function setup(
-	script: Step[],
-	options: { onWaiting?: (until: number) => number | null } = {},
-) {
+function setup(script: Step[], options: { deadlineMs?: number } = {}) {
 	setSystemTime(new Date(BASE));
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-music-wait-"));
 	dirs.push(dir);
@@ -80,11 +97,7 @@ function setup(
 	stores.push(store);
 	const queue = createQueue(store, { pollMs: 5 });
 	const requests: number[] = [];
-	const jobs: string[] = [];
-	const finished: string[] = [];
-	const extended: Array<[string, number]> = [];
 	const inference = {
-		captureControlInTransaction: () => "request-1",
 		captureUserControlInTransaction: () => "request-1",
 		executeControl: async () => ({
 			requestId: "request-1",
@@ -118,24 +131,19 @@ function setup(
 		inference,
 		capabilities,
 		gateway: () => gateway,
-		onJob: (_db, _runId, jobId) => jobs.push(jobId),
-		onFinished: (_db, runId) => finished.push(runId),
-		onWaiting: (_db, runId, untilMs) => {
-			extended.push([runId, untilMs]);
-			return options.onWaiting ? options.onWaiting(untilMs) : untilMs;
-		},
 		validateExecutionInTransaction: () => true,
 	});
 	queue.start();
-	const start = (execution?: ChildExecution) =>
+	const deadline = BASE + (options.deadlineMs ?? 3 * 3600 * SECOND);
+	const start = () =>
 		store.write((db) =>
 			music.startInTransaction(db, {
 				runId: "run-1",
 				conversationId: "main",
 				question: "雨の曲を作って",
 				originalRequest: "雨の曲を作って",
-				deadline: BASE + 120 * SECOND,
-				execution,
+				deadline,
+				execution: execution(deadline),
 			}),
 		);
 	const job = (id: string) =>
@@ -146,9 +154,7 @@ function setup(
 		queue,
 		music,
 		requests,
-		jobs,
-		finished,
-		extended,
+		deadline,
 		start,
 		job,
 		advance,
@@ -176,10 +182,8 @@ test("T1/T10: a capacity refusal waits 30 s, sends the request once more, and co
 		maxAttempts: 1,
 		state: "queued",
 	});
-	expect(h.jobs.at(-1)).toBe(job.id);
-	expect(h.extended).toEqual([["run-1", BASE + 330 * SECOND]]);
-	expect(h.store.read((db) => row(db, id)!.deadline)).toBe(BASE + 330 * SECOND);
-	expect(h.finished).toEqual([]);
+	// The row keeps its caller's deadline: the wait runs up to it, never past it.
+	expect(h.store.read((db) => row(db, id)!.deadline)).toBe(h.deadline);
 	h.advance(BASE + 29 * SECOND);
 	await idle();
 	expect(h.requests).toHaveLength(1);
@@ -187,7 +191,6 @@ test("T1/T10: a capacity refusal waits 30 s, sends the request once more, and co
 	await until(() => h.music.get(id)?.state === "completed");
 	expect(h.requests).toEqual([BASE, BASE + 30 * SECOND]);
 	expect(h.music.get(id)).toMatchObject({ phase: "completed" });
-	expect(h.finished).toEqual(["run-1"]);
 	await h.queue.close(100);
 });
 
@@ -205,32 +208,28 @@ test("T2: Retry-After 90 schedules the next try 90 s later", async () => {
 	await h.queue.close(100);
 });
 
-test("T3: refusals stop after 30 minutes with larm_capacity_timeout and nothing is sent afterwards", async () => {
+test("T3: a refusal that never ends retries every 30 s and stops at 30 minutes with larm_capacity_timeout", async () => {
 	const h = setup(["busy"]);
 	const { id } = await h.start();
 	let count = 1;
 	await until(waiting(h, id, count));
-	for (;;) {
+	while (h.music.get(id)?.state !== "failed" && count < 100) {
 		h.advance(h.job(id).availableAtMs);
-		await until(
-			() =>
-				h.music.get(id)?.state === "failed" ||
-				(h.music.get(id)?.capacityWait?.count === count + 1 &&
-					h.job(id).state === "queued"),
-			{ timeout: 5000 },
-		);
-		if (h.music.get(id)?.state === "failed") break;
 		count++;
+		const next = waiting(h, id, count);
+		await until(() => h.music.get(id)?.state === "failed" || next());
 	}
-	expect(h.requests).toHaveLength(61);
 	expect(h.music.get(id)).toMatchObject({
 		state: "failed",
 		errorCode: LARM_CAPACITY_TIMEOUT,
 	});
-	expect(h.finished).toEqual(["run-1"]);
+	// One request at the start and one per 30 s try, within 30 minutes.
+	expect(h.requests).toHaveLength(61);
+	expect(h.requests.at(-1)! - BASE).toBeLessThanOrEqual(30 * 60 * SECOND);
+	const sent = h.requests.length;
 	h.advance(BASE + 2 * 3600 * SECOND);
 	await idle();
-	expect(h.requests).toHaveLength(61);
+	expect(h.requests).toHaveLength(sent);
 	expect(
 		h.queue.list({ kind: "music.generate", state: "queued" }).items,
 	).toHaveLength(0);
@@ -252,43 +251,13 @@ test("T4: cancelling during the wait cancels the waiting job and nothing is sent
 	await h.queue.close(100);
 });
 
-test("T5: a run whose deadline cannot be extended ends with larm_capacity_timeout", async () => {
-	const h = setup(["busy", "ok"], { onWaiting: () => null });
+test("T5: an execution keeps its caller's deadline and ends with larm_capacity_timeout", async () => {
+	const h = setup(["busy", "ok"], { deadlineMs: 120 * SECOND });
 	const { id } = await h.start();
 	await until(() => h.music.get(id)?.state === "failed");
 	expect(h.music.get(id)).toMatchObject({ errorCode: LARM_CAPACITY_TIMEOUT });
 	expect(h.requests).toHaveLength(1);
-	expect(h.finished).toEqual(["run-1"]);
-	await h.queue.close(100);
-});
-
-test("T5: a child execution keeps its caller's deadline and ends with larm_capacity_timeout", async () => {
-	const h = setup(["busy", "ok"]);
-	const child = {
-		id: "child",
-		executionId: "exec-1",
-		revision: 1,
-		step: 0,
-		chainRevisionId: "toolchain:music.create@1",
-		request: "雨の曲を作って",
-		refs: [],
-		source: {
-			conversationId: "main",
-			messageId: "m1",
-			runId: "run-d",
-			request: "雨の曲を作って",
-			digest: "d",
-		},
-		deadline: BASE + 120 * SECOND,
-		modelCalls: 6,
-	} as unknown as ChildExecution;
-	const { id } = await h.start(child);
-	await until(() => h.music.get(id)?.state === "failed");
-	expect(h.music.get(id)).toMatchObject({ errorCode: LARM_CAPACITY_TIMEOUT });
-	expect(h.requests).toHaveLength(1);
-	expect(h.extended).toEqual([]);
-	expect(h.store.read((db) => row(db, id)!.deadline)).toBe(BASE + 120 * SECOND);
-	expect(h.finished).toEqual([]);
+	expect(h.store.read((db) => row(db, id)!.deadline)).toBe(h.deadline);
 	await h.queue.close(100);
 });
 
@@ -306,7 +275,6 @@ for (const [name, failure, code] of [
 		h.advance(BASE + 10 * 60 * SECOND);
 		await idle();
 		expect(h.requests).toHaveLength(1);
-		expect(h.extended).toEqual([]);
 		await h.queue.close(100);
 	});
 

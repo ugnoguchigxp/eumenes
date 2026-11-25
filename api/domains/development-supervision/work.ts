@@ -91,7 +91,6 @@ export function allowedScope(
 		!!quote &&
 		[
 			parent.source.request,
-			...(parent.confirmation ? [parent.confirmation.request] : []),
 			...parent.controls
 				.filter(({ taskId }) => !taskId || taskId === task.id)
 				.map(({ text, source }) => source?.request ?? text),

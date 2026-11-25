@@ -93,11 +93,9 @@ function makeClient(over: Record<string, unknown> = {}) {
 			revision: 7,
 			data: boardFixture,
 		})),
-		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: vi.fn(async (_event: object) => accepted),
 		toolchainAction: vi.fn(),
 		unsettledToolchainActions: vi.fn(async () => []),
-		answerToolchainInteraction: vi.fn(),
 		...over,
 	};
 }

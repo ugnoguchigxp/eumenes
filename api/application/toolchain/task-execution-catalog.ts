@@ -159,9 +159,22 @@ export function taskChildContext(host: TaskExecutionHost) {
 				ref.operationId!,
 				child,
 			);
+			// The domain's follow-up says how the operation progresses; the command's own result (what the old
+			// conversation answered from) is what the agent reports, so it leads and stays whole in the output.
+			const answerContext = saved.answerContext ?? saved.receipt;
 			return {
 				...current,
 				ref: { ...ref, domain: current.ref },
+				summary: `${JSON.stringify(answerContext)}\n${current.summary}`.slice(
+					0,
+					2000,
+				),
+				output:
+					typeof current.output === "object" &&
+					current.output !== null &&
+					!Array.isArray(current.output)
+						? { ...current.output, answerContext }
+						: { execution: current.output, answerContext },
 				modelCalls: total(child, (ref.calls ?? 0) + current.modelCalls),
 			};
 		}

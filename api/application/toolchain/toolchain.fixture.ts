@@ -39,7 +39,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../infrastructure/sqlite";
-import { systemContext } from "../../infrastructure/system-context";
 import { migrations } from "../migrations";
 import { createConversationService } from "../../domains/conversation";
 import { createSettings } from "../../domains/settings";
@@ -69,7 +68,6 @@ import { fixtureRouting } from "./toolchain-search.fixture";
 import { researchAcquisition } from "./research-acquisition.fixture";
 export { forbidden } from "./research-acquisition.fixture";
 import {
-	answerByScript,
 	askedOf,
 	callsOf,
 	candidatesOf,
@@ -86,12 +84,7 @@ import {
 	UNAVAILABLE_TEXT,
 } from "./conversation-script.fixture";
 /** The conversation agent's fixed tools, as a script reads what it may call. */
-/** The system of the router's fill of a structured answer (spec router-package-integration 2026-11-04). */
-const ANSWER_FILL = systemContext(
-	"dialogue.contexts.local.work-answer-arguments",
-	{},
-);
-const CONVERSATION_TOOLS = ["memory", "find_toolchain", "delegate", "work"].map(
+const CONVERSATION_TOOLS = ["memory", "find_toolchain", "delegate"].map(
 	(name) => ({
 		function: { name },
 	}),
@@ -294,16 +287,6 @@ export async function harness(options: HarnessOptions = {}) {
 				]);
 				return "";
 			}
-			// The router's fill of a structured answer to a work's question, from the same script.
-			if (callOptions?.jsonSchema && system === ANSWER_FILL)
-				return answerByScript(messages, (loop) =>
-					utteranceStep(
-						loop as never,
-						utteranceOf(messages),
-						CONVERSATION_TOOLS,
-						true,
-					),
-				);
 			// The local harness's routed turn: a silent choice held to a schema, from the same script.
 			const round = callOptions?.jsonSchema ? choiceRound(messages) : null;
 			if (round)
@@ -642,12 +625,6 @@ export async function harness(options: HarnessOptions = {}) {
 				inference,
 				capabilities: toolchain.capabilities,
 				gateway: options.musicGateway,
-				onJob: (db, runId, jobId) =>
-					dialogue.linkOperationJobInTransaction(db, runId, jobId),
-				onFinished: (db, runId) =>
-					dialogue.finishOperationInTransaction(db, runId),
-				onWaiting: (db, runId, untilMs) =>
-					dialogue.extendOperationDeadlineInTransaction(db, runId, untilMs),
 			})
 		: undefined;
 	const image = options.imageGateway
@@ -659,12 +636,6 @@ export async function harness(options: HarnessOptions = {}) {
 				inference,
 				capabilities: toolchain.capabilities,
 				gateway: options.imageGateway,
-				onJob: (db, runId, jobId) =>
-					dialogue.linkOperationJobInTransaction(db, runId, jobId),
-				onFinished: (db, runId) =>
-					dialogue.finishOperationInTransaction(db, runId),
-				onWaiting: (db, runId, untilMs) =>
-					dialogue.extendOperationDeadlineInTransaction(db, runId, untilMs),
 			})
 		: undefined;
 	const excalidraw = options.drawingConnection
@@ -686,12 +657,6 @@ export async function harness(options: HarnessOptions = {}) {
 				inference,
 				capabilities: toolchain.capabilities,
 				service: excalidraw,
-				onJob: (db, runId, jobId) =>
-					dialogue.linkOperationJobInTransaction(db, runId, jobId),
-				onFinished: (db, runId) =>
-					dialogue.finishOperationInTransaction(db, runId),
-				onWaiting: (db, runId, untilMs) =>
-					dialogue.extendOperationDeadlineInTransaction(db, runId, untilMs),
 			})
 		: undefined;
 	const objectRecognition = options.recognitionFetcher
@@ -723,6 +688,7 @@ export async function harness(options: HarnessOptions = {}) {
 		options,
 		image,
 		music,
+		markdown?.generated,
 	);
 	const knowledge =
 		options.knowledgeSelectionResourceId || options.knowledgeSource
@@ -909,24 +875,25 @@ export async function harness(options: HarnessOptions = {}) {
 		queue,
 		request,
 		parentContexts,
-		/** The conversation's open TODOs (the ledger the agency asks from). */
-		todos: (conversationId = "main") =>
-			store.read((db) => dialogue.todosInTransaction(db, conversationId)),
 		/**
-		 * The result of the conversation's newest finished TODO as text. Finished work is archived as it finishes and
-		 * told by its notice, not by a conversation reply of the run, so the work's own result is what a test reads.
+		 * The result of the conversation's newest finished execution (the list is newest first) as text: the agent reports a finished assignment
+		 * from its result, so what a test reads is the execution's own result, not a conversation reply of the run.
 		 */
 		reported: (conversationId = "main") => {
-			const done = store
-				.read((db) =>
-					dialogue.todoPageInTransaction(db, conversationId, {
-						state: "archived",
-						pageIndex: 0,
-						pageSize: 10,
-					}),
-				)
-				.rows.find((row) => row.outcome !== "cancelled");
-			return done ? JSON.stringify(done.result ?? null) : "";
+			const done = toolchain.agents.executions
+				.list(conversationId)
+				.filter((e) => e.result && e.result.status !== "cancelled")
+				.at(0);
+			if (!done) return "";
+			// A toolchain's own report is a JSON text in the summary: read as the data it is.
+			const summary = (() => {
+				try {
+					return JSON.parse(done.result!.summary) as unknown;
+				} catch {
+					return done.result!.summary;
+				}
+			})();
+			return JSON.stringify({ ...done.result, summary });
 		},
 		voice,
 		settings,

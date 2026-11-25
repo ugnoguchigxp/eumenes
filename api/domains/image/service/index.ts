@@ -7,7 +7,6 @@ import type { LarmPlayground } from "../../larm";
 import type { ImageRecord } from "../contracts";
 import {
 	row,
-	byRun,
 	record,
 	patch,
 	list,
@@ -41,10 +40,6 @@ export function createImage(deps: {
 	inference: InferencePort;
 	capabilities: Capabilities;
 	gateway: () => LarmPlayground;
-	onJob: (db: Database, runId: string, jobId: string) => void;
-	onFinished: (db: Database, runId: string) => void;
-	/** Extends the conversation run's deadline for a capacity wait; its deadline afterwards, or null. */
-	onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
 	validateExecutionInTransaction?: (
 		db: Database,
 		child: ChildExecution,
@@ -54,7 +49,6 @@ export function createImage(deps: {
 	function enqueue(
 		db: Database,
 		id: string,
-		runId: string,
 		deadline: number,
 		stage: "plan" | "generate",
 		wait?: { at: number; count: number },
@@ -75,15 +69,12 @@ export function createImage(deps: {
 			job.id,
 			id,
 		);
-		if (!JSON.parse(row(db, id)!.request_json).execution)
-			deps.onJob(db, runId, job.id);
 		return job.id;
 	}
 	function fail(db: Database, id: string, code: string) {
 		const r = row(db, id);
 		if (!r || !active(record(r))) return;
 		patch(db, id, { state: "failed", errorCode: code, phase: "failed" });
-		if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 	}
 	function cancel(db: Database, job: { payload: { id: string } }) {
 		const r = row(db, job.payload.id);
@@ -140,20 +131,15 @@ export function createImage(deps: {
 				question: string;
 				originalRequest: string;
 				deadline: number;
-				execution?: ChildExecution;
+				execution: ChildExecution;
 			},
 		) {
-			const existing = input.execution
-				? row(db, input.execution.id)
-				: byRun(db, input.runId);
+			const id = input.execution.id;
+			const existing = row(db, id);
 			if (existing) return { id: existing.id, jobId: existing.queue_job_id! };
 			const request = imageRequest.parse({ question: input.question });
-			if (
-				input.execution &&
-				!deps.validateExecutionInTransaction?.(db, input.execution)
-			)
+			if (!deps.validateExecutionInTransaction?.(db, input.execution))
 				throw new Error("execution_changed");
-			const id = input.execution?.id ?? crypto.randomUUID();
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
@@ -192,35 +178,15 @@ export function createImage(deps: {
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
-					...(input.execution
-						? { execution: input.execution, references: input.execution.refs }
-						: {}),
+					execution: input.execution,
+					references: input.execution.refs,
 				}),
 				JSON.stringify(prepared),
 				input.deadline,
 			);
 			return {
 				id,
-				jobId: enqueue(db, id, input.runId, input.deadline, "plan"),
-			};
-		},
-		resultInTransaction(db: Database, runId: string) {
-			const r = byRun(db, runId);
-			return r ? record(r) : null;
-		},
-		referenceInTransaction(db: Database, runId: string) {
-			const r = byRun(db, runId);
-			if (!r) return null;
-			const v = record(r);
-			return {
-				state: v.state,
-				title: v.title,
-				prompt: v.prompt,
-				errorCode: v.errorCode,
-				imageRef: v.artifactId,
-				url: v.artifactId
-					? `/api/images/${encodeURIComponent(v.artifactId)}/content`
-					: null,
+				jobId: enqueue(db, id, input.deadline, "plan"),
 			};
 		},
 		purgeCallInTransaction(db: Database, id: string) {

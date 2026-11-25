@@ -1,9 +1,5 @@
 import type { Database } from "bun:sqlite";
-import {
-	reportedTodoIds,
-	type ActionTicket,
-	type EmotionName,
-} from "eumenes-agency";
+import type { ActionTicket, EmotionName } from "eumenes-agency";
 import { hostDelivery, type DeliveryEmotion } from "../../domains/delivery";
 export const deliveryEmotionOf = (emotion: EmotionName): DeliveryEmotion =>
 	emotion === "calm" ? "none" : emotion;
@@ -25,7 +21,6 @@ export function persistSpeech(
 		text,
 		at,
 		ticket,
-		evidenceRefs,
 		input,
 	}: {
 		conversationId: string;
@@ -33,7 +28,6 @@ export function persistSpeech(
 		text: string;
 		at: number;
 		ticket: Pick<ActionTicket, "emotion" | "findingWorkRefs">;
-		evidenceRefs: readonly string[];
 		input: InputContext;
 	},
 ): "routed" | "appended" {
@@ -57,13 +51,11 @@ export function persistSpeech(
 			: {}),
 	});
 	deps.memory.referenceInputs?.recordMessageInTransaction(db, messageId, input);
-	const todoRefs = reportedTodoIds(evidenceRefs);
 	deps.recordSpokeInTransaction(db, {
 		conversationId,
 		messageId,
 		text,
 		at: new Date(at).toISOString(),
-		...(todoRefs.length ? { todoRefs } : {}),
 	});
 	deps.state?.linkFindingsInTransaction(
 		db,

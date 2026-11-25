@@ -20,21 +20,9 @@ import {
 	createSession,
 } from "./session";
 
-/** What happens before a generation: the log, a TODO, the memory step. */
+/** What happens before a generation: the log, the memory step. */
 type Step = {
 	events?: SeedEvent[];
-	/** A TODO's owner reports; the TODO must be in the trajectory's seed. */
-	work?: Array<{
-		key: string;
-		report:
-			| { status: "waiting"; questionId: string; question: string }
-			| {
-					status: "done";
-					outcome:
-						"succeeded" | "partial" | "failed" | "cancelled" | "interrupted";
-					result: unknown;
-			  };
-	}>;
 	/** State saved after the profile was published (it waits in `state.newMemories`). */
 	longTerm?: NonNullable<Seed["longTerm"]>;
 	notice?: string;
@@ -47,8 +35,6 @@ type TrajectoryTurn = {
 	utterance: string | null;
 	trigger?: Record<string, unknown>;
 	before?: Step;
-	/** TODOs the generation opened (a delegation): they exist when its actions are logged. */
-	startWork?: NonNullable<Seed["work"]>;
 	reply?: Reply;
 };
 
@@ -71,7 +57,7 @@ const SEARCH_ACTION = (query: string, id: string, title: string) => ({
 
 /**
  * Twelve generations. Generation 4 follows a memory step (a new State item); 5 hands work over and 6 is the fixed-text
- * generation the TODO finishing starts; 8 is started by a notice and stays silent; 9 follows a silence over the resume
+ * generation a notice of the finished work starts; 8 is started by a notice and stays silent; 9 follows a silence over the resume
  * gap (a re-construction, where the profile takes in the waiting item); 11 follows an idle over the cache lifetime.
  */
 export const DEFAULT_TRAJECTORY: Trajectory = {
@@ -112,15 +98,6 @@ export const DEFAULT_TRAJECTORY: Trajectory = {
 		{
 			minute: 4,
 			utterance: "旅行先のイメージ画像を作って",
-			startWork: [
-				{
-					key: "image",
-					toolchain: "image_studio",
-					request: "旅行先のイメージ画像を作る",
-					at: timeOf(4.5),
-					status: "todo",
-				},
-			],
 			reply: {
 				acted: [
 					{
@@ -131,7 +108,7 @@ export const DEFAULT_TRAJECTORY: Trajectory = {
 							action: "delegate",
 							toolchain: "image_studio",
 							request: "旅行先のイメージ画像を作る",
-							todo: "@image",
+							assignment: "a1",
 						},
 					},
 				],
@@ -142,34 +119,8 @@ export const DEFAULT_TRAJECTORY: Trajectory = {
 		{
 			minute: 6,
 			utterance: null,
-			trigger: {
-				kind: "todo_changed",
-				todos: [{ id: "@image", status: "done" }],
-			},
-			before: {
-				work: [
-					{
-						key: "image",
-						report: {
-							status: "done",
-							outcome: "succeeded",
-							result: {
-								asOf: timeOf(5.5),
-								claims: [
-									{ text: "京都の紅葉を描いた画像ができた", sources: [] },
-								],
-								limits: "画像は一枚だけ作った",
-							},
-						},
-					},
-				],
-			},
-			reply: {
-				acted: [{ fields: { action: "check", todo: "@image" } }],
-				text: "画像ができました。",
-				origin: "report",
-				todoRefs: ["@image"],
-			},
+			trigger: { kind: "notice", text: "頼まれた画像ができました" },
+			reply: { text: "画像ができました。", origin: "report" },
 		},
 		{
 			minute: 8,
@@ -251,8 +202,6 @@ export async function playTrajectory(
 		wiring.setNow(at);
 		const before = turn.before;
 		if (before?.events) await session.appendEvents(before.events);
-		for (const change of before?.work ?? [])
-			await session.reportWork(change.key, at, change.report);
 		if (before?.longTerm) await saveLongTerm(session, before.longTerm, at);
 		if (before?.notice || before?.longTerm)
 			await publishStep(
@@ -276,7 +225,6 @@ export async function playTrajectory(
 			input: generated.input,
 			cut: generated.cut,
 		});
-		for (const work of turn.startWork ?? []) await session.addWork(work);
 		await session.settle(generated, turn.reply);
 	}
 	return calls;

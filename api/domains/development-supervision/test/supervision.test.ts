@@ -548,33 +548,6 @@ test("a partial source result contributes its scoped evidence to a persisted des
 	}
 });
 
-test("an approved request supplies authority to its acceptance utterance and remains revocable", async () => {
-	const confirmedRequest =
-		"Please fix the source and run the regression check.";
-	const f = await fixture(
-		(data) => {
-			if (isAuthority(data)) {
-				expect(data.request).toBe("Proceed.");
-				expect(data.confirmedRequest).toBe(confirmedRequest);
-				return { mode: "edit" };
-			}
-			return plan([proposal("edit")]);
-		},
-		"Proceed.",
-		false,
-		confirmedRequest,
-	);
-	try {
-		await f.waitFor(() => f.children.size === 1);
-		const child = [...f.children.values()][0]!;
-		expect(f.grant(child, "continue")?.scope.mode).toBe("edit");
-		f.invalidateConfirmation();
-		expect(f.grant(child, "continue")).toBeNull();
-	} finally {
-		await f.close();
-	}
-});
-
 test("static evidence from the right execution still has to name a path in the grant", async () => {
 	const f = await fixture((data) =>
 		isAuthority(data)

@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
 import {
 	IMAGE,
+	agencyOf,
 	choice,
 	reply,
 	setup,
@@ -121,18 +122,18 @@ test("an answered utterance is not edited, and nothing changes", async () => {
 	expect(h.conversation.message(done.inputMessageId)?.text).toBe("やあ");
 });
 
-test("an utterance whose delegation was committed is refused and its run keeps waiting", async () => {
-	h = await setup();
+test("an utterance whose delegation was committed is refused: the agent holds the assignment", async () => {
+	h = await setup({ agency: agencyOf().agency });
 	h.state.steps.push(
 		choice({ choice: IMAGE.id, say: "描きます。", request: "犬の絵" }),
+		{ text: "頼みました。" },
 	);
-	const waiting = await h.say("犬の絵", "queued");
-	expect(await resubmit(waiting.inputMessageId, "猫の絵")).toEqual({
+	const asked = await h.say("犬の絵");
+	expect(await resubmit(asked.inputMessageId, "猫の絵")).toEqual({
 		ok: false,
 		code: "already_acted",
 	});
-	expect(h.dialogue.get(waiting.id)?.status).toBe("queued");
-	expect(h.conversation.message(waiting.inputMessageId)?.text).toBe("犬の絵");
+	expect(h.conversation.message(asked.inputMessageId)?.text).toBe("犬の絵");
 });
 
 test("an utterance followed by another is not the latest", async () => {

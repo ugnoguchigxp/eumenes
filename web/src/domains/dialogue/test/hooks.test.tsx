@@ -37,9 +37,6 @@ function setup() {
 		clearRecent: async () => ({ ok: true as const }),
 		runErrorReport: async (id) => ({ runId: id, text: "" }),
 		specialistSession: async () => ({ session: null }),
-		todoNotices: async () => ({ notices: [], unread: 0 }),
-		readTodoNotice: async () => {},
-		archiveTodoNotices: async () => {},
 		specialistCommand: async () => {
 			throw new Error("not_used");
 		},

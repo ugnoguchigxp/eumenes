@@ -330,6 +330,7 @@ test("conversation note adoption sends current goal and plan evidence to the mat
 			inputs.sources.filter((ref) => ref.startsWith("agency-record:")),
 		).toHaveLength(2);
 		let documentWrites = 0;
+		const discardedItems: string[] = [];
 		async function publish(sources: readonly string[], documentId: string) {
 			const scope = {
 				id: "c1",
@@ -346,8 +347,17 @@ test("conversation note adoption sends current goal and plan evidence to the mat
 						question: "Find source.",
 					},
 				],
-				agent: { researchReturned() {}, view: () => ({ items: [] }) },
+				agent: {
+					researchReturned() {},
+					forget(refs: string[]) {
+						discardedItems.push(...refs);
+					},
+					infoChanged() {},
+					view: () => ({ items: [] }),
+				},
 				finished: new Map(),
+				assignments: new Map(),
+				observed: new Map(),
 				revision: 0,
 				thoughts: [],
 				thoughtSeq: 0,
@@ -460,6 +470,7 @@ test("conversation note adoption sends current goal and plan evidence to the mat
 		await f.closePlan(plan.id, plan.revision);
 		await publish(inputs.sources, "stale-document");
 		expect(documentWrites).toBe(4);
+		expect(discardedItems).toEqual(["item"]);
 		expect(
 			f.store.read(
 				(db) =>

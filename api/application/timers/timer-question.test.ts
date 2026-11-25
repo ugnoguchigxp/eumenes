@@ -1,7 +1,5 @@
 import { expect, test } from "bun:test";
-import type { Database } from "bun:sqlite";
 import { createToolchainRouting } from "../toolchain/toolchain-routing";
-import { questionReader } from "../toolchain/toolchain-adapters";
 import { harness } from "../toolchain/toolchain.fixture";
 
 const TARGET = "builtin:timerTargetAnswer";
@@ -77,42 +75,4 @@ test("a choice list is capped at 20 timers", async () => {
 	} finally {
 		await h.close();
 	}
-});
-
-test("the question source shows only the question and its status, not the interaction's refs", () => {
-	const full = {
-		id: "interaction-1",
-		conversationId: "main",
-		status: "waiting_input",
-		revision: 2,
-		chainRevisionId: "toolchain:timers.manage@2",
-		artifactRevisionId: "artifact:timers.workspace@1",
-		question: {
-			questionId: "q",
-			prompt: "どれですか",
-			inputSchemaRef: TARGET,
-			revision: 2,
-			expiresAt: "2026-10-14T00:00:00.000Z",
-			choices: [{ ref: "t1", label: "お茶" }],
-		},
-		questionCount: 1,
-		receiptRef: { owner: "timers", operationId: "o", digest: "d" },
-		expiresAt: "2026-10-14T00:00:00.000Z",
-		createdAt: "x",
-		updatedAt: "y",
-	};
-	const reader = questionReader(() => ({
-		viewInTransaction: (_db: Database, id: string) =>
-			id === full.id ? full : null,
-	}))()!;
-	expect(reader.questionInTransaction({} as Database, full.id)).toEqual({
-		revision: 2,
-		data: { status: "waiting_input", question: full.question },
-	});
-	// Without an open question there is no source.
-	const closed = questionReader(() => ({
-		viewInTransaction: () => ({ ...full, question: null }),
-	}))()!;
-	expect(closed.questionInTransaction({} as Database, full.id)).toBeNull();
-	expect(reader.questionInTransaction({} as Database, "other")).toBeNull();
 });

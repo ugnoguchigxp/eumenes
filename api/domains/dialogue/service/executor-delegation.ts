@@ -1,18 +1,15 @@
 import { saveLatestSearch } from "../repository/search-offers";
-import { linkConfirmationRevision } from "../repository/confirmation-revisions";
-import { currentRevisions } from "./confirmation-revisions";
 import { conversationOffers } from "./conversation-offers";
 import type { Database } from "bun:sqlite";
+import { systemContext } from "../../../infrastructure/system-context";
 import type { RoutedPipelineStep } from "../../tool-runtime";
 import { isSystemPrompt } from "../contracts";
-import { saveAnnouncement } from "../repository";
-import {
-	confirmationResourceUris,
-	saveConfirmationRefs,
-} from "../repository/resources";
-import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
+import type { AssignmentDetails } from "../contracts/agency-always-on";
+import { saveAnnouncement, transition } from "../repository";
+import { resolveDelegateRefs } from "./delegate-refs";
 import { REPAIR_TOOLCHAIN, verifiedDiagnostic } from "./diagnostic-evidence";
 import { eventText } from "./event-text";
+import { executionSourceInTransaction } from "./execution-source";
 import {
 	TOOL_NAMES,
 	requestRequired,
@@ -20,15 +17,13 @@ import {
 	type DelegateArgs,
 	type ParsedCall,
 } from "./generation-tools";
-import { sessionTargetsInTransaction } from "./specialist-context";
+import { lineText } from "./input-text";
+import { startSpecialistSession } from "./specialist-start";
 import { carriedToolCalls, lastShownSearch } from "./tool-exchange";
 import { recordUtteranceInTransaction } from "./utterances";
-import { dispatchInTransaction } from "./work-dispatch";
 
 import {
 	HandoverRefused,
-	IMPACT_ORDER,
-	acceptHere,
 	adoptHere,
 	type ExecutorContext,
 	type Request,
@@ -57,21 +52,27 @@ function offerEvidence(
 	return [...new Set([offer.replyId, ...offer.sources.map((s) => s.id)])];
 }
 
-/* Delegations: the announced handover, the confirmation before a change and its approval (sections 6.5, 6.7). */
+/* Delegations: the announced hand-over to a session, and an assignment to the agent (spec toolchain-assignment-stage2-implementation-2026-11-25.md section 2.4). */
 /**
- * The announcement is saved and delivered before the work is handed over (section 6.5); the handover commits
+ * The announcement is saved and delivered before the conversation is handed to the session; the handover commits
  * only after the delivery (in full, or cut short by the user), with every authority checked again. Committing it
  * is this generation's adoption: its receipt is accepted and the memory it read is recorded there.
  */
-export async function handOver(
+async function handOver(
 	x: ExecutorContext,
 	call: ParsedCall,
 	chosen: Request,
 	signal: AbortSignal,
 ): Promise<ToolOutcome> {
-	const { deps, events, at, current, acted, handle, origin, actionKey } = x;
+	const { deps, events, at, current, acted, handle, origin } = x;
 	const { store, toolchains } = deps;
 	const target = `delegate:${chosen.card.id}`;
+	const announcement = systemContext(
+		"dialogue.contexts.local.router-announce",
+		{
+			title: lineText(chosen.card.title).slice(0, 30),
+		},
+	);
 	const available = store.read((db) => {
 		try {
 			toolchains!.resolveInTransaction(db, chosen.card.revisionId);
@@ -89,7 +90,7 @@ export async function handOver(
 			run.id,
 			run.revision,
 			`${run.revision}:${call.call.id}`,
-			chosen.announcement,
+			announcement,
 		);
 		handle(tx);
 		const { event } = events.appendInTransaction(tx, {
@@ -97,7 +98,7 @@ export async function handOver(
 			at: at(),
 			type: "said",
 			by: "agent",
-			fields: { text: chosen.announcement, origin: "announcement" },
+			fields: { text: announcement, origin: "announcement" },
 			messageIds: origin,
 			dedupeKey: `announcement:${run.id}:${run.revision}`,
 			deliveryKey: `announcement:${run.id}:${run.revision}`,
@@ -126,23 +127,19 @@ export async function handOver(
 				recordUtteranceInTransaction(deps, tx, {
 					conversationId: run.conversationId,
 					speaker: "agent",
-					text: chosen.announcement,
+					text: announcement,
 					// The words it was asked by: forgetting them takes the announcement out too.
 					messageId: run.inputMessageId,
 					at: deps.clock(),
 				});
 		});
-	// A spoken announcement is delivered before the work is handed over; one that failed hands nothing over.
+	// A spoken announcement is delivered before the session takes over; one that failed hands nothing over.
 	let heard: "full" | "partial" = "full";
 	if (
 		deps.externalOutput &&
 		store.read((tx) => deps.externalOutput!.owns(tx, run.id))
 	) {
-		heard = await deps.externalOutput.announce(
-			run,
-			chosen.announcement,
-			signal,
-		);
+		heard = await deps.externalOutput.announce(run, announcement, signal);
 	} else if (run.utteranceId) {
 		if (!deps.deliverAnnouncement)
 			throw new Error("announcement_delivery_unavailable");
@@ -155,9 +152,8 @@ export async function handOver(
 	}
 	signal.throwIfAborted();
 	await delivered(heard);
-	let committed: { handed: boolean; workId: string | null };
 	try {
-		committed = await store.write((tx) => {
+		await store.write((tx) => {
 			signal.throwIfAborted();
 			const run = current(tx);
 			if (
@@ -171,94 +167,31 @@ export async function handOver(
 				)
 			)
 				throw new HandoverRefused("diagnostic_evidence_changed");
-			const sources = chosen.confirmationId
-				? (deps.work!.confirmationInTransaction(tx, chosen.confirmationId)
-						?.messageIds ?? [])
-				: offerEvidence(x, tx, chosen.card);
+			const sources = offerEvidence(x, tx, chosen.card);
 			if (!sources) throw new HandoverRefused("toolchain_unavailable");
 			adoptHere(x, tx, run);
-			if (
-				chosen.confirmationId &&
-				!deps.work!.useConfirmationInTransaction(
-					tx,
-					chosen.confirmationId,
-					run.id,
-				)
-			)
-				throw new Error("confirmation_used");
-			const dispatched = dispatchInTransaction(deps, tx, {
-				jobId: x.jobId,
-				run,
-				card: chosen.card,
+			const started = startSpecialistSession(deps, tx, run, {
+				revisionId: chosen.card.revisionId,
 				request: chosen.request,
-				...(chosen.confirmationId
-					? { confirmationId: chosen.confirmationId }
-					: {}),
+				references: chosen.references ?? [],
 				...(chosen.target ? { target: chosen.target } : {}),
 				...(chosen.resolveUnsaved
 					? { resolveUnsaved: chosen.resolveUnsaved }
 					: {}),
-				...(chosen.inputs ? { inputs: chosen.inputs } : {}),
-				...(chosen.diagnosticRef
-					? { diagnosticRef: chosen.diagnosticRef }
-					: {}),
-				...(chosen.routedSteps ? { routedSteps: chosen.routedSteps } : {}),
-				references: chosen.references ?? [],
 			});
-			// A refused dispatch rolls everything of this step back; the model is told why.
-			if (!dispatched.ok) throw new HandoverRefused(dispatched.code);
-			acceptHere(x, tx, dispatched);
+			// A refused start rolls everything of this step back; the model is told why.
+			if (!started.ok) throw new HandoverRefused(started.code);
+			transition(tx, run.id, run.revision, "queued", deps.clock());
 			// The resources handed over were used now: they move to the top of the state's list.
-			for (const uri of chosen.refUris ?? []) {
-				const used = deps.resourceLedger?.byUriInTransaction(
-					tx,
-					run.conversationId,
-					uri,
-				);
-				if (used) deps.resourceLedger!.touchInTransaction(tx, used.id);
-			}
-			const work = dispatched.session
-				? null
-				: deps.work!.startInTransaction(tx, {
-						conversationId: run.conversationId,
-						runId: run.id,
-						card: chosen.card,
-						request: chosen.request,
-						...(chosen.words ? { title: chosen.words } : {}),
-						dedupeKey: actionKey(target),
-						messageIds: [...new Set([...origin, ...sources])],
-						...(dispatched.sourceRef
-							? { sourceRef: dispatched.sourceRef }
-							: {}),
-					}).row;
+			touchRefs(x, tx, run, chosen);
 			acted(tx, target, {
 				action: "delegate",
 				toolchain: chosen.card.id,
 				request: eventText(deps, chosen.request),
-				...(work ? { todo: work.id } : { session: true }),
+				session: true,
 			});
-			toolchains!.recordSelectionInTransaction(tx, {
-				runId: run.id,
-				conversationId: run.conversationId,
-				utteranceId: run.utteranceId ?? null,
-				requestId: run.requestId ?? null,
-				retrieval: x.state.search?.route.retrieval ?? "none",
-				candidates: (x.state.search?.route.cards ?? []).map((card) => ({
-					toolchainId: card.id,
-					revisionId: card.revisionId,
-					functionName: card.functionName,
-					...card.score,
-				})),
-				historyRefs:
-					x.state.search?.route.past.map((past) => past.selectionId) ?? [],
-				decision: "toolchain",
-				toolchainId: chosen.card.id,
-				toolchainRevisionId: chosen.card.revisionId,
-				functionName: chosen.card.functionName,
-				request: chosen.request,
-				...(x.state.search?.query ? { query: x.state.search.query } : {}),
-			});
-			// The announcement reached the user before this commit: the turn's calls join it here, with the work.
+			recordChoice(x, tx, run, chosen);
+			// The announcement reached the user before this commit: the turn's calls join it here.
 			saveLatestSearch(
 				tx,
 				run.id,
@@ -268,133 +201,175 @@ export async function handOver(
 			deps.conversation.input.attachToolCallsInTransaction(tx, {
 				conversationId: run.conversationId,
 				messageId: run.inputMessageId,
-				toolCalls: carriedToolCalls(
-					[
-						...x.state.exchange,
-						{
-							name: call.name,
-							arguments: call.call.arguments,
-							result: {
-								delegated: true,
-								...(work ? { todo: work.id } : {}),
-							},
-						},
-					],
-					deps.work!.refsInTransaction(tx, run.conversationId),
-				),
+				toolCalls: carriedToolCalls([
+					...x.state.exchange,
+					{
+						name: call.name,
+						arguments: call.call.arguments,
+						result: { delegated: true },
+					},
+				]),
 			});
-			return { handed: dispatched.handed, workId: work?.id ?? null };
 		});
 	} catch (error) {
 		if (error instanceof HandoverRefused)
 			return { result: { delegated: false, code: error.code } };
 		throw error;
 	}
-	x.state.handover = { announcement: chosen.announcement, ...committed };
-	return {
-		result: {
-			delegated: true,
-			...(committed.workId ? { todo: committed.workId } : {}),
-		},
-		end: true,
+	x.state.handover = { announcement };
+	return { result: { delegated: true }, end: true };
+}
+
+/** The resources handed over with a request were used now: they move to the top of the state's list. */
+function touchRefs(
+	x: ExecutorContext,
+	tx: Database,
+	run: { conversationId: string },
+	chosen: Request,
+) {
+	const { deps } = x;
+	for (const uri of chosen.refUris ?? []) {
+		const used = deps.resourceLedger?.byUriInTransaction(
+			tx,
+			run.conversationId,
+			uri,
+		);
+		if (used) deps.resourceLedger!.touchInTransaction(tx, used.id);
+	}
+}
+
+/** What `delegate` carries besides the request and its references: handed to the agent as the assignment's details. */
+function detailsOf(chosen: Request): AssignmentDetails | undefined {
+	const details: AssignmentDetails = {
+		...(chosen.inputs ? { inputs: chosen.inputs } : {}),
+		...(chosen.target ? { target: chosen.target } : {}),
+		...(chosen.diagnosticRef ? { diagnosticRef: chosen.diagnosticRef } : {}),
+		...(chosen.resolveUnsaved ? { resolveUnsaved: chosen.resolveUnsaved } : {}),
+		...(chosen.routedSteps ? { routedSteps: [...chosen.routedSteps] } : {}),
 	};
+	return Object.keys(details).length ? details : undefined;
 }
 
 /**
- * The saved item a request names, as the toolchain offers it now (the same choices a session starts from): its name,
- * or null when the toolchain offers no such item. A toolchain without saved items takes the request as it is.
+ * Hands the work to the agent as its assignment, as `start_preparation` hands a research: the agent holds it (its
+ * status, the assignee's question, its result as a note) and tells the user when it is done. No announcement and no
+ * confirmation: the reply says what it took from this tool's result.
  */
-function targetOf(
+async function assignTo(
 	x: ExecutorContext,
-	db: Database,
-	card: Request["card"],
-	target: string,
-): { label: string | null } | null {
-	const targets = sessionTargetsInTransaction(x.deps, db, card, x.input.runId);
-	if (!targets) return { label: null };
-	const found = targets.find((t) => t.ref === target);
-	return found ? { label: found.label } : null;
+	chosen: Request,
+): Promise<ToolOutcome> {
+	const { deps, current, acted, actionKey } = x;
+	const { store } = deps;
+	const title = chosen.card.title;
+	const prepared = store.read((db) => {
+		const run = current(db);
+		const source = executionSourceInTransaction(deps, db, run.id);
+		return source ? { run, source } : null;
+	});
+	if (!prepared) return { result: { delegated: false, code: "not_from_user" } };
+	const { conversationId, messageId, runId, request, digest } = prepared.source;
+	const details = detailsOf(chosen);
+	let assigned: string;
+	try {
+		assigned = await store.write((tx) => {
+			const run = current(tx);
+			touchRefs(x, tx, run, chosen);
+			recordChoice(x, tx, run, chosen);
+			// Last in the writer: the agent takes the item only when everything above holds.
+			const outcome = deps.agency!.assign!({
+				toolchainId: chosen.card.id,
+				revisionId: chosen.card.revisionId,
+				title,
+				request: chosen.request,
+				references: chosen.references ?? [],
+				source: { conversationId, messageId, runId, request, digest },
+				...(details ? { details } : {}),
+			});
+			if (outcome.status === "refused")
+				throw new AssignmentRefused(outcome.code, outcome.id);
+			acted(tx, actionKey(`delegate:${chosen.card.id}`), {
+				action: "delegate",
+				toolchain: chosen.card.id,
+				request: eventText(deps, chosen.request),
+				assignment: outcome.id,
+			});
+			return outcome.id;
+		});
+	} catch (error) {
+		// A duplicate names the assignment that does it already: the reply says so instead of asking again.
+		if (error instanceof AssignmentRefused)
+			return {
+				result: {
+					delegated: false,
+					code: error.code,
+					...(error.id ? { assignment: error.id } : {}),
+				},
+			};
+		throw error;
+	}
+	// The run's trace keeps this choice when the generation ends (it is not an answer without a hand-over).
+	x.state.assigned = { card: chosen.card, request: chosen.request };
+	return {
+		result: {
+			delegated: true,
+			assignment: assigned,
+			assignee: title,
+			next: "状態の assignments に出る。担当の質問はそこに出て、終わると作業報告のメモで届く（あなたから知らせる）",
+		},
+	};
 }
 
-/** A confirmation before a change (section 6.7): saved, never executed; the generation's speech states it. */
-export function confirm(
+class AssignmentRefused extends Error {
+	constructor(
+		readonly code: string,
+		readonly id?: string,
+	) {
+		super(code);
+	}
+}
+
+/** The choice of this toolchain among the candidates the search showed: the search learns from it. */
+function recordChoice(
 	x: ExecutorContext,
-	_call: ParsedCall,
-	chosen: Omit<Request, "announcement">,
-	impact: string,
-	revises?: number,
-): Promise<ToolOutcome> {
-	const { deps, current, acted, handle, origin } = x;
-	const { store } = deps;
-	return store.write((tx): ToolOutcome => {
-		const run = current(tx);
-		if (
-			chosen.diagnosticRef &&
-			!verifiedDiagnostic(
-				deps,
-				tx,
-				run.conversationId,
-				chosen.diagnosticRef,
-				run.id,
-			)
-		)
-			return {
-				result: { delegated: false, code: "diagnostic_evidence_changed" },
-			};
-		// The item is named as the toolchain offers it, so the open confirmations tell two on one request apart.
-		const target = chosen.target
-			? targetOf(x, tx, chosen.card, chosen.target)
-			: { label: null };
-		if (!target)
-			return { result: { delegated: false, code: "target_not_found" } };
-		const draft =
-			revises === undefined
-				? undefined
-				: currentRevisions(deps, tx, run.conversationId).find(
-						(d) => d.row.ref === revises,
-					);
-		if (revises !== undefined && !draft)
-			return { result: { delegated: false, code: "revision_not_open" } };
-		const sources = offerEvidence(x, tx, chosen.card);
-		if (!sources)
-			return { result: { delegated: false, code: "toolchain_unavailable" } };
-		const row = deps.work!.issueConfirmationInTransaction(
-			tx,
-			{
-				conversationId: run.conversationId,
-				toolchainId: chosen.card.id,
-				toolchainRevisionId: chosen.card.revisionId,
-				request: chosen.request,
-				inputs: chosen.diagnosticRef
-					? { ...chosen.inputs, diagnosticRef: chosen.diagnosticRef }
-					: (chosen.inputs ?? null),
-				target: chosen.target ?? null,
-				targetLabel: target.label,
-				resolveUnsaved: chosen.resolveUnsaved ?? null,
-				words: chosen.words ?? null,
-				impact,
-				statementDeliveryKey: `run:${run.id}`,
-			},
-			[...new Set([...origin, ...(draft?.row.messageIds ?? []), ...sources])],
-		);
-		if (draft) linkConfirmationRevision(tx, draft.row.id, row.id, deps.clock());
-		// The resources named with the request are handed over as they were when it is approved.
-		if (chosen.refUris?.length)
-			saveConfirmationRefs(tx, row.id, chosen.refUris);
-		handle(tx);
-		acted(tx, `confirm:${chosen.card.id}`, {
-			action: "confirm",
-			confirmation: row.id,
-			toolchain: chosen.card.id,
-			impact,
-		});
-		return {
-			result: { confirmation: `c${row.ref}` },
-			confirmationId: row.id,
-		};
+	tx: Database,
+	run: {
+		id: string;
+		conversationId: string;
+		utteranceId?: string | null;
+		requestId?: string | null;
+	},
+	chosen: Request,
+) {
+	x.deps.toolchains!.recordSelectionInTransaction(tx, {
+		runId: run.id,
+		conversationId: run.conversationId,
+		utteranceId: run.utteranceId ?? null,
+		requestId: run.requestId ?? null,
+		retrieval: x.state.search?.route.retrieval ?? "none",
+		candidates: (x.state.search?.route.cards ?? []).map((card) => ({
+			toolchainId: card.id,
+			revisionId: card.revisionId,
+			functionName: card.functionName,
+			...card.score,
+		})),
+		historyRefs:
+			x.state.search?.route.past.map((past) => past.selectionId) ?? [],
+		decision: "toolchain",
+		toolchainId: chosen.card.id,
+		toolchainRevisionId: chosen.card.revisionId,
+		functionName: chosen.card.functionName,
+		request: chosen.request,
+		...(x.state.search?.query ? { query: x.state.search.query } : {}),
 	});
 }
 
+/**
+ * One hand-over of work to a toolchain (the toolchain assignment design, section 2.4): an instant one answers at
+ * once, a session takes the conversation over after the host's announcement, and anything else is the agent's own
+ * assignment, with no confirmation. Without an agency that serves the conversation's replies there is no one to give
+ * the work to: `agency_unavailable`.
+ */
 export async function delegate(
 	x: ExecutorContext,
 	call: ParsedCall,
@@ -404,55 +379,11 @@ export async function delegate(
 ): Promise<ToolOutcome> {
 	const { deps, offered } = x;
 	const { store, toolchains } = deps;
-	if (!toolchains || !deps.work)
+	if (!toolchains)
 		return { result: { delegated: false, code: "toolchain_unavailable" } };
 	// A host-written prompt (a schedule, a notice) acts for no one present: it starts no work.
 	if (store.read((db) => isSystemPrompt(x.current(db).sourceKind)))
 		return { result: { delegated: false, code: "not_from_user" } };
-	if (args.mode === "approve") {
-		const approved = store.read((db) => approval(x, db, args.confirmation));
-		if (!approved.ok) {
-			// A confirmation whose item is gone can never be approved: it is closed, so a second yes asks nothing.
-			if (
-				approved.code === "target_not_found" ||
-				approved.code === "diagnostic_evidence_changed"
-			)
-				await store.write((tx) => {
-					const run = x.current(tx);
-					const closed = deps.work!.withdrawConfirmationInTransaction(
-						tx,
-						run.conversationId,
-						Number(args.confirmation.slice(1)),
-					);
-					if (closed) x.handle(tx);
-				});
-			return { result: { delegated: false, code: approved.code } };
-		}
-		if (!args.announcement)
-			throw toolRejection("announcement_required", [
-				{
-					tool: TOOL_NAMES.delegate,
-					path: "announcement",
-					reason: "announcement_required",
-				},
-			]);
-		// The resources named when it was issued must still be there (held in the ledger and at their owner).
-		const refs = approved.request.refUris ?? [];
-		const references = await referencesOfUris(
-			deps,
-			x.input.conversationId,
-			refs,
-			signal,
-		);
-		if (!references)
-			return { result: { delegated: false, code: "resource_unavailable" } };
-		return handOver(
-			x,
-			call,
-			{ ...approved.request, references, announcement: args.announcement },
-			signal,
-		);
-	}
 	const card = offered.get(args.toolchain);
 	if (!card)
 		throw toolRejection("toolchain_not_offered", [
@@ -464,8 +395,7 @@ export async function delegate(
 		]);
 	if (!store.read((db) => offerEvidence(x, db, card)))
 		return { result: { delegated: false, code: "toolchain_unavailable" } };
-	if (card.instant && args.mode === "execute")
-		return instant(x, call, card, args.inputs, signal);
+	if (card.instant) return instant(x, call, card, args.inputs, signal);
 	// The request text is what the toolchain works from; an instant one needed only its inputs.
 	const request = args.request;
 	if (!request) throw requestRequired();
@@ -480,7 +410,7 @@ export async function delegate(
 		args.refs,
 		signal,
 	);
-	const chosen = {
+	const chosen: Request = {
 		card,
 		request,
 		...(routedSteps ? { routedSteps } : {}),
@@ -489,120 +419,14 @@ export async function delegate(
 		...(args.diagnosticRef ? { diagnosticRef: args.diagnosticRef } : {}),
 		...(args.target ? { target: args.target } : {}),
 		...(args.resolveUnsaved ? { resolveUnsaved: args.resolveUnsaved } : {}),
-		...(args.words ? { words: args.words } : {}),
 	};
-	// A call without `impact` (a local model often leaves it out) is not refused: a request on a saved target is
-	// taken as changing it, anything else as no change of its own (the review fixes design, D7).
-	const declared = args.impact ?? (args.target ? "modify_existing" : "none");
-	// The toolchain's declared least impact raises the conversation's estimate, never lowers it (section 6.7).
-	const impact =
-		IMPACT_ORDER[
-			Math.max(
-				IMPACT_ORDER.indexOf(declared),
-				card.minImpact ? IMPACT_ORDER.indexOf(card.minImpact) : 0,
-			)
-		]!;
-	const needsConfirmation =
-		impact === "modify_existing" || impact === "irreversible";
-	if (args.mode === "confirm")
-		return confirm(x, call, chosen, impact, args.revises);
-	if (needsConfirmation)
-		throw toolRejection("confirmation_required", [
-			{
-				tool: TOOL_NAMES.delegate,
-				path: "mode",
-				reason: "confirmation_required",
-			},
-		]);
-	if (!args.announcement)
-		throw toolRejection("announcement_required", [
-			{
-				tool: TOOL_NAMES.delegate,
-				path: "announcement",
-				reason: "announcement_required",
-			},
-		]);
-	return handOver(
-		x,
-		call,
-		{ ...chosen, announcement: args.announcement },
-		signal,
-	);
-}
-
-/** The structural checks of an approval (section 6.7): the host executes the saved request as it is. */
-export function approval(
-	x: ExecutorContext,
-	db: Database,
-	confirmationId: string,
-):
-	| { ok: true; request: Omit<Request, "announcement"> }
-	| { ok: false; code: string } {
-	const { deps, input, events } = x;
-	const { clock, toolchains } = deps;
-	// The model names the confirmation by its number (`c<ref>`, the layout specification's section 6).
-	const ref = /^c(\d+)$/.exec(confirmationId);
-	const row = ref
-		? deps.work!.confirmationByRefInTransaction(
-				db,
-				input.conversationId,
-				Number(ref[1]),
-			)
-		: null;
-	if (!row) return { ok: false, code: "confirmation_not_found" };
-	if (row.usedAt) return { ok: false, code: "confirmation_used" };
-	if (row.supersededAt) return { ok: false, code: "confirmation_superseded" };
-	if (Date.parse(row.expiresAt) <= Date.parse(clock()))
-		return { ok: false, code: "confirmation_expired" };
-	if (input.final.kind !== "utterances")
-		return { ok: false, code: "approval_missing" };
-	const statement = deps.work!.confirmationStatementInTransaction(db, row);
-	const pending = events.pendingInTransaction(db, input.conversationId);
-	if (
-		!statement ||
-		!pending.some(
-			(event) =>
-				event.seq > statement.seq &&
-				input.final.kind === "utterances" &&
-				input.final.seqs.includes(event.seq),
-		)
-	)
-		return { ok: false, code: "approval_before_statement" };
-	const heard = events.heardInTransaction(
-		db,
-		input.conversationId,
-		statement.id,
-	);
-	const enough =
-		row.impact === "irreversible"
-			? heard === "full"
-			: heard === "full" || heard === "partial";
-	if (!enough) return { ok: false, code: "confirmation_not_heard" };
-	const card = toolchains!.cardInTransaction(db, row.toolchainRevisionId);
-	if (!card) return { ok: false, code: "toolchain_unavailable" };
-	const { diagnosticRef: evidence, ...inputs } = row.inputs ?? {};
-	if (
-		evidence !== undefined &&
-		(card.id !== REPAIR_TOOLCHAIN ||
-			typeof evidence !== "string" ||
-			!verifiedDiagnostic(deps, db, input.conversationId, evidence))
-	)
-		return { ok: false, code: "diagnostic_evidence_changed" };
-	// The item must still be there before the approval is announced (its hand-over would be refused after it).
-	if (row.target && !targetOf(x, db, card, row.target))
-		return { ok: false, code: "target_not_found" };
-	return {
-		ok: true,
-		request: {
-			card,
-			request: row.request,
-			...(row.inputs ? { inputs } : {}),
-			...(typeof evidence === "string" ? { diagnosticRef: evidence } : {}),
-			...(row.target ? { target: row.target } : {}),
-			...(row.resolveUnsaved ? { resolveUnsaved: row.resolveUnsaved } : {}),
-			...(row.words ? { words: row.words } : {}),
-			confirmationId: row.id,
-			refUris: confirmationResourceUris(db, row.id),
-		},
-	};
+	if (card.execution === "session") return handOver(x, call, chosen, signal);
+	const served =
+		!!deps.agency?.assign &&
+		store.read((db) =>
+			deps.agency!.servesRepliesInTransaction?.(db, x.input.conversationId),
+		);
+	if (!served)
+		return { result: { delegated: false, code: "agency_unavailable" } };
+	return assignTo(x, chosen);
 }

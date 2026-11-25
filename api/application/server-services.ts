@@ -167,6 +167,8 @@ function buildServerAgency(
 				resources: resources.access.registry,
 				producesInTransaction: resources.dialogue.producesInTransaction,
 				execution: ports.execution,
+				// A stopped assignment's queued jobs are aborted at once (a LARM request is cancelled there).
+				queue: core.queue,
 			},
 			...liveBridge.agency,
 			steering,
@@ -302,7 +304,6 @@ export async function buildServices(
 		core,
 		agents: toolchain.agents,
 		capabilities: toolchain.capabilities,
-		dialogue: () => dialogue,
 	});
 	const resources = buildResources({
 		store,
@@ -417,7 +418,6 @@ export async function buildServices(
 	const { voice, liveVoice, prewarm } = liveBridge.attach({
 		...core,
 		conversation,
-		continuity,
 		dialogue,
 		memory,
 		agency: agency.dialoguePort,

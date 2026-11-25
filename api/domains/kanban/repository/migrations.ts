@@ -195,4 +195,45 @@ SELECT workspace_ref,owner_ref,executor_id,epoch,state,'exclusive' FROM kanban_w
 DROP TABLE kanban_workspace_guards_legacy;
 `,
 	},
+	{
+		id: "kanban/0007-run-origin-execution",
+		after: ["kanban/0006-workspace-holders"],
+		// Widens the origin CHECK of kanban_runs to include 'execution'. kanban_run_git_grants
+		// references kanban_runs(id) and the runner keeps foreign_keys=ON inside the transaction,
+		// so the child is set aside, rebuilt after the parent, and its rows put back.
+		sql: `
+CREATE TABLE kanban_runs_next (
+ seq INTEGER PRIMARY KEY AUTOINCREMENT,
+ id TEXT NOT NULL UNIQUE, card_id TEXT NOT NULL,
+ executor_id TEXT NOT NULL, executor_revision INTEGER NOT NULL,
+ workspace_ref TEXT NOT NULL, session_ref TEXT,
+ kind TEXT NOT NULL CHECK(kind IN ('task','followup','commit_push','commit','push')),
+ state TEXT NOT NULL CHECK(state IN ('queued','dispatched','running','waiting','settling','stopping','completed','blocked','cancelled','unknown')),
+ reason TEXT, card_revision INTEGER NOT NULL, title TEXT NOT NULL, prompt TEXT NOT NULL,
+ body TEXT NOT NULL, claude_session_id TEXT NOT NULL, project_id TEXT NOT NULL,
+ origin TEXT NOT NULL CHECK(origin IN ('board','conversation','execution')), conversation_id TEXT,
+ stop_requested INTEGER NOT NULL DEFAULT 0,
+ execution_stopped INTEGER NOT NULL DEFAULT 0,
+ attempt_ref TEXT,
+ created_at INTEGER NOT NULL, handed_at INTEGER, finished_at INTEGER
+);
+INSERT INTO kanban_runs_next(seq,id,card_id,executor_id,executor_revision,workspace_ref,session_ref,
+ kind,state,reason,card_revision,title,prompt,body,claude_session_id,project_id,origin,conversation_id,
+ stop_requested,execution_stopped,attempt_ref,created_at,handed_at,finished_at)
+SELECT seq,id,card_id,executor_id,executor_revision,workspace_ref,session_ref,
+ kind,state,reason,card_revision,title,prompt,body,claude_session_id,project_id,origin,conversation_id,
+ stop_requested,execution_stopped,attempt_ref,created_at,handed_at,finished_at FROM kanban_runs;
+DELETE FROM sqlite_sequence WHERE name='kanban_runs_next';
+INSERT INTO sqlite_sequence(name,seq) SELECT 'kanban_runs_next',seq FROM sqlite_sequence WHERE name='kanban_runs';
+CREATE TABLE kanban_run_git_grants_keep AS SELECT run_id,grant_json FROM kanban_run_git_grants;
+DROP TABLE kanban_run_git_grants;
+DROP TABLE kanban_runs;
+ALTER TABLE kanban_runs_next RENAME TO kanban_runs;
+CREATE INDEX kanban_runs_state ON kanban_runs(executor_id,state,seq);
+CREATE INDEX kanban_runs_card ON kanban_runs(card_id,seq);
+CREATE TABLE kanban_run_git_grants(run_id TEXT PRIMARY KEY REFERENCES kanban_runs(id),grant_json TEXT NOT NULL);
+INSERT INTO kanban_run_git_grants(run_id,grant_json) SELECT run_id,grant_json FROM kanban_run_git_grants_keep;
+DROP TABLE kanban_run_git_grants_keep;
+`,
+	},
 ];

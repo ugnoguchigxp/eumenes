@@ -114,7 +114,6 @@ export function synthMain(fault: Fault = {}): RunEvidence {
 			atMs: T0 + t * 1000,
 			serverNowMs: T0 + SERVER_OFFSET + t * 1000,
 			timers,
-			interactions: null,
 		});
 		if (t >= 4 && t % 3 === 0) {
 			const m = mainTimer(t, duration, !!fault.driftWhilePaused);

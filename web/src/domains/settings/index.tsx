@@ -293,8 +293,11 @@ function useGeneralChange(client: EumenesClient, failure: string) {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const value = query.data;
-	async function save(change: (general: Settings["general"]) => void) {
-		if (!value || busy) return;
+	/** False when nothing was saved (not loaded, another save in flight, or a failure). */
+	async function save(
+		change: (general: Settings["general"]) => void,
+	): Promise<boolean> {
+		if (!value || busy) return false;
 		setBusy(true);
 		setError(null);
 		try {
@@ -307,11 +310,13 @@ function useGeneralChange(client: EumenesClient, failure: string) {
 				keys: [],
 			});
 			cache.setQueryData([queryRoots.settings, client.identity], saved);
+			return true;
 		} catch {
 			setError(failure);
 			void cache.invalidateQueries({
 				queryKey: [queryRoots.settings, client.identity],
 			});
+			return false;
 		} finally {
 			setBusy(false);
 		}
@@ -335,13 +340,14 @@ export function useBackground(client: EumenesClient) {
 	return { ready: !!general, selected, busy, error, select };
 }
 
-/** The saved image behind the Live2D model: chosen from the image library, kept in the settings. */
+/** The Live2D drawing area's saved image (from the image library) and colour, kept in the settings. */
 export function useAvatarBackdrop(client: EumenesClient) {
 	const { general, busy, error, save } = useGeneralChange(
 		client,
-		"背景の画像を保存できませんでした",
+		"背景を保存できませんでした",
 	);
 	const imageId = general?.avatarBackdropImageId ?? null;
+	const color = general?.avatarBackgroundColor ?? null;
 	/** null removes the image. */
 	async function select(id: string | null) {
 		if (id === imageId) return;
@@ -349,7 +355,32 @@ export function useAvatarBackdrop(client: EumenesClient) {
 			next.avatarBackdropImageId = id;
 		});
 	}
-	return { ready: !!general, imageId, busy, error, select };
+	/** null returns to the built-in gradient. */
+	async function selectColor(next: string | null) {
+		if (next === color) return true;
+		return save((general) => {
+			if (next === null) delete general.avatarBackgroundColor;
+			else general.avatarBackgroundColor = next;
+		});
+	}
+	/** Removes the image and the colour in one save. */
+	async function reset() {
+		if (imageId === null && color === null) return;
+		await save((general) => {
+			general.avatarBackdropImageId = null;
+			delete general.avatarBackgroundColor;
+		});
+	}
+	return {
+		ready: !!general,
+		imageId,
+		color,
+		busy,
+		error,
+		select,
+		selectColor,
+		reset,
+	};
 }
 
 export { notificationSoundWav, completionVoiceWav } from "./notification-sound";

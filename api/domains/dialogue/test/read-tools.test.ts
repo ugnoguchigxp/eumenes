@@ -347,7 +347,6 @@ test("a tool the talk turn was not offered is refused and never run; its next ca
 	);
 	const run = await h.say("絵を描いて");
 	expect(toolResult(h.state.calls.at(-1)!)).toContain("refused: true");
-	expect(h.state.images.size).toBe(0);
 	expect(h.dialogue.answerText(run.id)).toBe("それはできません。");
 });
 
@@ -420,9 +419,6 @@ test("the sub-agents' work and World's records are told as records; nothing foun
 				"memory",
 				"find_toolchain",
 				"delegate",
-				"approve_confirmation",
-				"decline_confirmation",
-				"work",
 				"discard_for_pending_switch",
 			)
 			.filter((name) => name !== "read_memory"),

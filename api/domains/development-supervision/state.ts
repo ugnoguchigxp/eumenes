@@ -60,6 +60,7 @@ export type Parent = {
 	revision: number;
 	source: SupervisionSource;
 	goalScope?: SupervisionScope;
+	/** Left on parents saved before the TODO ledger was retired: such a parent no longer has a current source. */
 	confirmation?: { id: string; request: string; digest: string };
 	request: string;
 	workspace: SupervisionWorkspace;

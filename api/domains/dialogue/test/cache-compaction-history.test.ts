@@ -7,6 +7,7 @@ import {
 } from "../service/conversation-input";
 import { conversationHarness } from "../service/harness";
 import {
+	agencyOf,
 	choice,
 	IMAGE,
 	reply,
@@ -177,14 +178,13 @@ test("hard limit cut promotes a valid staged summary in 0ms and renders `## Summ
 
 test("hard limit without staged summary installs mechanical fallback and 30-minute gap clears it", async () => {
 	let nowMs = Date.now();
-	h = await setup();
+	h = await setup({ agency: agencyOf().agency });
 	h.state.steps.push(
 		choice({ choice: IMAGE.id }),
 		...reply("了解です。"),
 		...reply("次へ進みます。"),
 	);
-	const w = await h.say("夕暮れの海辺イラストを描いて", "queued");
-	await h.finishImage(w.id, { state: "completed", title: "海辺" });
+	await h.say("夕暮れの海辺イラストを描いて");
 	nowMs += 60_000;
 	await h.say("ありがとう");
 	nowMs += 60_000;
@@ -252,45 +252,6 @@ test("hard limit without staged summary installs mechanical fallback and 30-minu
 			h!.conversation.input.activeSummaryInTransaction!(db, "main"),
 		),
 	).toBeNull();
-});
-
-test("read_agents finds archived dialogue_work by query/toolchain and excludes forgotten work", async () => {
-	const agents = { list: () => [], report: () => null };
-	h = await setup({ memory: true, agents });
-	h.state.steps.push(choice({ choice: IMAGE.id }));
-	const w1 = await h.say("七里ヶ浜の夕暮れカフェの水彩画を描いて", "queued");
-	await h.finishImage(w1.id, { state: "completed", title: "七里ヶ浜カフェ" });
-
-	h.state.steps.push(choice({ choice: IMAGE.id }));
-	const w2 = await h.say("秘密の暗号メモを画像にして", "queued");
-	await h.finishImage(w2.id, { state: "completed", title: "秘密画像" });
-
-	// Forget w2 before querying read_agents.
-	await h.memory!.forget({
-		conversationId: "main",
-		messageIds: [w2.inputMessageId],
-		itemIds: [],
-	});
-
-	h.state.steps.push(
-		choice({ choice: "none" }),
-		{
-			calls: [
-				{
-					name: "read_agents",
-					args: { count: 5, query: "七里ヶ浜 水彩画", toolchain: IMAGE.id },
-				},
-			],
-		},
-		{ text: "七里ヶ浜の水彩画の依頼を確認しました。" },
-	);
-	await h.say("前に頼んだ七里ヶ浜の画像依頼の条件を教えて");
-	const toolMsg = [...h.state.calls.at(-1)!.messages]
-		.reverse()
-		.find((m) => (m.role as string) === "tool")!;
-	expect(toolMsg.content).toContain("t1");
-	expect(toolMsg.content).toContain("七里ヶ浜の夕暮れカフェの水彩画を描いて");
-	expect(toolMsg.content).not.toContain("秘密");
 });
 
 test("read_history supports NFKC normalization, multi-token AND, partial fallback, and tool call tags", async () => {

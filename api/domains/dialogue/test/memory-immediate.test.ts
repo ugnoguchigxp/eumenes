@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { testConversationAgent } from "./conversation-agent.fixture";
 import {
+	agencyWith,
 	choice,
 	reply,
 	sectionLines,
@@ -486,12 +487,11 @@ test("a forget by reference tells the agency what was excluded in the same trans
 	h = await setup({
 		memory: true,
 		conversationAgent: { ...testConversationAgent, handsWork: () => false },
-		agency: {
-			workChangedInTransaction() {},
+		agency: agencyWith({
 			memoryExcludedInTransaction: (_db, input) => {
 				excluded.push(input);
 			},
-		},
+		}),
 	});
 	const { saved, first } = await shownFact();
 	h!.state.steps.push(

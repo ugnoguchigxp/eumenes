@@ -6,7 +6,10 @@ import type { DialogueDeps } from "./context";
 import { readyCatalog } from "./delegate-conversation";
 import { TOOL_NAMES } from "./generation-tools";
 
-import type { MessageVersion as Source } from "../repository/confirmation-revisions";
+import { lineText } from "./input-text";
+
+/** A user message as it was when a search answered it: its id and the revision of its text. */
+type Source = { id: string; revision: string };
 export type ConversationOffer = {
 	card: ToolchainCard;
 	replyId: string;
@@ -28,7 +31,7 @@ export function offerSources(
 	return versions.length === ids.length ? versions : [];
 }
 
-export function currentSources(
+function currentSources(
 	deps: DialogueDeps,
 	db: Database,
 	conversationId: string,
@@ -155,4 +158,38 @@ export function conversationOffers(
 			? [{ card, replyId: messageId, sources: evidence }]
 			: [];
 	});
+}
+
+/** The callable list as `## State` shows it, and the messages it stands on; prepared from the same snapshot. */
+export function offerContext(
+	deps: DialogueDeps,
+	tx: Database,
+	conversationId: string,
+	stateLines: string[],
+) {
+	const offers = conversationOffers(deps, tx, conversationId);
+	if (offers.length) {
+		stateLines.push("検索済みの担当候補:");
+		const seen = new Set<string>();
+		for (const offer of offers) {
+			const userSources = offer.sources
+				.filter((source) => !seen.has(source.id))
+				.flatMap((source) => {
+					seen.add(source.id);
+					const m = deps.conversation.messageInTransaction(
+						tx,
+						source.id,
+					)?.message;
+					return m?.role === "user" ? [lineText(m.text).slice(0, 300)] : [];
+				});
+			if (userSources.length)
+				stateLines.push(`検索時の利用者の発言 ${JSON.stringify(userSources)}`);
+			const { id, title, summary } = offer.card;
+			stateLines.push(JSON.stringify({ id, title, summary }));
+		}
+	}
+	return {
+		offers,
+		sources: offers.flatMap((o) => [o.replyId, ...o.sources.map((s) => s.id)]),
+	};
 }

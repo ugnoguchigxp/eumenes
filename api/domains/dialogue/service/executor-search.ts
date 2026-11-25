@@ -178,8 +178,12 @@ export function answered(
 	"runId"
 > {
 	const { input } = x;
-	// An instant toolchain's answer, or a read the search offered, is that one's decision with its inputs.
-	const chosen = x.state.instant ?? x.state.read;
+	// An instant toolchain's answer, a read the search offered, or the work handed to the agent as its assignment
+	// is that one's decision with its request.
+	const used = x.state.instant ?? x.state.read;
+	const chosen = used
+		? { card: used.card, request: JSON.stringify(used.inputs) }
+		: x.state.assigned;
 	return {
 		conversationId: input.conversationId,
 		retrieval: x.state.search?.route.retrieval ?? "none",
@@ -197,7 +201,7 @@ export function answered(
 					toolchainId: chosen.card.id,
 					toolchainRevisionId: chosen.card.revisionId,
 					functionName: chosen.card.functionName,
-					request: JSON.stringify(chosen.inputs),
+					request: chosen.request,
 				}
 			: { decision: refused ? ("rejected" as const) : ("answer" as const) }),
 		...(x.state.search?.query ? { query: x.state.search.query } : {}),

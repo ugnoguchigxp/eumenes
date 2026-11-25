@@ -74,18 +74,20 @@ test("a memory saved after the profile was drawn waits until a cut draws `## Mem
 	expect(memoryOf(calls[8]!).join("\n")).toContain("辛い物が好き");
 });
 
-test("the delegation's TODO is a line of the state, and a notice is the host notice of its generation", async () => {
+test("a notice of the finished work and a timer are the host notice of their own generation", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
-	// The work is read by the choice calls of a generation of utterances (`routed.state`); a notice only talks.
-	const todos = (call: TrajectoryCall) =>
-		sectionLines(call.input.routed?.state ?? "", "State").filter((line) =>
-			/^- t\d+ /.test(line),
-		);
-	expect(todos(calls[4]!)).toEqual([]);
+	// The work is the agent's own assignment: the state has no line of it, and a notice only talks.
+	for (const call of calls)
+		expect(
+			sectionLines(call.input.routed?.state ?? "", "State").filter((line) =>
+				/^- t\d+ /.test(line),
+			),
+		).toEqual([]);
 	expect(calls[5]!.input.final).toEqual({ kind: "fixed" });
 	expect(calls[5]!.input.routed).toBeUndefined();
-	expect(todos(calls[6]!)).toEqual([
-		"- t1 旅行先のイメージ画像を作る 通知済み",
+	expect(sectionOf(calls[5]!, "Host notice")).toEqual([
+		"- kind: notice",
+		"- text: 頼まれた画像ができました",
 	]);
 	expect(calls[7]!.input.final).toEqual({ kind: "fixed" });
 	expect(sectionOf(calls[7]!, "Host notice")).toEqual([

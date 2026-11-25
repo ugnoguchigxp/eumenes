@@ -1,70 +1,83 @@
 import type { Database } from "bun:sqlite";
 import { emotionName, type InputContext } from "eumenes-agency";
-import { RESEARCH_TTL_MS, type AgendaTicket } from "eumenes-agency/agenda";
-import type { AgendaNote } from "../../domains/dialogue";
-import { referencedInput } from "./input";
+import {
+	RESEARCH_RETRY_MS,
+	RESEARCH_TTL_MS,
+	type AgendaTicket,
+} from "eumenes-agency/agenda";
+import type { AgendaNote, AgendaResearchTicket } from "../../domains/dialogue";
+import { currentInput, referencedInput } from "./input";
 import { persistSpeech } from "./speech";
 import {
 	citableNotes,
 	noteRef,
-	shownMemory,
+	seenRefs,
 	type AgendaScope,
 } from "./always-on-scope";
-import { toErrorCode } from "../../infrastructure/error-code";
+import {
+	isTransientStoreError,
+	toErrorCode,
+} from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
 import type { AgencyHostDeps } from "./host-types";
+import { prepareResearch } from "./research-admission";
+
+export { researchRevision } from "./research-admission";
 
 const log = getLogger("agency");
 
 export const workRoot = (c: AgendaScope, ticketId: string) =>
 	`agency:${c.scope}:${ticketId}`;
 
-/** Refusals that will not pass by waiting: the research fails (and the user is told), it is not asked again. */
-const PERMANENT =
-	/^(agency_approval_required|agency_action_budget|agency_capability_unavailable|agency_research_unavailable|agency_execution_unavailable|agency_no_research_capability)$/u;
+const RESEARCH_REFUSALS_KEPT = 100;
+const RETRYABLE = new Set([
+	"agency_checkpoint_stale",
+	"agency_dispatch_interval",
+]);
+const START_REFUSALS = new Set([
+	"agency_approval_required",
+	"agency_action_budget",
+	"agency_capability_unavailable",
+	"agency_research_unavailable",
+	"agency_execution_unavailable",
+	"agency_origin_stale",
+	"agency_reference_stale",
+	"request_conflict",
+]);
 
 type ResearchTicket = Extract<AgendaTicket, { kind: "research" }>;
+
+/** How long work the user asked a toolchain for may run: the longest a toolchain's own run is allowed (two hours). */
+export const ASSIGNMENT_TTL_MS = 2 * 60 * 60 * 1000;
 type SpeakTicket = Extract<AgendaTicket, { kind: "speak" }>;
-
-/**
- * The capability a research runs on: the web note toolchain (Codex's own web search), never another one. Without it
- * the research cannot be done (the user's request is not handed to an unrelated capability).
- */
-export function researchRevision(
-	deps: AgencyHostDeps,
-	catalog: ReadonlyArray<{
-		revisionId: string;
-		requiresApproval: boolean;
-		effect?: string | null;
-	}>,
-): string | undefined {
-	if (deps.researchRevision) return deps.researchRevision(catalog);
-	return catalog.find(
-		(card) =>
-			!card.requiresApproval &&
-			card.revisionId.startsWith("toolchain:web.note@"),
-	)?.revisionId;
-}
-
-/** What the model calls of the agent saw: the user's recent words and the memory its calls were given lately. */
-export function seenRefs(
-	deps: AgencyHostDeps,
-	c: AgendaScope,
-	now: number,
-): string[] {
-	return [
-		...c.agent
-			.view()
-			.said.filter((s) => s.who === "user")
-			.map((s) => s.id),
-		...shownMemory(deps, c, now),
-	];
-}
 
 export type ResearchOutcome =
 	| { status: "started" }
-	| { status: "refused" }
-	| { status: "failed"; code: string };
+	| { status: "retry"; code: string }
+	| { status: "failed"; code: string; refusal?: "recorded" | "repeated" };
+
+function researchReceipt(deps: AgencyHostDeps, c: AgendaScope, id: string) {
+	try {
+		return deps.store.read((db) =>
+			deps.state!.workReceiptInTransaction(db, workRoot(c, id)),
+		);
+	} catch {
+		return "unknown";
+	}
+}
+
+function markResearchAccepted(
+	c: AgendaScope,
+	held: AgendaResearchTicket,
+	ticket: ResearchTicket,
+	now: number,
+): ResearchOutcome {
+	delete held.pendingAdmission;
+	held.agentTicketId = ticket.id;
+	c.agent.researchStarted(ticket.id, true, now);
+	c.revision++;
+	return { status: "started" };
+}
 
 /**
  * Hands one research ticket of the agent to the toolchain: the ticket is saved with the checkpoint first (it is
@@ -83,8 +96,6 @@ export async function startResearch(input: {
 	const { deps, c, ticket } = input;
 	if (!deps.state)
 		return { status: "failed", code: "agency_research_unavailable" };
-	if (ticket.delegatedTo)
-		return { status: "failed", code: "agency_capability_unavailable" };
 	const finished = c.finished.get(ticket.itemId);
 	if (finished) {
 		c.finished.delete(ticket.itemId);
@@ -98,36 +109,71 @@ export async function startResearch(input: {
 		c.revision++;
 		return { status: "started" };
 	}
+	// Work the user asked a toolchain for: what it needs to start was kept when the user asked (`delegate`).
+	const assignment = ticket.delegatedTo
+		? c.assignments.get(ticket.itemId)
+		: undefined;
 	const taken = c.tickets.find((t) => t.itemId === ticket.itemId);
-	if (taken) {
-		const active = deps.store.read((db) =>
-			deps.state!.workActiveInTransaction(db, workRoot(c, taken.id)),
-		);
-		if (active) {
-			taken.agentTicketId = ticket.id;
-			c.agent.researchStarted(ticket.id, true, input.now());
-			c.revision++;
-			return { status: "started" };
-		}
-		c.tickets = c.tickets.filter((t) => t !== taken);
-	}
-	const prepared = deps.store.read((db) => {
-		const revisionId = researchRevision(
+	const deadline =
+		(taken?.at ?? ticket.at) +
+		(assignment ? ASSIGNMENT_TTL_MS : RESEARCH_TTL_MS);
+	const receipt = taken ? researchReceipt(deps, c, taken.id) : "missing";
+	if (taken && receipt === "accepted")
+		return markResearchAccepted(c, taken, ticket, input.now());
+	if (receipt === "unknown" && input.now() + RESEARCH_RETRY_MS < deadline)
+		return { status: "retry", code: "agency_research_receipt_unavailable" };
+	const item = c.agent
+		.view()
+		.items.find((candidate) => candidate.id === ticket.itemId);
+	const prepared = deps.store.read((db) =>
+		prepareResearch(
 			deps,
-			deps.state!.catalogInTransaction(db),
-		);
-		return {
-			revisionId,
-			context: referencedInput(deps, db, citableNotes(c), [
-				...ticket.refs,
-				...seenRefs(deps, c, input.now()),
-			]),
-		};
-	});
+			db,
+			citableNotes(c),
+			{ ...ticket, text: item?.text ?? ticket.text },
+			seenRefs(deps, c, input.now()),
+			assignment?.revisionId,
+		),
+	);
+	const discard = (held: AgendaResearchTicket | undefined) => {
+		if (!held) return;
+		c.tickets = c.tickets.filter((t) => t !== held);
+		c.revision++;
+	};
+	const fail = (code: string, held = taken): ResearchOutcome => {
+		discard(held);
+		c.researchRefusals.set(prepared.key, {
+			key: prepared.key,
+			code,
+			sources: prepared.context.complete ? prepared.context.sources : [],
+		});
+		while (c.researchRefusals.size > RESEARCH_REFUSALS_KEPT)
+			c.researchRefusals.delete(c.researchRefusals.keys().next().value!);
+		return { status: "failed", code, refusal: "recorded" };
+	};
+	const previous = c.researchRefusals.get(prepared.key);
+	if (previous) {
+		discard(taken);
+		return { status: "failed", code: previous.code, refusal: "repeated" };
+	}
+	if (receipt === "unknown") return fail("agency_research_receipt_unavailable");
+	if (taken && (receipt === "closed" || !taken.pendingAdmission))
+		return fail("agency_origin_stale");
+	if (ticket.delegatedTo && !assignment)
+		return fail("agency_capability_unavailable");
 	if (!prepared.revisionId)
-		return { status: "failed", code: "agency_no_research_capability" };
-	if (!prepared.context.complete) return { status: "refused" };
-	const held = {
+		return fail(
+			assignment
+				? "agency_capability_unavailable"
+				: "agency_no_research_capability",
+		);
+	if (prepared.reason) return fail(prepared.reason);
+	if (input.now() >= deadline) return fail("agency_research_admission_expired");
+	if (taken && taken.revisionId !== prepared.revisionId) {
+		discard(taken);
+		return { status: "failed", code: "agency_capability_unavailable" };
+	}
+	const held: AgendaResearchTicket = taken ?? {
 		id: ticket.id,
 		itemId: ticket.itemId,
 		agentTicketId: ticket.id,
@@ -136,8 +182,19 @@ export async function startResearch(input: {
 		at: ticket.at,
 		refs: [...ticket.refs],
 		inputs: [...prepared.context.sources],
+		pendingAdmission: true,
+		...(assignment
+			? {
+					assignment: true as const,
+					references: structuredClone(assignment.references),
+					...(assignment.details
+						? { details: structuredClone(assignment.details) }
+						: {}),
+				}
+			: {}),
 	};
-	c.tickets.push(held);
+	if (!taken) c.tickets.push(held);
+	held.agentTicketId = ticket.id;
 	c.revision++;
 	try {
 		// Another change of the conversation may move the checkpoint meanwhile: save again, at once.
@@ -146,29 +203,55 @@ export async function startResearch(input: {
 			saved = await input.save();
 		if (!saved) throw new Error("agency_checkpoint_stale");
 		await deps.store.write((db) => {
-			if (!input.current(db)) throw new Error("agency_origin_stale");
+			if (!input.current(db) || !c.tickets.includes(held))
+				throw new Error("agency_origin_stale");
+			if (!currentInput(deps, db, { sources: held.inputs, complete: true }))
+				throw new Error("agency_reference_stale");
 			deps.state!.startInTransaction(db, {
-				rootId: workRoot(c, ticket.id),
+				rootId: workRoot(c, held.id),
 				conversationId: c.id,
 				epoch: c.epoch,
-				ticketId: ticket.id,
+				ticketId: held.id,
 				revisionId: held.revisionId,
-				question: ticket.text,
-				// The agent stops waiting for research after this; the work does not outlive it.
-				deadline: ticket.at + RESEARCH_TTL_MS,
+				question: held.question,
+				// The agent stops waiting for research after this; the work does not outlive it. An assignment runs as
+				// long as its toolchain allows (the owner ends it and reports the end).
+				deadline,
+				...(assignment
+					? {
+							assignment: true,
+							references: held.references ?? [],
+							source: assignment.source,
+							...(held.details ? { details: held.details } : {}),
+						}
+					: {}),
 				sourceRefs: held.inputs,
 				// Pacing is the agent's rule; the ledger only fences the epoch (budgets stay in the actions).
 				outboundIntervalMs: 0,
 			});
 		});
-		return { status: "started" };
+		return markResearchAccepted(c, held, ticket, input.now());
 	} catch (error) {
-		c.tickets = c.tickets.filter((t) => t !== held);
-		c.revision++;
 		const code = toErrorCode(error, "agency_research_failed");
-		return PERMANENT.test(code)
-			? { status: "failed", code }
-			: { status: "refused" };
+		if (code === "request_conflict") return fail(code, held);
+		const receipt = researchReceipt(deps, c, held.id);
+		if (receipt === "accepted")
+			return markResearchAccepted(c, held, ticket, input.now());
+		let retry: string | undefined;
+		if (receipt === "unknown") retry = "agency_research_receipt_unavailable";
+		if (receipt === "missing") {
+			if (isTransientStoreError(error)) retry = "agency_store_busy";
+			else if (RETRYABLE.has(code)) retry = code;
+		}
+		if (retry) {
+			if (input.now() + RESEARCH_RETRY_MS < deadline)
+				return { status: "retry", code: retry };
+			return fail("agency_research_admission_expired", held);
+		}
+		return fail(
+			START_REFUSALS.has(code) ? code : "agency_research_failed",
+			held,
+		);
 	}
 }
 
@@ -219,7 +302,6 @@ export async function deliverSpeak(input: {
 				findingWorkRefs: findingWorkRefs(c, ticket.refs),
 				...(ticket.emotion ? { emotion: emotionName(ticket.emotion) } : {}),
 			},
-			evidenceRefs: [],
 			input: context,
 		});
 	});

@@ -141,6 +141,10 @@ export function parseWire(
 				return refuse("選択肢から1つ以上選んでください");
 			return { ok: true, change: { value: list as string[] } };
 		}
+		case "color":
+			return /^#[0-9a-f]{6}$/i.test(wire)
+				? { ok: true, change: { value: wire.toLowerCase() } }
+				: refuse("色を選んでください");
 		default:
 			if (wire.length > (rule.maxLength ?? field.maxLength ?? 4096))
 				return refuse("文字数の上限を超えています");

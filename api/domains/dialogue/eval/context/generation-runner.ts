@@ -62,39 +62,13 @@ export function rankCandidates(
 		.map((entry) => entry.card);
 }
 
-type DocumentView = {
-	/** The work the choice calls read (`t<n>`), with the line `## State` shows for each. */
-	todos: Array<{ id: string; line: string }>;
-	/** The confirmation numbers the pending turn reads (`c<n>`). */
-	confirmations: string[];
-};
-
-/** What the operations need to know of the input the choice calls read: the work and the open confirmations. */
-function viewOf(input: GenerateInput): DocumentView {
-	const routed = input.routed;
-	const lines = (routed?.state ?? "").split("\n");
-	return {
-		todos: (routed?.todos ?? []).map((todo) => ({
-			id: `t${todo.ref}`,
-			line:
-				lines.find((line) => line.startsWith(`- t${todo.ref} `))?.slice(2) ??
-				todo.title,
-		})),
-		confirmations: (routed?.pending.confirmations ?? []).map(
-			(c) => `c${c.ref}`,
-		),
-	};
-}
-
-/** The offline host side of the operations. `ended` is set when a hand-over ended the turn. */
+/** The offline host side of the operations: a delegation is the agent's assignment, accepted as it is asked. */
 function createEvalExecutor(
 	input: GenerateInput,
 	catalog: readonly EvalCard[],
 	record: ToolCallRecord[],
 ) {
-	const view = viewOf(input);
-	const offered = new Set(input.retained.map((entry) => entry.card.id));
-	const state = { announcement: "" };
+	const offered = new Set(input.switching ? [input.switching.id] : []);
 	const need = (tool: string, path: string, reason: string) =>
 		toolRejection(reason, [{ tool, path, reason }]);
 	const execute: ToolExecutor = async (call) => {
@@ -118,49 +92,22 @@ function createEvalExecutor(
 			}
 			case "delegate": {
 				const args = call.args;
-				if (args.mode === "approve") {
-					if (!view.confirmations.includes(args.confirmation))
-						return {
-							result: { delegated: false, code: "confirmation_unknown" },
-						};
-					state.announcement = args.announcement ?? "";
-					return {
-						result: { delegated: true, todo: "eval-todo" },
-						end: true,
-					};
-				}
 				if (!offered.has(args.toolchain))
 					throw need(TOOL_NAMES.delegate, "toolchain", "toolchain_not_offered");
-				if (args.mode === "confirm")
-					return {
-						result: { confirmation: "eval-confirmation", expiresAt: "eval" },
-						confirmationId: "eval-confirmation",
-					};
-				// A request that names a saved item changes something that exists: it is confirmed first.
-				if (args.target)
-					throw need(TOOL_NAMES.delegate, "mode", "confirmation_required");
-				state.announcement = args.announcement ?? "";
 				return {
-					result: { delegated: true, todo: "eval-todo" },
-					end: true,
+					result: {
+						delegated: true,
+						assignment: "eval-assignment",
+						assignee: args.toolchain,
+					},
 				};
-			}
-			case "work": {
-				const todo = view.todos.find((t) => t.id === call.args.todo);
-				if (!todo) return { result: { ok: false, code: "todo_not_found" } };
-				// A check reads the record of the work; any other operation is taken.
-				return call.args.operation === "check"
-					? { result: todo.line }
-					: { result: { ok: true, todo: todo.id } };
 			}
 			default:
 				// The read tools find nothing in the evaluation's simulated host.
 				return { result: { text: "" } };
 		}
 	};
-	/** The user declines a confirmation: closed when it is one the input shows. */
-	const decline = async (ref: number) => view.confirmations.includes(`c${ref}`);
-	return { execute, decline, state };
+	return { execute };
 }
 
 /**
@@ -176,11 +123,7 @@ export async function runConversation(options: {
 }): Promise<ConversationOutcome> {
 	const { input, inference } = options;
 	const record: ToolCallRecord[] = [];
-	const { execute, decline, state } = createEvalExecutor(
-		input,
-		options.catalog,
-		record,
-	);
+	const { execute } = createEvalExecutor(input, options.catalog, record);
 	// Only the ports the routed turn reads: the model, the persona the choice writes in, and the reply loop. The
 	// store is read for the persona alone, which the case decides.
 	const deps = {
@@ -196,14 +139,8 @@ export async function runConversation(options: {
 		signal: options.signal,
 		delta: () => {},
 		execute,
-		decline,
 	});
-	return {
-		kind: "ok",
-		// A hand-over ended the turn: what the user hears is the announcement that went with it.
-		text: generated.ended ? state.announcement : generated.text,
-		toolCalls: record,
-	};
+	return { kind: "ok", text: generated.text, toolCalls: record };
 }
 
 /** What the scoring reads of an outcome that ran. */

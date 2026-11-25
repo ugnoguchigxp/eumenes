@@ -1,27 +1,33 @@
 import { test, expect } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { excalidrawFixture } from "./excalidraw.fixture";
+import {
+	ask,
+	assignmentAgenda,
+	ended,
+	executions,
+	plannedBy,
+	until,
+} from "./assignment.fixture";
 for (const action of ["create", "library"] as const)
-	test(`drawing ${action}: conversation chooses the registered set, accepts the plan, and returns the browser entry`, async () => {
+	test(`drawing ${action}: the assignment starts the registered set, accepts the plan, and returns the browser entry`, async () => {
 		const f = excalidrawFixture(action),
-			h = await harness({
-				model: f.model,
-				drawingConnection: f.connection,
-				drawingFetch: f.fetcher,
-			});
+			a = await assignmentAgenda({
+				harness: {
+					model: plannedBy({ other: f }),
+					drawingConnection: f.connection,
+					drawingFetch: f.fetcher,
+				},
+			}),
+			h = a.h;
 		try {
-			const r = await (
-				await h.request("/api/runs", {
-					requestId: crypto.randomUUID(),
-					conversationId: "main",
-					text: "図を描く・編集する画面を開いて",
-				})
-			).json();
-			const run = await h.dialogue.waitForTerminal(r.id, { timeoutMs: 5000 });
-			expect(run?.status).toBe("completed");
-			const operation = h.drawingOperations!.list("main")[0]!;
+			await a.start();
+			await ask(a, "excalidraw.edit", "図を描く・編集する画面を開いて");
+			await until(a, () => ended(a));
+			expect(executions(a)[0]).toMatchObject({ status: "completed" });
+			const operation = h.drawingOperations!.list("ao")[0]!;
 			expect(operation.state).toBe("completed");
-			expect(f.stages).toEqual(["route", "plan"]);
+			expect(f.stages).toEqual(["plan"]);
 			expect(f.contexts.join("\n")).not.toContain("consumer-");
 			expect(f.contexts.join("\n")).not.toContain("business-");
 			// A new drawing is an unsaved draft link: LARM is not contacted until it is saved.
@@ -29,7 +35,7 @@ for (const action of ["create", "library"] as const)
 				expect(operation.url).toMatch(
 					/^http:\/\/127\.0\.0\.1:5173\/#drawing\/new\/[0-9a-f-]{36}\?title=/,
 				);
-			expect(h.excalidraw!.list("main")).toHaveLength(0);
+			expect(h.excalidraw!.list("ao")).toHaveLength(0);
 			expect(f.requests).toHaveLength(0);
 			expect((await h.app.request("/api/excalidraw/references")).status).toBe(
 				401,
@@ -47,9 +53,9 @@ for (const action of ["create", "library"] as const)
 				).status,
 			).toBe(403);
 		} finally {
-			await h.close();
+			await a.close();
 		}
-	});
+	}, 30_000);
 test("dedicated credentials are encrypted, distinct, and missing configuration never falls back to the LLM token", async () => {
 	const h = await harness();
 	try {

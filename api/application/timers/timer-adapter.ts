@@ -18,6 +18,7 @@ import { projectTimerResult } from "./timer-result-context";
 export const TIMER_ADAPTER_REF = "adapter:timers@1";
 const SETUP = "query:timers.setup@1";
 const CURRENT = "query:timers.current@1";
+/** Registered timers.workspace revisions bind this query; no interaction opens a question to read any more, so it has no data. */
 const QUESTION = "query:timers.question@1";
 const HMS = "input:timer-hms@1";
 
@@ -52,14 +53,6 @@ const STATE_LABEL: Record<string, string> = {
 	paused: "一時停止",
 	elapsed: "時間切れ",
 	cancelled: "取消済み",
-};
-
-type Interactions = {
-	/** An open question of a toolchain interaction, as the question source shows it. */
-	questionInTransaction(
-		tx: Database,
-		interactionId: string,
-	): { revision: number; data: unknown } | null;
 };
 
 /** What the timer adapter offers, without a timers service (bundle checks, evaluation). */
@@ -98,10 +91,7 @@ export const describeTimerAdapter = () => ({
  * public transaction operations, so its clock, receipts, scheduler, revision and scope stay the
  * only source of truth. The conversation and UI action hosts both execute through it.
  */
-export function createTimerAdapter(
-	timers: TimersService,
-	options: { interactions?: () => Interactions | undefined } = {},
-): DomainAdapter {
+export function createTimerAdapter(timers: TimersService): DomainAdapter {
 	const scope = timers.scope ?? DEFAULT_TIMER_SCOPE;
 	function originOf(origin: AdapterOrigin, operationName: string): TimerOrigin {
 		return origin.kind === "conversation" || origin.kind === "task"
@@ -276,10 +266,6 @@ export function createTimerAdapter(
 				const view = timers.viewInTransaction(tx, targetRef);
 				return view ? { revision: view.timer.revision, data: view } : null;
 			}
-			if (query === QUESTION && targetRef)
-				return (
-					options.interactions?.()?.questionInTransaction(tx, targetRef) ?? null
-				);
 			return null;
 		},
 		targetInput(query, targetRef, revision) {

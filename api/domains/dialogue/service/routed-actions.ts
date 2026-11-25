@@ -1,28 +1,15 @@
-import { systemContext } from "../../../infrastructure/system-context";
-import { IMPACT_ORDER } from "./executor-context";
 import { TOOL_NAMES } from "./generation-tools";
-import { lineText } from "./input-text";
-import {
-	NEW_TARGET,
-	answerMessages,
-	answerSchema,
-	type ChoiceCandidate,
-} from "./routed-choice";
+import { NEW_TARGET, type ChoiceCandidate } from "./routed-choice";
 import type { Turn } from "./routed-turn";
 import { ARGUMENT_CHARS, ASK_STEP } from "./tool-exchange";
 
 /** A work tool either finishes the reply, returns control to the conversation, or explains a refusal. */
 export type Step = "done" | "talk" | { retry: string };
 
-const IMPACT_SAID: Record<string, string> = {
-	modify_existing: systemContext("dialogue.contexts.local.impact-modify", {}),
-	irreversible: systemContext(
-		"dialogue.contexts.local.impact-irreversible",
-		{},
-	),
-};
+/** A hand-over's end: the reply is finished, the work is the agent's assignment (the reply goes on), or it is refused. */
+export type Handed = Step | { assigned: Record<string, unknown> };
 
-/** The fields a hand-over takes besides the toolchain (`request`, `inputs`, `target`, `refs`, `resolveUnsaved`). */
+/** The fields a hand-over takes besides the toolchain (`request`, `diagnosticRef`, `target`, `refs`, `resolveUnsaved`). */
 export type Fields = Record<string, unknown>;
 
 /**
@@ -63,19 +50,17 @@ function recordQuestion(turn: Turn, request?: string): void {
 }
 
 /**
- * A hand-over to the toolchain: announced as `announcement`, or confirmed first when it changes something that
- * exists or cannot be undone (section 6.7). `words` are what the request is when the fields have none.
+ * A hand-over to the toolchain through `delegate`: a session takes the conversation over after the host's
+ * announcement, anything else becomes the agent's assignment. `words` are what the request is when the fields have none.
  */
 export async function handWith(
 	turn: Turn,
 	candidate: ChoiceCandidate,
 	fields: Fields,
-	announcement: string,
 	words: string,
-): Promise<Step> {
-	const request = {
+): Promise<Handed> {
+	const handed = await turn.act(TOOL_NAMES.delegate, {
 		toolchain: candidate.id,
-		announcement,
 		// Keep the complete words for request-based delegation.
 		request: typeof fields.request === "string" ? fields.request : words,
 		...(typeof fields.diagnosticRef === "string"
@@ -94,118 +79,16 @@ export async function handWith(
 		candidate.id === turn.routed?.switching
 			? { resolveUnsaved: "discard" as const }
 			: {}),
-		// The user's own words, when the request carries more than they said: the TODO's title and the statement's quote.
-		...(typeof fields.words === "string" ? { words: fields.words } : {}),
-	};
-	const handed =
-		typeof fields.revises === "number"
-			? null
-			: await turn.act(TOOL_NAMES.delegate, {
-					mode: "execute",
-					...request,
-				});
-	if (!handed || "refused" in handed) {
-		if (handed && handed.refused.message !== "confirmation_required")
-			return { retry: turn.reasonOf(handed.refused) };
-		// A change of something that exists, or one that cannot be undone, is confirmed first (section 6.7).
-		const issued = await turn.act(TOOL_NAMES.delegate, {
-			mode: "confirm",
-			...request,
-			...(typeof fields.revises === "number"
-				? { revises: fields.revises }
-				: {}),
-		});
-		if ("refused" in issued) return { retry: turn.reasonOf(issued.refused) };
-		if (!issued.outcome.confirmationId)
-			return {
-				retry: String(
-					(issued.outcome.result as { code?: unknown }).code ??
-						"confirmation_failed",
-				),
-			};
-		turn.speak(
-			confirmStatement(candidate, {
-				request: request.diagnosticRef
-					? `診断 ${request.diagnosticRef} の原因分析を依頼する。${request.request}`
-					: request.request,
-				...(request.target ? { target: request.target } : {}),
-			}),
-		);
-		return "done";
-	}
+	});
+	if ("refused" in handed) return { retry: turn.reasonOf(handed.refused) };
 	if (handed.outcome.end) return "done";
-	const code = (handed.outcome.result as { code?: unknown }).code;
-	return { retry: `${candidate.title}: ${String(code ?? "not_delegated")}` };
-}
-
-/** The user answered the question work `t<n>` asked. */
-export async function answerQuestion(turn: Turn, todo: string, text: string) {
-	const answer = (words: string) =>
-		turn.act(TOOL_NAMES.work, { todo, operation: "answer", text: words });
-	let worked = await answer(text);
-	// A question that asks for a structured answer refuses the words as they are and names its shape: the
-	// conversation model writes them in that shape once using the question as context.
-	const refused =
-		"outcome" in worked
-			? (worked.outcome.result as { code?: unknown; inputSchema?: unknown })
-			: null;
-	if (
-		refused?.code === "invalid_answer" &&
-		refused.inputSchema &&
-		typeof refused.inputSchema === "object" &&
-		turn.canChoose
-	) {
-		const inputSchema = refused.inputSchema as Record<string, unknown>;
-		const question =
-			turn.routed?.pending.questions.find((q) => `t${q.ref}` === todo)
-				?.question ?? "";
-		const filled = await turn.choose(
-			answerMessages({
-				routed: turn.routed!,
-				question,
-				inputSchema,
-				utterance: text,
-			}),
-			answerSchema(inputSchema),
-		);
-		if (filled && filled !== "cut" && filled.choice === "answer")
-			worked = await answer(JSON.stringify(filled.answer));
-	}
-	return worked;
-}
-
-/** What a hand-over of the candidate does to what exists: a saved target is a change; the toolchain's own least impact raises it. */
-function impactOf(candidate: ChoiceCandidate, target: string | undefined) {
-	const declared = target ? "modify_existing" : "none";
-	return IMPACT_ORDER[
-		Math.max(
-			IMPACT_ORDER.indexOf(declared),
-			candidate.minImpact
-				? IMPACT_ORDER.indexOf(
-						candidate.minImpact as (typeof IMPACT_ORDER)[number],
-					)
-				: 0,
-		)
-	]!;
-}
-
-/** The host's confirmation statement: the toolchain, the request and what it does to what exists (section 6.7). */
-function confirmStatement(
-	candidate: ChoiceCandidate,
-	request: { request?: string; target?: string },
-): string {
-	const impact = impactOf(candidate, request.target);
-	const words = {
-		title: lineText(candidate.title),
-		request: lineText(request.request ?? ""),
-		impact: IMPACT_SAID[impact] ?? IMPACT_SAID.modify_existing!,
+	const result = handed.outcome.result as {
+		delegated?: unknown;
+		code?: unknown;
 	};
-	// The item it changes is named as the candidate showed it: the user approves that item, not any.
-	const target = candidate.targets?.find((t) => t.ref === request.target);
-	return target
-		? systemContext("dialogue.contexts.local.confirm-target", {
-				...words,
-				target: lineText(target.label),
-			})
-		: systemContext("dialogue.contexts.local.confirm", words);
+	if (result.delegated === true)
+		return { assigned: result as Record<string, unknown> };
+	return {
+		retry: `${candidate.title}: ${String(result.code ?? "not_delegated")}`,
+	};
 }

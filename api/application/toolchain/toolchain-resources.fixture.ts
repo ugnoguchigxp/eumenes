@@ -14,6 +14,7 @@ export function fixtureResources(
 	options: HarnessOptions,
 	image: unknown,
 	music: unknown,
+	generated?: Parameters<typeof createMarkdownResourceAdapter>[2],
 ) {
 	const resources = options.resources
 		? createResourceAccess({
@@ -29,6 +30,7 @@ export function fixtureResources(
 								createMarkdownResourceAdapter(
 									store,
 									(id) => !!options.scratch?.get(id),
+									generated,
 								),
 							]
 						: []),

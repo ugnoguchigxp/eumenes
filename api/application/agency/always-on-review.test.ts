@@ -253,18 +253,19 @@ test("under review: only the corrected versions that the agent's items cite, and
 		);
 		const current = f.h.memory!.list().find((i) => i.status === "active")!;
 		await settle();
+		const planMarks = [`plan:${plan.id}`, `plan:${plan.id}@${plan.revision}`];
 		// The agent's item cites the corrected version: under review; the plan too. The corrected version no item
 		// cites is not marked, and one made again on the current version is not.
 		expect(marksFor(f.deps, citing(`memory:${old.id}`)).underReview).toEqual([
 			`memory:${old.id}`,
-			`plan:${plan.id}`,
+			...planMarks,
 		]);
 		await settle();
-		expect(marksFor(f.deps, citing()).underReview).toEqual([`plan:${plan.id}`]);
+		expect(marksFor(f.deps, citing()).underReview).toEqual(planMarks);
 		await settle();
 		expect(
 			marksFor(f.deps, citing(`memory:${current.id}`)).underReview,
-		).toEqual([`plan:${plan.id}`]);
+		).toEqual(planMarks);
 	} finally {
 		await f.close();
 	}

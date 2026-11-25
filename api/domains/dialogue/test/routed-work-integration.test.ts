@@ -13,7 +13,6 @@ test("clarifying a multi-step request holds every action and preserves the origi
 			"まず案を一緒に作りますか？",
 		);
 		expect(h.dialogue.answerText(run.id)).toContain(text);
-		expect(h.todos()).toHaveLength(0);
 		expect(h.state.searchSlots).toHaveLength(0);
 	} finally {
 		await h.close();

@@ -183,7 +183,6 @@ function setup(
 			scopeRef: "scope:main",
 		})),
 		toolchainArtifacts: vi.fn(async () => []),
-		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: submit,
 		toolchainAction: vi.fn(),
 		unsettledToolchainActions: vi.fn(async () => []),

@@ -357,9 +357,7 @@ export function createToolchainRouting(
 		bound,
 		instantInTransaction: instant.run,
 		recordSelectionInTransaction: history.recordSelectionInTransaction,
-		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
-		requestOfRunInTransaction: history.requestOfRunInTransaction,
 		offeredInRunInTransaction: history.offeredInRunInTransaction,
 		usageOfRunInTransaction: history.usageOfRunInTransaction,
 	};

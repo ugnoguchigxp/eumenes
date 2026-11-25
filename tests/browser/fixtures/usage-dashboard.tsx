@@ -72,7 +72,6 @@ const client = {
 		digest: "fixture",
 		scopeRef: "scope:main",
 	}),
-	toolchainInteractions: async () => [],
 	toolchainArtifactSource: async (
 		_revision: string,
 		_source: string,

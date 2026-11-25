@@ -69,6 +69,13 @@ export function createRebuildingAgencyHost(
 			) => current.conversationAgent.respond(...args),
 		},
 		dialoguePort: {
+			assign: (
+				...args: Parameters<NonNullable<typeof current.dialoguePort.assign>>
+			) =>
+				current.dialoguePort.assign?.(...args) ?? {
+					status: "refused" as const,
+					code: "agency_unavailable",
+				},
 			isCurrentInputInTransaction: (
 				...args: Parameters<
 					NonNullable<typeof current.dialoguePort.isCurrentInputInTransaction>
@@ -89,11 +96,6 @@ export function createRebuildingAgencyHost(
 					NonNullable<typeof current.dialoguePort.stateForContextInTransaction>
 				>
 			) => current.dialoguePort.stateForContextInTransaction!(...args),
-			workChangedInTransaction: (
-				...args: Parameters<
-					typeof current.dialoguePort.workChangedInTransaction
-				>
-			) => current.dialoguePort.workChangedInTransaction(...args),
 			steeredInTransaction: (
 				...args: Parameters<
 					NonNullable<typeof current.dialoguePort.steeredInTransaction>

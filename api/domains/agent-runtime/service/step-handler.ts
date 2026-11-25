@@ -26,6 +26,7 @@ import { createToolSelection } from "./tool-selection";
 import { guidedWeb, guidedActionFor } from "./guided-contract";
 import {
 	activeExecutionChild,
+	releaseExecutionCalls,
 	reservedExecutionCalls,
 } from "./execution-children";
 import type { ChildExecution } from "../../tool-runtime";
@@ -73,6 +74,14 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				return { status: "stale", reason: "autonomous_origin_invalid" };
 			const execution = JSON.parse(t.input_json ?? "{}").execution as
 				ChildExecution | undefined;
+			// A step starts only after the children it waited for have finished: their reservations end here.
+			if (
+				execution &&
+				!tools
+					.invocationsInTransaction(db, t.id)
+					.some((i) => i.state === "pending")
+			)
+				releaseExecutionCalls(db, t.id);
 			if (
 				execution &&
 				(!activeExecutionChild(db, execution) ||

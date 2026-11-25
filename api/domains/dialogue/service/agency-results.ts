@@ -3,10 +3,30 @@ import type { AgencyActionDeps, createAgencyActions } from "./agency-actions";
 import {
 	agencyWorks,
 	agencyWork,
+	agencyRecords,
 	currentAgencyWork,
 	autonomousActionSource,
 	returnAgencyWork,
+	type AgencyWorkRow,
 } from "../repository/agency";
+import { isAgendaSnapshot } from "../contracts/agency-always-on";
+
+/**
+ * The user's words an assignment runs as (the source its toolchain took the work under), or null for the agency's own
+ * work. An assignment is held to those words, not to the agency's own grant: a toolchain revoked meanwhile still
+ * reports how its work ended (a failure), where the agency's own work, made invalid by the revocation, is dropped.
+ */
+function assignmentSource(db: Database, w: AgencyWorkRow) {
+	const record = agencyRecords(db).find(
+		(r) => r.conversationId === w.conversation_id && r.epoch === w.epoch,
+	);
+	if (!record || !isAgendaSnapshot(record.snapshot)) return null;
+	const ticket = record.snapshot.tickets.find((t) => t.id === w.ticket_id);
+	return ticket?.assignment
+		? (record.snapshot.assignments?.find((a) => a.itemId === ticket.itemId)
+				?.source ?? null)
+		: null;
+}
 
 /** Reconciles both historical read-only work and shared action executions before releasing their authority. */
 export function agencyResults(
@@ -32,8 +52,8 @@ export function agencyResults(
 					];
 				if (w.execution_id) {
 					const view = actions.result(db, w.root_id);
-					// The execution is gone (its owner forgot it): the work ends here, or its TODO would stay open
-					// for ever and the ticket would never come back.
+					// The execution is gone (its owner forgot it): the work ends here, or the agent
+					// would wait on its ticket for ever.
 					if (!view)
 						return [
 							{
@@ -49,6 +69,12 @@ export function agencyResults(
 							},
 						];
 					if (!view.result) return [];
+					// The work failed because its toolchain was revoked meanwhile: the owner's result is only the
+					// stop it made of its own work, so the work ends under the reason.
+					const revoked =
+						view.status === "failed" &&
+						!!deps.toolchains &&
+						!deps.toolchains.cardInTransaction(db, w.toolchain_revision_id);
 					return [
 						{
 							general: true,
@@ -72,7 +98,9 @@ export function agencyResults(
 											  view.status === "interrupted"
 											? ("interrupted" as const)
 											: ("failed" as const),
-							summary: JSON.stringify(view.result),
+							summary: revoked
+								? "capability_revoked"
+								: JSON.stringify(view.result),
 						},
 					];
 				}
@@ -149,7 +177,8 @@ export function agencyResults(
 			const w = agencyWork(db, rootId);
 			let adopted = true;
 			if (w?.execution_id) {
-				const source = autonomousActionSource(db, rootId, deps.now());
+				const own = autonomousActionSource(db, rootId, deps.now());
+				const source = own && (assignmentSource(db, w) ?? own);
 				if (
 					!currentAgencyWork(db, w) ||
 					!source ||
@@ -160,7 +189,7 @@ export function agencyResults(
 					return false;
 				}
 				const view = actions.result(db, rootId);
-				// Nothing is left to adopt of an execution that is gone: its TODO is closed with it.
+				// Nothing is left to adopt of an execution that is gone.
 				if (!view) {
 					actions.discard(db, rootId);
 					returnAgencyWork(db, rootId);
@@ -168,7 +197,7 @@ export function agencyResults(
 				}
 				if (!view.result) return false;
 				try {
-					actions.synchronize(db, view);
+					actions.synchronize(db, view, rootId);
 				} catch (error) {
 					if (
 						!(error instanceof Error) ||

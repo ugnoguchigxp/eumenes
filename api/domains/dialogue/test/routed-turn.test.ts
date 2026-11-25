@@ -145,9 +145,6 @@ test("a plain exchange can answer without calling its offered tools", async () =
 		"memory",
 		"find_toolchain",
 		"delegate",
-		"approve_confirmation",
-		"decline_confirmation",
-		"work",
 		"discard_for_pending_switch",
 	]);
 	expect(talk.session?.outputSchema).toBeUndefined();
@@ -167,26 +164,6 @@ test("a plain exchange can answer without calling its offered tools", async () =
 	expect(last).toMatch(/^## State\n今: [^\n]+\n\n## User\nこんにちは$/);
 });
 
-test("a no on the pending turn closes the confirmation: the next turn has nothing pending", async () => {
-	h = await setup({
-		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
-	});
-	h.state.steps.push(
-		choice({ choice: IMAGE.id, say: "差し替えます。", request: "壁紙" }),
-		choice({ choice: "decline", confirmation: "c1" }),
-	);
-	await h.say("壁紙を差し替えて");
-	const declined = await h.say("やっぱりやめる");
-	expect(h.dialogue.answerText(declined.id)).toBe(
-		"わかりました。やめておきます。",
-	);
-	h.state.steps.push(choice({ choice: "none" }), { text: "はい。" });
-	await h.say("こんにちは");
-	expect(
-		h.state.calls.slice(-2).map((c) => c.messages.at(-1)!.content),
-	).not.toContainEqual(expect.stringContaining("## Pending"));
-});
-
 test("the talk turn's recent conversation is the last two of the user's utterances and the reply before them", async () => {
 	h = await setup();
 	for (let i = 1; i <= 4; i++) {
@@ -198,25 +175,6 @@ test("the talk turn's recent conversation is the last two of the user's utteranc
 		.messages.slice(2, -1)
 		.map((m) => m.content);
 	expect(recent).toEqual(["a1", "u2", "a2", "u3", "a3"]);
-});
-
-test("finished work State still lists may be checked, never corrected: the check's record is what the talk turn tells", async () => {
-	h = await setup();
-	h.state.steps.push(choice({ choice: IMAGE.id }));
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	await h.finishImage(waiting.id, { state: "completed", title: "猫の絵" });
-	expect(h.archived().map((todo) => todo.title)).toEqual(["猫の絵を描いて"]);
-	h.state.steps.push(choice({ choice: "t1", operation: "check" }), {
-		text: "猫の絵はできあがっています。",
-	});
-	const run = await h.say("猫の絵はどうなった？");
-	expect(h.dialogue.answerText(run.id)).toBe("猫の絵はできあがっています。");
-	const talked = h.state.calls.at(-1)!;
-	expect(talked.tools).toContain("work");
-	expect(talked.messages.at(-1)!.content).toContain(
-		"t1「猫の絵を描いて」が終わりました（成功）。",
-	);
-	expect(h.todos()).toEqual([]);
 });
 
 test("the conversation resolves a past reference before the selected toolchain fills its arguments", async () => {

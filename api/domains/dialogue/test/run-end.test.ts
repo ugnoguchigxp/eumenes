@@ -1,16 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
 import { insert } from "../repository";
-import {
-	IMAGE,
-	choice,
-	reply,
-	setup,
-	type Harness,
-} from "./generation.fixture";
+import { reply, setup, type Harness } from "./generation.fixture";
 
 /**
  * The one place a run ends (the ContextWindow specification, sections 9 and 10.1): the steward is told how it ended,
- * once; the TODO a run was still waiting for ends with it, unless the run completed.
+ * once.
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -38,36 +32,7 @@ test("a failed run tells the steward its failure", async () => {
 	]);
 });
 
-test("a cancelled run tells the steward it was cancelled, and its waiting TODO ends with it", async () => {
-	h = await setup();
-	h.state.steps.push(
-		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
-	);
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	const [todo] = h.todos();
-	expect(todo).toMatchObject({ status: "todo" });
-	await h.dialogue.cancel(waiting.id);
-	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
-	// The TODO ends with the run as cancelled; cancelled work is not reported back, so it is archived at once.
-	expect(h.todos()).toEqual([]);
-	expect(h.state.runEnds.filter((e) => e.runId === waiting.id)).toEqual([
-		{ runId: waiting.id, conversationId: "main", state: "cancelled" },
-	]);
-});
-
-test("stopping the reply of a run that handed its work over keeps the run and its TODO", async () => {
-	h = await setup();
-	h.state.steps.push(
-		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
-	);
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	// A voice barge-in on the next utterance stops only the reply: the work's lifetime is not the reply's.
-	expect((await h.dialogue.stopReply(waiting.id))?.status).toBe("queued");
-	expect(h.todos()).toMatchObject([{ status: "todo" }]);
-	expect(h.state.runEnds.filter((e) => e.runId === waiting.id)).toEqual([]);
-});
-
-test("stopping the reply of a run that handed nothing over cancels it", async () => {
+test("stopping the reply of a run cancels it", async () => {
 	h = await setup({ autoStart: false });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
@@ -123,4 +88,49 @@ test("a run left without a job when the backend restarts is interrupted and the 
 	expect(h.state.runEnds).toEqual([
 		{ runId: "r-orphan", conversationId: "main", state: "interrupted" },
 	]);
+});
+
+test("recovery closes the TODO and confirmation rows the retired ledger left open, once", async () => {
+	h = await setup({ autoStart: false });
+	await h.store.write((db) => {
+		db.run(
+			`INSERT INTO dialogue_work(id, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title,
+			 status, revision, source_ref, dedupe_key, created_at, updated_at)
+			 VALUES ('w-open', 'main', 'r1', 'fake.image', 'toolchain:fake.image@1', 'image', 'request', 'title',
+			 'todo', 1, NULL, 'key-open', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z')`,
+		);
+		db.run(
+			`INSERT INTO dialogue_confirmations(id, conversation_id, toolchain_id, toolchain_revision_id, request, impact,
+			 statement_delivery_key, issued_at, expires_at)
+			 VALUES ('c-open', 'main', 'fake.image', 'toolchain:fake.image@1', 'request', 'modify_existing',
+			 'k', '2026-10-13T00:00:00.000Z', '2099-10-13T00:10:00.000Z')`,
+		);
+	});
+	await h.dialogue.recover();
+	const rows = () =>
+		h!.store.read((db) => ({
+			work: db
+				.query(
+					"SELECT status, outcome, archived_at AS archivedAt FROM dialogue_work",
+				)
+				.all(),
+			confirmations: db
+				.query(
+					"SELECT superseded_at AS supersededAt FROM dialogue_confirmations",
+				)
+				.all(),
+		}));
+	const closed = rows();
+	expect(closed.work).toMatchObject([
+		{ status: "done", outcome: "interrupted" },
+	]);
+	expect(
+		(closed.work[0] as { archivedAt: string | null }).archivedAt,
+	).not.toBeNull();
+	expect(
+		(closed.confirmations[0] as { supersededAt: string | null }).supersededAt,
+	).not.toBeNull();
+	// Nothing is open now: a second start changes nothing.
+	await h.dialogue.recover();
+	expect(rows()).toEqual(closed);
 });

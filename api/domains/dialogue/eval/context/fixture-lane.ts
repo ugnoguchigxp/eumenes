@@ -54,24 +54,10 @@ function choiceOf(testCase: ContextCase, schema: Schema): Schema {
 	const picked =
 		delegated?.kind === "delegated" && delegated.toolchain
 			? find((_, choice) => choice === delegated.toolchain)
-			: tool?.kind === "tool_called" && tool.name === "work"
-				? // A question the work asked is answered; any other work is cancelled.
-					(find((_, choice) => choice === "answer") ??
-					find(
-						(branch, choice) =>
-							/^t\d+$/.test(choice) &&
-							(
-								branch.properties.operation?.enum as string[] | undefined
-							)?.includes("cancel") === true,
-					))
-				: tool?.kind === "tool_called" && tool.name === "memory"
-					? find((_, choice) => choice === "memory.request")
-					: null;
-	const branch = picked ?? { choice: "none" };
-	// A cancel or an amendment carries the operation the branch allows.
-	return branch.choice !== "answer" && /^t\d+$/.test(String(branch.choice))
-		? { ...branch, operation: "cancel" }
-		: branch;
+			: tool?.kind === "tool_called" && tool.name === "memory"
+				? find((_, choice) => choice === "memory.request")
+				: null;
+	return picked ?? { choice: "none" };
 }
 
 /** A model that follows `testCase`'s plan, then answers with one short sentence (or stays silent). */

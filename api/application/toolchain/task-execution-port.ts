@@ -1,7 +1,10 @@
 import { claudeWorkspace } from "../work/claude-code-task-adapter";
 import { pipelineContract } from "../pipelines/pipeline-contract";
 import { adoptTaskResources } from "./task-execution-resources";
-import { autonomousActionSource } from "../../domains/dialogue";
+import {
+	agencyHoldsExecution,
+	autonomousActionSource,
+} from "../../domains/dialogue";
 import { taskAutonomy } from "./task-autonomy";
 import { pipelineComponents } from "../pipelines/component-catalog";
 import type { CollaborationInteract } from "../collaboration/collaboration-backends";
@@ -160,6 +163,8 @@ function configureWebNote(
 			// The agency reads an autonomous note from its ledger: there is no notice to send.
 			const root = note.sourceRunInTransaction(db, view.id);
 			if (root && autonomousActionSource(db, root, Date.now())) return true;
+			// Work the agent holds as the user's assignment is reported by the agent: no notice run.
+			if (agencyHoldsExecution(db, view.id)) return true;
 			return !sendExecutionNotice(
 				{
 					dialogue,
@@ -477,6 +482,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				}
 				return true;
 			}
+			// Work the agent holds (an assignment) is reported by the agent: the conversation gets no notice run.
+			if (agencyHoldsExecution(db, view.id)) return true;
 			// The durable collaboration watcher delivers to the owning specialist session.
 			if (host.collaboration?.works.ownsChild(db, view.id, view.conversationId))
 				return true;

@@ -40,6 +40,11 @@ import {
 import type { AgencyHostDeps } from "./host-types";
 import { quietThought } from "./always-on-thoughts";
 import { heldMemoryRefs } from "./always-on-recall";
+import {
+	ASSIGNMENT,
+	assignmentTool,
+	controlAssignment,
+} from "./always-on-assignments";
 
 const log = getLogger("agency");
 /** The calls a reply keeps in its history: the agenda's own tools. */
@@ -48,6 +53,7 @@ const AGENDA_TOOL_NAMES: ReadonlySet<string> = new Set([
 	READ_NOTE,
 	SHOW_NOTE,
 	SET_QUIET,
+	ASSIGNMENT,
 	...goalReplyToolNames,
 ]);
 /** Tool calls a reply may add for the agenda's own tools (the host's read tools keep theirs). */
@@ -59,7 +65,7 @@ const AGENDA_TOOL_SPECS: Record<
 > = {
 	[START_PREPARATION]: {
 		description:
-			"調べもの担当に調査メモ作成を依頼する（1件ずつ実行、完了後通知）。",
+			"公開情報の調査メモを依頼する（1件ずつ実行、完了後通知）。担当の作業状況は read_agents で確認する。",
 		props: {
 			request:
 				"今回依頼の対象・URL・条件・詳しさを書く。過去発話からは指示語の対象と利用者が今回、明示的に引き継いだ条件のみ補い、別件や仮説を足さない。",
@@ -324,11 +330,31 @@ async function executeAgendaReply(
 		},
 	});
 	const hostNames = new Set(args.tools.tools.map((t) => t.name));
-	const offered = own.tools
-		.filter(
-			(t) => !hostNames.has(t.name) && (!args.readOnly || t.name === READ_NOTE),
-		)
-		.map((tool) => compactAgendaTool(tool));
+	const offered = [
+		...own.tools
+			.filter(
+				(t) =>
+					!hostNames.has(t.name) && (!args.readOnly || t.name === READ_NOTE),
+			)
+			.map((tool) => compactAgendaTool(tool)),
+		...(args.readOnly ? [] : [assignmentTool]),
+	];
+	// The user's latest words the reply answers (those it took in meanwhile included): what an answer to an assignee is.
+	const userMessage = () =>
+		deps.store.read((db) => {
+			const delivered = [...run.messageIds, ...(steer?.delivered() ?? [])];
+			for (const id of delivered.reverse()) {
+				const source = deps.conversation.sourceInTransaction(db, id);
+				if (
+					source.state === "available" &&
+					source.message.role === "user" &&
+					source.message.conversationId === c.id &&
+					!deps.memory.isBlockedInTransaction?.(db, id)
+				)
+					return source.message.id;
+			}
+			return undefined;
+		});
 	const offeredNames = new Set(offered.map((t) => t.name));
 	c.reply = { runId: run.runId, included: new Set(run.messageIds) };
 	let steer: ReturnType<NonNullable<AgendaScope["steering"]>["begin"]> | null =
@@ -407,6 +433,14 @@ async function executeAgendaReply(
 							}
 						: result;
 				}
+				if (call.name === ASSIGNMENT)
+					return controlAssignment({
+						deps,
+						c,
+						arguments: call.arguments,
+						messageId: userMessage(),
+						at: now(),
+					});
 				return own.call(call, signal);
 			},
 		};
@@ -533,6 +567,51 @@ export function createAgendaPorts(input: AgendaPortsInput) {
 					...excluded.itemIds.map((id) => `memory:${id}`),
 				]);
 		},
+		assign(request) {
+			const c = input.serving(request.source.conversationId);
+			if (!c) return { status: "refused", code: "agency_unavailable" };
+			const asked = c.agent.requestResearch({
+				text: request.request,
+				at: input.now(),
+				requested: true,
+				delegatedTo: request.title,
+				// A form the user sent on a screen is their request, though the agent heard no words of it.
+				...(request.userMessage
+					? { userRef: { id: request.userMessage.id } }
+					: {}),
+			});
+			if ("rejected" in asked) {
+				const same =
+					asked.rejected === "duplicate"
+						? c.agent
+								.view()
+								.items.find(
+									(i) =>
+										i.delegatedTo === request.title &&
+										(i.status === "open" || i.status === "doing"),
+								)
+						: undefined;
+				return {
+					status: "refused",
+					code: asked.rejected,
+					...(same ? { id: same.id } : {}),
+				};
+			}
+			c.assignments.set(asked.item.id, {
+				itemId: asked.item.id,
+				toolchainId: request.toolchainId,
+				revisionId: request.revisionId,
+				title: request.title,
+				references: structuredClone(request.references),
+				source: { ...request.source },
+				...(request.details
+					? { details: structuredClone(request.details) }
+					: {}),
+			});
+			c.revision++;
+			c.kick();
+			return { status: "accepted", id: asked.item.id };
+		},
 		isCurrentInputInTransaction: (db, input) => currentInput(deps, db, input),
 		// Memory keeps the input of delivered speech with the message; a line handed to Live is asked for here.
 		inputForMessageInTransaction: (_db, id) =>
@@ -542,9 +621,6 @@ export function createAgendaPorts(input: AgendaPortsInput) {
 		inputForContextInTransaction: () => ({ sources: [], complete: true }),
 		stateForContextInTransaction: () => [],
 		goalSlotsInTransaction: (db) => goalSlots(deps, db),
-		workChangedInTransaction: () => {
-			changed();
-		},
 		steeredInTransaction: (_db: Database, runId: string) =>
 			[...convs.values()].flatMap((c) => c.taken.get(runId) ?? []),
 		// A scope exists for every conversation the agenda has seen (no scope is made inside a prompt's transaction).

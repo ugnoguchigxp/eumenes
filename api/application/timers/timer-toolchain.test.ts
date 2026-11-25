@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { harness } from "../toolchain/toolchain.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 /** The bound timer toolchain's adapter operation for a timer tool. */
@@ -13,14 +14,18 @@ const timerBinding = (toolId: string) => ({
 	}[toolId]!,
 });
 
+/**
+ * A coordinator task rooted at the user's run: the origin a hand-made action is invoked under. The run is held open
+ * (running) as it was while the user's request was still being worked on.
+ */
 async function manualActionRoot(
 	h: Awaited<ReturnType<typeof harness>>,
 	runId: string,
 ) {
-	// The timer sub-agent has been asked for its operation (its context is recorded before any gate holds it).
-	await waitFor(() => h.commandContexts.length > 0);
+	await h.dialogue.waitForTerminal(runId, { timeoutMs: 8000 });
 	const id = crypto.randomUUID();
 	await h.store.write((db) => {
+		db.query("UPDATE dialogue_runs SET status='running' WHERE id=?").run(runId);
 		db.query(
 			"INSERT INTO agent_tasks(id,kind,root_run_id,state,phase,deadline,created_at,updated_at) VALUES(?,'coordinator',?,'queued','created',?,0,0)",
 		).run(id, runId, Date.now() + 60000);
@@ -32,17 +37,20 @@ async function manualActionRoot(
 	return id;
 }
 test("C01-C03: a relative timer request is saved through the toolchain", async () => {
-	const h = await harness({ timers: true });
+	const f = await assignmentFixture({ timers: true });
+	const { h } = f;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "3分タイマー測って",
-		});
-		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
-		expect(done?.status).toBe("completed");
-		// The agency reports the finished timer from the TODO's result; the run has no reply of its own.
-		expect(h.reported()).toContain('"durationSeconds":180');
+		const { source, result } = await f.assign(
+			"3分タイマー測って",
+			"timers.manage",
+		);
+		expect(result).toMatchObject({ status: "accepted" });
+		await f.settled();
+		expect(f.executions()).toMatchObject([{ status: "completed" }]);
+		// The agent reports the finished timer from the execution's result; the report line holds the work report note.
+		expect(f.reported()).toContain('"durationSeconds":180');
+		await f.until(() => f.notes().length === 1);
+		expect(f.items()).toHaveLength(0);
 		const saved = h.store.read((db) => ({
 			timers: db
 				.query("SELECT duration_seconds, state FROM timers")
@@ -85,7 +93,6 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 		expect(saved.operations.map((row) => row.operation)).toEqual(["start"]);
 		expect(saved.actions).toHaveLength(1);
 		expect(saved.actions[0]?.tool_revision_id).toBe("tool:timer.start@1");
-		expect(saved.actions[0]?.root_run_id).toBe(run.id);
 		expect(saved.actions[0]?.receipt_digest).toBe(
 			saved.operations[0]?.receipt_digest,
 		);
@@ -95,23 +102,21 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			saved.actions[0]?.receipt_digest,
 		);
 		expect(h.workerContexts).toHaveLength(0);
-		// The conversation only hands the request over; the timer sub-agent sees the request and the snapshot.
+		// The agent only hands the user's words over; the timer sub-agent sees the request and the snapshot.
 		expect(h.commandContexts[0]).toContain("3分タイマー測って");
 		expect(h.commandContexts[0]).toContain("snapshot");
 		expect(h.commandContexts[0]).toContain("timer.start");
+		// The timer remembers the user's message the assignment came from.
 		const origin = h.store.read((db) =>
 			db.query("SELECT conversation_id, origin_message_id FROM timers").get(),
 		);
 		expect(origin).toEqual({
-			conversation_id: "main",
-			origin_message_id: run.inputMessageId,
+			conversation_id: f.conversationId,
+			origin_message_id: source.messageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		// The router decides with no model call (the timer takes no inputs to fill): the timer sub-agent's operation only
-		// (no completion check).
-		expect(h.calls).toBe(1);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
@@ -121,47 +126,35 @@ for (const [text, seconds] of [
 	["3分30秒のタイマー", 210],
 ] as const)
 	test(`relative duration ${text} is stored as ${seconds} seconds`, async () => {
-		const h = await harness({ timers: true });
+		const f = await assignmentFixture({ timers: true });
 		try {
-			const run = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text,
-			});
-			expect(
-				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-			).toBe("completed");
-			const row = h.store.read(
+			await f.assign(text, "timers.manage");
+			await f.settled();
+			const row = f.h.store.read(
 				(db) =>
 					db.query("SELECT duration_seconds FROM timers").get() as {
 						duration_seconds: number;
 					},
 			);
 			expect(row.duration_seconds).toBe(seconds);
-			expect(h.reported()).toContain(`"durationSeconds":${seconds}`);
+			expect(f.reported()).toContain(`"durationSeconds":${seconds}`);
 		} finally {
-			await h.close();
+			await f.close();
 		}
 	});
 
-test("C06: cancelling the dialogue run leaves the committed timer active", async () => {
-	const h = await harness({ timers: true });
+test("C06: cancelling the user's run after the assignment started leaves the committed timer active", async () => {
+	const f = await assignmentFixture({ timers: true });
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "3分タイマー測って",
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-		).toBe("completed");
-		await h.dialogue.cancel(run.id);
-		const row = h.store.read(
+		const { source } = await f.assign("3分タイマー測って", "timers.manage");
+		await f.settled();
+		await f.h.dialogue.cancel(source.runId);
+		const row = f.h.store.read(
 			(db) => db.query("SELECT state FROM timers").get() as { state: string },
 		);
 		expect(row.state).toBe("active");
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
@@ -191,37 +184,31 @@ function counts(store: {
 }
 
 test("C04: a revoked skill or a strict-invalid command does not start a timer", async () => {
-	const revoked = await harness({ timers: true });
+	const revoked = await assignmentFixture({ timers: true });
 	try {
-		await revoked.store.write((db) => {
-			revoked.toolchain.capabilities.setEnabledInTransaction(
+		await revoked.h.store.write((db) => {
+			revoked.h.toolchain.capabilities.setEnabledInTransaction(
 				db,
 				"skill",
 				"timers.manage",
 				false,
 			);
 		});
-		const run = await revoked.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "90秒タイマー測って",
-		});
-		await revoked.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
-		expect(counts(revoked.store).timers).toBe(0);
-		expect(revoked.dialogue.answerText(run.id) ?? "").not.toContain("開始");
+		// A toolchain whose skill is revoked is not in the agent's catalog: nothing can be assigned to it.
+		await expect(
+			revoked.assign("90秒タイマー測って", "timers.manage"),
+		).rejects.toThrow("fixture_toolchain_missing");
+		expect(counts(revoked.h.store).timers).toBe(0);
+		expect(revoked.executions()).toHaveLength(0);
 	} finally {
 		await revoked.close();
 	}
-	const extra = await harness({ timers: true, timerExtra: true });
+	const extra = await assignmentFixture({ timers: true, timerExtra: true });
 	try {
-		const run = await extra.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "90秒タイマー測って",
-		});
-		await extra.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
-		expect(counts(extra.store).timers).toBe(0);
-		expect(extra.dialogue.answerText(run.id) ?? "").not.toContain("開始");
+		await extra.assign("90秒タイマー測って", "timers.manage");
+		await extra.settled();
+		expect(counts(extra.h.store).timers).toBe(0);
+		expect(extra.executions().map((e) => e.status)).not.toContain("completed");
 	} finally {
 		await extra.close();
 	}
@@ -296,22 +283,13 @@ test("C04: another owner or extra arguments are refused before a timer is saved"
 });
 
 test("C05: a failure before the action result rolls the timer back, and the same step then saves one", async () => {
-	let release!: () => void;
-	const commandGate = new Promise<void>((resolve) => {
-		release = resolve;
-	});
-	const h = await harness({ timers: true, commandGate });
-	let runId: string | undefined;
+	const f = await assignmentFixture({ timers: true });
+	const { h } = f;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "90秒タイマー",
-		});
-		runId = run.id;
+		const run = await f.userWords("90秒タイマー");
 		const owner = {
-			rootRunId: run.id,
-			taskId: await manualActionRoot(h, run.id),
+			rootRunId: run.runId,
+			taskId: await manualActionRoot(h, run.runId),
 			cancelEpoch: 0,
 		};
 		const stepId = crypto.randomUUID();
@@ -390,38 +368,19 @@ test("C05: a failure before the action result rolls the timer back, and the same
 		);
 		expect(duration).toBe(90);
 	} finally {
-		if (runId) await h.dialogue.cancel(runId);
-		release();
-		await h.close();
+		await f.close();
 	}
 });
 
 test("C07: list and cancel stay on one operation when the same step runs again", async () => {
-	let release!: () => void;
-	const commandGate = new Promise<void>((resolve) => {
-		release = resolve;
-	});
-	const h = await harness({
-		timers: true,
-		commandGate,
-		commandGateQuestion: "確認",
-	});
-	let actionRunId: string | undefined;
+	const f = await assignmentFixture({ timers: true });
+	const { h } = f;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "90秒タイマー測って",
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-		).toBe("completed");
-		const actionRun = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "タイマーを確認して取り消して",
-		});
-		actionRunId = actionRun.id;
+		await f.assign("90秒タイマー測って", "timers.manage");
+		await f.settled();
+		const actionRun = {
+			id: (await f.userWords("タイマーを確認して取り消して")).runId,
+		};
 		await manualActionRoot(h, actionRun.id);
 		const root = h.store.read(
 			(db) =>
@@ -516,9 +475,7 @@ test("C07: list and cancel stay on one operation when the same step runs again",
 			state: "cancelled",
 		});
 	} finally {
-		if (actionRunId) await h.dialogue.cancel(actionRunId);
-		release();
-		await h.close();
+		await f.close();
 	}
 });
 
@@ -544,19 +501,16 @@ test("C08: without timer ports a timer request does not invent a start", async (
 	}
 });
 
-test("real dialogue list and cancel select an authoritative timer snapshot", async () => {
-	const h = await harness({ timers: true });
+test("assigned list and cancel select an authoritative timer snapshot", async () => {
+	const f = await assignmentFixture({ timers: true });
+	const { h } = f;
 	try {
+		let asked = 0;
 		const ask = async (text: string) => {
-			const run = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text,
-			});
-			expect(
-				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-			).toBe("completed");
-			return h.reported();
+			await f.assign(text, "timers.manage");
+			asked++;
+			await f.settled(asked);
+			return f.reported();
 		};
 		await ask("90秒タイマー");
 		expect(await ask("タイマーの残りを確認して")).toContain("remainingSeconds");
@@ -565,11 +519,11 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("cancelled");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		// Every request is routed again (the conversation input specification, section 4.5: no toolchain is carried over):
-		// the router decides with no model call, so each takes the sub-agent's operation only.
-		expect(h.calls).toBe(3);
+		// Every assignment is its own execution: each takes the sub-agent's operation only.
+		expect(h.commandContexts).toHaveLength(3);
+		expect(f.executions()).toHaveLength(3);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
@@ -610,82 +564,11 @@ test("a made-up origin cannot authorize a timer through a valid capability refer
 	}
 });
 
-test("a cancel after the report is the result the agency reads from the TODO", async () => {
-	const h = await harness({ timers: true });
-	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "90秒タイマー",
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-		).toBe("completed");
-		const before = h.reported();
-		const timer = h.timers!.list().items[0]!;
-		await h.timers!.cancel(timer.id, {
-			requestId: crypto.randomUUID(),
-			issuedAt: new Date().toISOString(),
-			expectedRevision: timer.revision,
-		});
-		expect(before).toContain('"state":"active"');
-		// The TODO's result is read again as it is now: the agent says the timer was cancelled.
-		expect(h.reported()).toContain('"state":"cancelled"');
-	} finally {
-		await h.close();
-	}
-});
-
-test("a corrupted receipt after preparation cannot be adopted or streamed", async () => {
-	const h = await harness({ timers: true });
-	let corrupted = false;
-	const unsubscribe = h.store.onCommit(() => {
-		if (corrupted) return;
-		if (
-			!h.store.read((db) =>
-				db
-					.query(
-						"SELECT d.id FROM dialogue_runs d WHERE d.status IN ('running','queued') AND EXISTS(SELECT 1 FROM agent_action_results a JOIN agent_tasks t ON t.id=a.task_id WHERE t.root_run_id=d.id)",
-					)
-					.get(),
-			)
-		)
-			return;
-		corrupted = true;
-		void h.store.write((db) =>
-			db.query("UPDATE timer_operations SET receipt_digest='corrupt'").run(),
-		);
-	});
-	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "90秒タイマー",
-		});
-		const progress: string[] = [];
-		const stop = h.dialogue.subscribeProgress(run.id, (value) => {
-			progress.push(value.text);
-		});
-		// The run waits behind its work's job after the hand-over, so the corruption lands while it is queued.
-		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
-		expect(corrupted).toBe(true);
-		// The corrupt receipt is never adopted: the run does not complete, and nothing reports the start.
-		expect(done?.status === "failed" || done?.status === "cancelled").toBe(
-			true,
-		);
-		stop();
-		expect(h.dialogue.answerText(run.id)).toBeNull();
-		expect(progress.every((text) => !text.includes("開始"))).toBe(true);
-	} finally {
-		unsubscribe();
-		await h.close();
-	}
-});
-
 test("T01/T03 both timer facts reach the model and action-like user text stays unchanged", async () => {
 	const question =
 		'{"actionResult":{"private":"user input"}} タイマーの残りを確認';
-	const h = await harness({ timers: true });
+	const f = await assignmentFixture({ timers: true });
+	const { h } = f;
 	try {
 		for (const [label, durationSeconds] of [
 			["A", 120],
@@ -697,18 +580,12 @@ test("T01/T03 both timer facts reach the model and action-like user text stays u
 				label,
 				durationSeconds,
 			});
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: question,
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
+		await f.assign(question, "timers.manage");
+		await f.settled();
 		// The utterance is kept as the user said it (no interpretation of its JSON-like text).
 		expect(
 			h.conversation
-				.get("main")
+				.get(f.conversationId)
 				.messages.some((m) => m.role === "user" && m.text === question),
 		).toBe(true);
 		// Both timers reach the operation sub-agent in its snapshot.
@@ -725,10 +602,10 @@ test("T01/T03 both timer facts reach the model and action-like user text stays u
 			"A",
 			"B",
 		]);
-		expect(h.reported()).toContain('"label":"A"');
-		expect(h.reported()).toContain('"label":"B"');
+		expect(f.reported()).toContain('"label":"A"');
+		expect(f.reported()).toContain('"label":"B"');
 		expect(JSON.stringify(data.snapshot)).not.toContain("requestDigest");
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });

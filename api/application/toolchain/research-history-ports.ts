@@ -97,8 +97,11 @@ export function createReadPorts(
 			owner.rootRunId,
 			Date.now(),
 		);
+		// The user's words started it: as a conversation run, or as an assignment of the agent (its run has ended).
 		const origin =
-			autonomous ?? readActionOriginInTransaction(db, owner.rootRunId);
+			autonomous ??
+			runtime().executionOriginInTransaction(db, owner)?.source ??
+			readActionOriginInTransaction(db, owner.rootRunId);
 		if (!origin || !conversation) throw new Error("history_scope_unavailable");
 		return {
 			key:
@@ -106,7 +109,9 @@ export function createReadPorts(
 				JSON.stringify([owner.rootRunId, owner.taskId, owner.cancelEpoch]),
 			conversationId: origin.conversationId,
 			deadline: root.deadline,
-			...("messageId" in origin ? { excludeMessageId: origin.messageId } : {}),
+			...("messageId" in origin && origin.messageId
+				? { excludeMessageId: origin.messageId }
+				: {}),
 		};
 	}
 	const historyRoots = new Map<string, Set<string>>();

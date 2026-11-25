@@ -19,6 +19,7 @@ import {
 export type ScopePatch = {
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
+	droppedItems?: Set<string>;
 };
 
 export function createAgendaCheckpoints(input: {
@@ -51,7 +52,19 @@ export function createAgendaCheckpoints(input: {
 			gone([...n.refs, ...(n.inputs ?? [])]),
 		);
 		const lostRefs = new Set(lost.map((n) => `note:${n.id}`));
-		c.agent.forget([...set, ...aliases, ...lostRefs]);
+		const lostTickets = new Set(
+			c.tickets.filter(
+				(t) =>
+					gone([...t.refs, ...t.inputs]) || t.refs.some((r) => lostRefs.has(r)),
+			),
+		);
+		c.agent.forget([
+			...set,
+			...aliases,
+			...lostRefs,
+			...[...lostTickets].map((ticket) => ticket.itemId),
+		]);
+		if (lostTickets.size) c.agent.infoChanged(now());
 		// A records pass in flight is not kept (it read the words as they were).
 		c.forgetSeq++;
 		// Thoughts carry no refs: any forget takes them all off the screen.
@@ -66,10 +79,13 @@ export function createAgendaCheckpoints(input: {
 				c.id,
 				lost.map((n) => n.id),
 			);
-		c.tickets = c.tickets.filter(
-			(t) =>
-				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lostRefs.has(r)),
-		);
+		c.tickets = c.tickets.filter((t) => !lostTickets.has(t));
+		for (const ticket of lostTickets) {
+			c.assignments.delete(ticket.itemId);
+			c.observed.delete(ticket.id);
+		}
+		for (const [key, refusal] of c.researchRefusals)
+			if (gone(refusal.sources)) c.researchRefusals.delete(key);
 		for (const [item, done] of c.finished)
 			if (done.note && lost.some((n) => n.id === done.note!.id))
 				c.finished.delete(item);
@@ -81,10 +97,20 @@ export function createAgendaCheckpoints(input: {
 			const record = agendaRecord(c, hostDigest, now());
 			const change = patch?.get(c.id);
 			if (change) {
+				const original = record.snapshot as ReturnType<typeof agendaEnvelope>;
 				const snapshot = {
-					...(record.snapshot as ReturnType<typeof agendaEnvelope>),
-					...change,
+					...original,
+					tickets: change.tickets,
+					notes: change.notes,
 				};
+				if (change.droppedItems?.size) {
+					const keep = (item: { id: string }) =>
+						!change.droppedItems!.has(item.id);
+					snapshot.agent.items = snapshot.agent.items.filter(keep);
+					snapshot.assignments = snapshot.assignments?.filter(
+						(item) => !change.droppedItems!.has(item.itemId),
+					);
+				}
 				record.snapshot = snapshot;
 				record.sourceRefs = agendaSources(snapshot);
 			}

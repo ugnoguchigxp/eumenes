@@ -12,13 +12,23 @@ import { byId } from "../repository";
 import type { DialogueDeps } from "./context";
 import { commandSource } from "./command-source";
 import {
+	ANSWER_TEXT_SCHEMA,
 	commandPrompt,
 	commandOutputFor,
 	parseToolCommand,
 } from "./toolchain-command";
-import type { BoundInvocation } from "./command-apply";
 import { executionSourceInTransaction } from "./execution-source";
 import { specialistExecutionSource } from "./specialist-source";
+
+/** The typed operation of a bound chain, as the agent runtime executes it (route "action"). */
+type BoundInvocation = {
+	bindingRevisionId: string;
+	adapterRef: string;
+	packageRevisionId: string;
+	toolRevisionId: string;
+	operationName: string;
+	input: Record<string, unknown>;
+};
 
 /** The existing command translator, with a real source turn and a separate child-call identity. */
 export function executionCommands(deps: DialogueDeps) {
@@ -70,7 +80,6 @@ export function executionCommands(deps: DialogueDeps) {
 				conversationId: child.source.conversationId,
 			},
 			set,
-			{ toolchainRevisionId: child.chainRevisionId },
 			child,
 		);
 		if (!loaded.ok) throw new Error(loaded.code);
@@ -155,7 +164,7 @@ export function executionCommands(deps: DialogueDeps) {
 			return {
 				receipt,
 				question: out.question,
-				answerSchema: out.answerSchema ?? "builtin:answerText",
+				answerSchema: out.answerSchema ?? ANSWER_TEXT_SCHEMA,
 				questionSchema: out.answerSchema
 					? input.questionDetails[out.answerSchema]
 					: undefined,
@@ -249,7 +258,7 @@ export function executionCommands(deps: DialogueDeps) {
 			schema: string,
 			input: unknown,
 		) {
-			if (schema === "builtin:answerText")
+			if (schema === ANSWER_TEXT_SCHEMA)
 				return (
 					typeof input === "string" &&
 					input.trim().length > 0 &&

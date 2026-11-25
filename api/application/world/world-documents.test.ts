@@ -43,10 +43,10 @@ const read = (packet: Packet) => {
 test("collected seed reaches the existing worker and report without becoming a personal claim", async () => {
 	const h = await boot([search, read, report]);
 	await h.world.documents.import(SCOPE, seed);
-	const { done } = await h.ask("収集資料から搬入規程の対象を調べて");
-	expect(done?.status).toBe("completed");
+	const { execution } = await h.ask("収集資料から搬入規程の対象を調べて");
+	expect(execution.status).toBe("completed");
 	expect(h.packets[2]!.observations[0]!.origin).toBe("collected_document");
-	// The agency is given the finished TODO's result.
+	// The agent is given the finished execution's result.
 	const parent = h.reported();
 	expect(parent).toContain('"kind":"world_document"');
 	expect(parent).toContain("搬入規程");

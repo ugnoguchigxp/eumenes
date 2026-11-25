@@ -2,8 +2,7 @@ import type { Database } from "bun:sqlite";
 import { backgroundInput } from "./background-input";
 import type { DialogueDeps } from "./context";
 import type { ConversationPrefix } from "./conversation-input";
-import { workOfRun } from "../repository/work";
-import { workContextInput } from "./work-context-input";
+import { imageObservationInput } from "./generated-images";
 
 export function recordPromptSources(
 	deps: DialogueDeps,
@@ -20,7 +19,7 @@ export function recordPromptSources(
 		conversationId: string;
 		prefix: ConversationPrefix;
 		pendingIds: ReadonlySet<string>;
-		media: ReadonlyArray<{ workId: string }>;
+		media: ReadonlyArray<{ rootId: string }>;
 		notAdopted: boolean;
 	},
 ) {
@@ -30,8 +29,8 @@ export function recordPromptSources(
 	const pendingInput = memory.referenceInputs.captureInTransaction(tx, {
 		messageIds: [...pendingIds],
 	});
-	const mediaInputs = media.map(({ workId }) =>
-		workContextInput(deps, tx, workId, "image-observation"),
+	const mediaInputs = media.map(({ rootId }) =>
+		imageObservationInput(tx, rootId),
 	);
 	memory.referenceInputs.recordRunInTransaction(
 		tx,
@@ -49,7 +48,6 @@ export function recordPromptSources(
 				pendingInput.complete &&
 				mediaInputs.every((entry) => entry?.complete),
 		},
-		// An already committed work item still inherits the sources of the attempt that created it.
-		{ replace: notAdopted && workOfRun(tx, runId).length === 0 },
+		{ replace: notAdopted },
 	);
 }

@@ -1,8 +1,6 @@
 import { buildAnalysisFactory } from "./media/visual-perception";
 import { registerCaptureLibrary } from "./media/capture-library";
-import type { Database } from "bun:sqlite";
 import type { Capabilities } from "../domains/capabilities";
-import type { DialogueService } from "../domains/dialogue";
 import {
 	createExcalidraw,
 	registerDrawingOperations,
@@ -25,17 +23,13 @@ import {
 import type { Config } from "../infrastructure/config";
 import type { Core } from "./server-core";
 
-/**
- * Music, image, drawing and object recognition. Their jobs report into the
- * dialogue that is built after them, hence the lazy `dialogue`.
- */
+/** Music, image, drawing and object recognition. */
 export function buildMedia(
 	config: Config,
 	deps: {
 		core: Pick<Core, "store" | "queue" | "inference" | "settings">;
 		capabilities: Capabilities;
 		agents?: import("../domains/agent-runtime").AgentRuntime;
-		dialogue: () => DialogueService;
 	},
 ) {
 	const { store, queue, inference, settings } = deps.core;
@@ -57,12 +51,6 @@ export function buildMedia(
 		inference,
 		capabilities: deps.capabilities,
 		gateway: mediaGateway,
-		onJob: (db: Database, runId: string, jobId: string) =>
-			deps.dialogue().linkOperationJobInTransaction(db, runId, jobId),
-		onFinished: (db: Database, runId: string) =>
-			deps.dialogue().finishOperationInTransaction(db, runId),
-		onWaiting: (db: Database, runId: string, untilMs: number) =>
-			deps.dialogue().extendOperationDeadlineInTransaction(db, runId, untilMs),
 	};
 	const music = createMusic(mediaDependencies);
 	const image = createImage(mediaDependencies);

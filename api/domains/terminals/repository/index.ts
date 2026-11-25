@@ -41,12 +41,54 @@ CREATE INDEX terminal_requests_state ON terminal_requests(state);
 CREATE INDEX terminal_requests_session ON terminal_requests(terminal_session_id, state);
 `;
 
+/** Widens the origin CHECK to include 'execution' (work started by an agent execution). */
+const originExecutionMigration = `
+CREATE TABLE terminal_requests_next (
+ id TEXT PRIMARY KEY,
+ digest TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('queued','sending','delivered','started','completed','interrupted','ended','unknown','cancelled')),
+ reason TEXT,
+ owner TEXT NOT NULL,
+ target TEXT NOT NULL CHECK(target IN ('new','conversation','current')),
+ mode TEXT NOT NULL CHECK(mode IN ('work','commit')),
+ project_id TEXT NOT NULL,
+ task TEXT NOT NULL,
+ prompt TEXT NOT NULL,
+ origin TEXT NOT NULL CHECK(origin IN ('board','conversation','execution')),
+ conversation_id TEXT,
+ claude_session_id TEXT,
+ exclusive_group TEXT,
+ terminal_session_id TEXT,
+ terminal_run INTEGER,
+ prompt_id TEXT,
+ last_report TEXT,
+ files_json TEXT NOT NULL DEFAULT '[]',
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL
+);
+INSERT INTO terminal_requests_next(id,digest,state,reason,owner,target,mode,project_id,task,prompt,
+ origin,conversation_id,claude_session_id,exclusive_group,terminal_session_id,terminal_run,prompt_id,
+ last_report,files_json,created_at,updated_at)
+SELECT id,digest,state,reason,owner,target,mode,project_id,task,prompt,
+ origin,conversation_id,claude_session_id,exclusive_group,terminal_session_id,terminal_run,prompt_id,
+ last_report,files_json,created_at,updated_at FROM terminal_requests;
+DROP TABLE terminal_requests;
+ALTER TABLE terminal_requests_next RENAME TO terminal_requests;
+CREATE INDEX terminal_requests_state ON terminal_requests(state);
+CREATE INDEX terminal_requests_session ON terminal_requests(terminal_session_id, state);
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const migrations: readonly Migration[] = [
 	{
 		id: "terminals/0001-requests",
 		sql: migration,
 		after: ["queue/0001-init"],
+	},
+	{
+		id: "terminals/0002-request-origin-execution",
+		sql: originExecutionMigration,
+		after: ["terminals/0001-requests"],
 	},
 ];
 

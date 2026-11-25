@@ -150,9 +150,6 @@ export function settleIn(
 				createdAt: ctx.wiring.now(),
 				runId: generated.runId,
 			});
-			const todoRefs = (reply.todoRefs ?? []).map(
-				(ref) => resolve(ref) as string,
-			);
 			const about = (reply.about ?? []).map((ref) => resolve(ref) as string);
 			const { event: said } = events.appendInTransaction(db, {
 				conversationId: CONVERSATION_ID,
@@ -164,7 +161,6 @@ export function settleIn(
 					...(reply.origin && reply.origin !== "reply"
 						? { origin: reply.origin }
 						: {}),
-					...(todoRefs.length ? { todoRefs } : {}),
 					...(about.length ? { about } : {}),
 				},
 				messageIds: [id],

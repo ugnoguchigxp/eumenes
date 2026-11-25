@@ -82,7 +82,6 @@ test("the persistent save bar applies API-provided model and registered voice se
 				targets: [],
 			},
 		}),
-		toolchainInteractions: async () => [],
 		unsettledToolchainActions: async () => [],
 		submitToolchainAction: submit,
 	} as unknown as EumenesClient;

@@ -9,15 +9,19 @@ import { createGoalsService } from "../../domains/goals";
 import type { Messages } from "../../domains/inference/contracts";
 import { fixture as markdownFixture } from "../../domains/markdown/test/workspace.fixture";
 import { createTerminals } from "../../domains/terminals";
-import { waitFor } from "../../infrastructure/wait-for";
+import { replyWith } from "../agency/always-on.fixture";
 import {
-	afterUtterance,
-	searchThenDelegate,
-	type Step,
-} from "../toolchain/conversation-script.fixture";
-import { harness } from "../toolchain/toolchain.fixture";
+	ask,
+	assignmentAgenda,
+	cancelAssignment,
+	card,
+	items,
+	until,
+	userWords,
+} from "../media/assignment.fixture";
 import { configureDevelopmentSupervision } from "./development-supervision-host";
 
+const TOOLCHAIN = "development-supervision.request";
 const request = "入力処理を読んでください。集計の試験も実行してください。";
 const separateRequest = "別件としてログ出力の設計も調べてください。";
 const ownerPrompt = "入力はどれを対象にしますか。";
@@ -126,7 +130,7 @@ function seed(root: string) {
 	);
 }
 
-test("conversation work preserves the promoted question and controls the specified task at its observed revision", async () => {
+test("the agent holds the owner's questions as the assignment's question, passes the user's answers to the question that is open, and a cancel stops the assignment's works", async () => {
 	const root = realpathSync(
 		mkdtempSync(join(tmpdir(), "eumenes-supervision-controls-")),
 	);
@@ -194,58 +198,23 @@ test("conversation work preserves the promoted question and controls the specifi
 		},
 	};
 	const archive = markdownFixture();
-	let todo = "t1";
-	let target = "";
-	const readToolOutput = new Map<string, string>();
-	const calls = new Map<string, Step["calls"]>();
-	const h = await harness({
-		markdown: archive.archive,
-		memory: true,
-		webNote: {},
-		claudeRunner: runner,
-		terminals: (store) =>
-			createTerminals({
-				store,
-				command: ["fixture"],
-				spawn: () => {
-					throw new Error("unexpected terminal");
-				},
-			}),
-		discoveryTarget: () => "development_supervision",
-		firstRound: (_tools, text, messages) => {
-			if (text === request || text === separateRequest) {
-				return searchThenDelegate(
-					(card) => card.id === "development-supervision.request",
-					text,
-					{ impact: "none", announcement: "開発調査を進めます。" },
-				)(messages);
-			}
-			const exchanged = afterUtterance(messages);
-			if (exchanged.length) {
-				readToolOutput.set(
-					text,
-					exchanged.map(({ content }) => content).join("\n"),
-				);
-				return { text: "確認しました。" };
-			}
-			const operation =
-				text === "対象の進捗を教えてください。"
-					? "check"
-					: text.includes("取消")
-						? "cancel"
-						: "answer";
-			const selection =
-				operation === "check" || text === "集計の作業だけ取消してください。"
-					? { target }
-					: {};
-			const step = {
-				calls: [{ name: "work", args: { todo, operation, ...selection } }],
-			};
-			calls.set(text, step.calls);
-			return step;
+	const a = await assignmentAgenda({
+		harness: {
+			markdown: archive.archive,
+			webNote: {},
+			claudeRunner: runner,
+			terminals: (store) =>
+				createTerminals({
+					store,
+					command: ["fixture"],
+					spawn: () => {
+						throw new Error("unexpected terminal");
+					},
+				}),
+			structuredResponse: (messages) => structured(root, messages),
 		},
-		structuredResponse: (messages) => structured(root, messages),
 	});
+	const h = a.h;
 	try {
 		const owner = h.toolchain.developmentSupervision;
 		await h.store.write((db) =>
@@ -273,51 +242,42 @@ test("conversation work preserves the promoted question and controls the specifi
 			},
 		});
 		h.toolchain.claudeCode.start();
-		const turn = (text: string) =>
-			h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text,
-			});
+		await a.start();
 		const rows = () =>
 			h.store.read((db) =>
-				owner.boardRowsInTransaction(db, { conversationId: "main" }),
+				owner.boardRowsInTransaction(db, { conversationId: "ao" }),
 			);
-		const initial = await turn(request);
-		await waitFor(
+		const supervised = () =>
+			items(a).filter(
+				({ delegatedTo }) => delegatedTo === card(a, TOOLCHAIN).title,
+			);
+		const first = await ask(a, TOOLCHAIN, request);
+		await until(
+			a,
 			() =>
 				!!starts.get("verify") &&
-				h.todos().some(({ question }) => question === ownerPrompt),
-			{ timeout: 8_000 },
+				supervised().some(({ question }) => question === ownerPrompt),
 		).catch(() => {
 			throw new Error(
 				JSON.stringify({
-					initial: h.dialogue.get(initial.id)?.status,
-					answer: h.dialogue.answerText(initial.id),
-					todos: h.todos(),
+					items: items(a),
 					rows: rows(),
 					starts: [...starts.keys()],
 				}),
 			);
 		});
 		const verifier = starts.get("verify")!;
-		const shown = h.todos().find(({ question }) => question === ownerPrompt)!;
-		todo = `t${shown.ref}`;
-		const separate = await turn(separateRequest);
-		expect(
-			(await h.dialogue.waitForTerminal(separate.id, { timeoutMs: 5_000 }))
-				?.status,
-		).toBe("completed");
-		const open = h.todos();
-		expect(
-			open.filter(
-				({ toolchainId }) => toolchainId === "development-supervision.request",
-			),
-		).toHaveLength(2);
-		expect(open.find(({ id }) => id === shown.id)?.questionId).toBe(
-			shown.questionId,
+		const shown = supervised().find(
+			({ question }) => question === ownerPrompt,
+		)!;
+		expect(shown.id).toBe(first.id);
+		// A separate request is a separate assignment; the first one keeps the question it is asking.
+		const separate = await ask(a, TOOLCHAIN, separateRequest);
+		await until(a, () => supervised().length === 2);
+		expect(supervised().map(({ id }) => id)).toEqual([first.id, separate.id]);
+		expect(supervised().find(({ id }) => id === first.id)?.question).toBe(
+			ownerPrompt,
 		);
-		target = rows().find(({ title }) => title === checkTitle)!.taskId;
 		const verifyWork = observations.get(verifier)!;
 		verifyWork.seq++;
 		verifyWork.state = "waiting";
@@ -328,68 +288,54 @@ test("conversation work preserves the promoted question and controls the specifi
 			inputSchema: { type: "string" },
 			presentation: "waiting",
 		};
-		await waitFor(() =>
+		await until(a, () =>
 			rows().some(({ reason }) => reason === "質問の提示待ち"),
 		);
-		const answer1 = await turn("入力は配列です。");
-		await waitFor(() => h.dialogue.get(answer1.id)?.status === "completed");
-		const second = h.todos().find(({ question }) => question === runnerPrompt)!;
-		expect(second).toMatchObject({ status: "waiting", ref: shown.ref });
-		expect(second.questionId).not.toBe(shown.questionId);
-		const answer2 = await turn("期待値は2件です。");
-		await waitFor(
-			() =>
-				h.dialogue.get(answer2.id)?.status === "completed" &&
-				replies.length === 1,
-		);
-		expect(replies).toEqual([{ id: verifier, answer: "期待値は2件です。" }]);
-		const check = await turn("対象の進捗を教えてください。");
-		await waitFor(() => h.dialogue.get(check.id)?.status === "completed");
-		const status = readToolOutput.get("対象の進捗を教えてください。");
-		expect(status).toContain(target);
-		expect(status).not.toContain(
-			rows().find(({ title }) => title === readerTitle)!.taskId,
-		);
-		expect(status).toContain(
-			`"revision":${rows().find(({ taskId }) => taskId === target)!.revision}`,
-		);
-		const noScope = await turn("作業の取消をお願いします。");
-		await waitFor(() => h.dialogue.get(noScope.id)?.status === "completed");
-		expect(readToolOutput.get("作業の取消をお願いします。")).toContain(
-			"work_target_required",
-		);
-		expect(stopped).toEqual([]);
-		await waitFor(() =>
-			rows().some((row) => row.taskId === target && row.state === "running"),
-		);
-		const cancel = await turn("集計の作業だけ取消してください。");
-		await waitFor(
-			() =>
-				h.dialogue.get(cancel.id)?.status === "completed" &&
-				rows().some((row) => row.taskId === target && row.state === "finished"),
-			{ timeout: 8_000 },
-		).catch(() => {
-			throw new Error(
-				JSON.stringify({
-					turn: h.dialogue.get(cancel.id)?.status,
-					output: readToolOutput.get("集計の作業だけ取消してください。"),
-					rows: rows(),
-					stopped,
-				}),
+		// The user's answer goes to the question that is open; the runner's question follows it.
+		const answer = (id: string, text: string) =>
+			userWords(a, text).then((words) =>
+				replyWith(
+					a,
+					[{ name: "assignment", arguments: { id, action: "answer", text } }],
+					{
+						runId: `run-${crypto.randomUUID()}`,
+						messageIds: [words.messageId],
+					},
+				),
 			);
-		});
+		const answered = await answer(first.id, "入力は配列です。");
 		expect(
-			calls.get("集計の作業だけ取消してください。")?.at(0)?.args.target,
-		).toBe(target);
-		expect(stopped).toEqual([verifier]);
-		expect(rows().find(({ taskId }) => taskId === target)).toMatchObject({
+			answered.seen[1]!.filter((m) => m.role === "tool").map((m) => m.content),
+		).toEqual([`answered: ${card(a, TOOLCHAIN).title}に回答を渡した`]);
+		await until(a, () =>
+			supervised().some(({ question }) => question === runnerPrompt),
+		);
+		expect(
+			supervised().find(({ question }) => question === runnerPrompt)?.id,
+		).toBe(first.id);
+		await answer(first.id, "期待値は2件です。");
+		await until(a, () => replies.length === 1);
+		expect(replies).toEqual([{ id: verifier, answer: "期待値は2件です。" }]);
+		expect(stopped).toEqual([]);
+		// The check is running when the user stops the assignment.
+		await until(a, () =>
+			rows().some((row) => row.title === checkTitle && row.state === "running"),
+		);
+		const cancelled = await cancelAssignment(
+			a,
+			first.id,
+			"調べるのをやめてください。",
+		);
+		expect(
+			cancelled.seen[1]!.filter((m) => m.role === "tool").map((m) => m.content),
+		).toEqual([`cancelled: ${card(a, TOOLCHAIN).title}への依頼をやめた`]);
+		await until(a, () => stopped.includes(verifier));
+		expect(supervised().map(({ id }) => id)).toEqual([separate.id]);
+		expect(rows().find(({ title }) => title === checkTitle)).toMatchObject({
 			outcome: "cancelled",
 		});
-		expect(rows().find(({ title }) => title === readerTitle)?.state).not.toBe(
-			"finished",
-		);
 	} finally {
-		await h.close();
+		await a.close();
 		rmSync(root, { recursive: true, force: true });
 	}
-}, 25_000);
+}, 30_000);

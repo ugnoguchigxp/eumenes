@@ -33,7 +33,6 @@ export const queryRoots = {
 	terminals: "terminals",
 	kanban: "kanban",
 	toolchainArtifacts: "toolchain-artifacts",
-	toolchainInteractions: "toolchain-interactions",
 	steward: "steward",
 } as const;
 
@@ -67,7 +66,6 @@ export const changeRoots = [
 	queryRoots.shell,
 	queryRoots.terminals,
 	queryRoots.kanban,
-	queryRoots.toolchainInteractions,
 	queryRoots.steward,
 ] as const;
 

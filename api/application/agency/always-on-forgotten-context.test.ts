@@ -65,14 +65,6 @@ for (const withCompletedWork of [false, true]) {
 			prefix()
 				.messages.map((m) => m.content)
 				.join("\n");
-		const archived = () =>
-			f.h.store.read((db) =>
-				f.h.dialogue.todoPageInTransaction(db, "ao", {
-					state: "archived",
-					pageIndex: 0,
-					pageSize: 10,
-				}),
-			).rows;
 		try {
 			await f.start();
 			const run = await f.h.dialogue.submit({
@@ -82,16 +74,11 @@ for (const withCompletedWork of [false, true]) {
 			});
 			await waitFor(() => f.h.dialogue.get(run.id)?.status === "completed");
 			await settle();
-			let ref = 0;
-			if (withCompletedWork) {
+			if (withCompletedWork)
 				await waitFor(async () => {
 					await f.advance(1000);
 					return f.host.inspect("ao")!.snapshot.notes.length === 1;
 				});
-				await waitFor(() => archived().length === 1);
-				ref = archived()[0]!.ref;
-				expect(text()).toContain(`t${ref} `);
-			}
 			// Before forgetting: the topic and its answer are in what the next call reads.
 			expect(text()).toContain(TOPIC);
 			expect(text()).toContain(ANSWER);
@@ -110,7 +97,8 @@ for (const withCompletedWork of [false, true]) {
 			expect(text()).not.toContain(TOPIC);
 			expect(text()).not.toContain(ANSWER);
 			expect(prefix().input?.sources ?? []).not.toContain(forgottenId);
-			if (withCompletedWork) expect(text()).not.toContain(`t${ref} `);
+			if (withCompletedWork)
+				expect(f.host.inspect("ao")!.snapshot.notes).toHaveLength(0);
 			// The next background call reads none of it either.
 			const calls = f.requests.length;
 			await f.user("user-b", "ao", "今は別の景色を眺めるのが楽しみです。");

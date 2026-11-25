@@ -40,7 +40,6 @@ async function fixture(
 		undefined,
 		adoption
 			? {
-					workChangedInTransaction: () => {},
 					replyInputInTransaction: () => ({
 						sources: [],
 						complete: adoption.complete,

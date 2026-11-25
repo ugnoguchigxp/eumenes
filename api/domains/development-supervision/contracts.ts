@@ -199,13 +199,6 @@ export type SupervisionHost = Pick<
 		): void;
 	};
 	revokeInTransaction(db: Database, noticeId: string): void;
-	confirmedRequestInTransaction?(
-		db: Database,
-		source: ExecutionSource,
-		confirmationId: string,
-		requestedText: string,
-	): { request: string; digest: string } | null;
-	ledgerInTransaction?(db: Database, view: ExecutionView): void;
 	workspace: {
 		inTransaction(
 			db: Database,

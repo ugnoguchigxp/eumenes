@@ -58,7 +58,6 @@ export function createLiveDelivery(
 		db: Database,
 		run: { id: string; conversationId: string },
 		text: string,
-		confirmation = false,
 	) {
 		const linked = db
 			.query("SELECT session_id FROM live_voice_runs WHERE run_id=?")
@@ -69,15 +68,6 @@ export function createLiveDelivery(
 			db.query(
 				"INSERT INTO live_voice_outputs(session_id,run_id,text,kind) VALUES(?,?,?,?)",
 			).run(linked.session_id, run.id, text, "commentary");
-			if (confirmation)
-				db.query(
-					"INSERT OR IGNORE INTO live_voice_notices VALUES(?,?,?,?,0)",
-				).run(
-					`confirmation:${run.id}`,
-					linked.session_id,
-					text,
-					"confirmation",
-				);
 		}
 		return true;
 	}
@@ -128,22 +118,15 @@ export function createLiveDelivery(
 		});
 		return "full";
 	}
-	async function displayed(
-		id: string,
-		noticeId: string,
-		onDisplayed?: (db: Database, conversationId: string) => void,
-	) {
+	async function displayed(id: string, noticeId: string) {
 		await store.write((db) => {
 			const row = session(db, id);
 			if (!row || row.status !== "active")
 				throw new Error("live_session_inactive");
 			const n = db
-				.query(
-					"SELECT kind FROM live_voice_notices WHERE id=? AND session_id=?",
-				)
-				.get(noticeId, id) as { kind: string } | null;
+				.query("SELECT 1 FROM live_voice_notices WHERE id=? AND session_id=?")
+				.get(noticeId, id);
 			if (!n) throw new Error("live_notice_missing");
-			onDisplayed?.(db, row.conversation_id);
 			db.query("UPDATE live_voice_notices SET displayed=1 WHERE id=?").run(
 				noticeId,
 			);
@@ -151,22 +134,5 @@ export function createLiveDelivery(
 		waiters.get(noticeId)?.();
 		sendState(id);
 	}
-	function report(
-		db: Database,
-		input: { id: string; runId: string; conversationId: string; text: string },
-	) {
-		const row = active(db, input.conversationId);
-		if (!row || row.test || row.status !== "active" || !usable(row.id))
-			return false;
-		const noticeId = `report:${input.id}`;
-		const inserted = db
-			.query("INSERT OR IGNORE INTO live_voice_notices VALUES(?,?,?,?,0)")
-			.run(noticeId, row.id, input.text, "announcement");
-		if (inserted.changes)
-			db.query(
-				"INSERT INTO live_voice_outputs(session_id,run_id,text,kind) VALUES(?,?,?,'report')",
-			).run(row.id, input.runId, input.text);
-		return true;
-	}
-	return { owns, assertCurrent, capture, offer, announce, displayed, report };
+	return { owns, assertCurrent, capture, offer, announce, displayed };
 }

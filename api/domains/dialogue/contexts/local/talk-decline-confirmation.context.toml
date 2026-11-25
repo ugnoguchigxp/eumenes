@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/talk-work-controls.ts
-text = '''State の確認（c<n>）を閉じる。取消は followUp=cancel。訂正のため旧案を閉じて追加情報を待つときは followUp=revise（訂正内容が揃っていれば delegate の revises を使う）。'''

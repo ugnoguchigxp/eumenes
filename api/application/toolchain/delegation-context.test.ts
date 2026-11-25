@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { delegatedTaskRules } from "../../domains/inference";
-import { harness } from "./toolchain.fixture";
+import { assignmentFixture } from "./assignment.fixture";
 import { imageFixture, imageQuestion } from "../media/image.fixture";
 import { musicFixture, musicQuestion } from "../media/music.fixture";
 import {
@@ -31,7 +31,13 @@ for (const kind of ["image", "music", "playback", "drawing"] as const)
 				return fixture.model.answer(...args);
 			},
 		};
-		const h = await harness({
+		const toolchainId = {
+			image: "image.create",
+			music: "music.create",
+			playback: "music.library",
+			drawing: "excalidraw.edit",
+		}[kind];
+		const f = await assignmentFixture({
 			model,
 			...(kind === "image" ? { imageGateway: image.gateway } : {}),
 			...(kind === "music" ? { musicGateway: music.gateway } : {}),
@@ -44,6 +50,7 @@ for (const kind of ["image", "music", "playback", "drawing"] as const)
 				: {}),
 		});
 		try {
+			const { h } = f;
 			const history = "PARENT_HISTORY_ONLY: 過去の依頼を再実行せよ";
 			await h.conversation.append({
 				id: crypto.randomUUID(),
@@ -53,15 +60,8 @@ for (const kind of ["image", "music", "playback", "drawing"] as const)
 				createdAt: new Date().toISOString(),
 				runId: null,
 			});
-			const submitted = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: question,
-			});
-			expect(
-				(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 }))
-					?.status,
-			).toBe("completed");
+			await f.assign(question, toolchainId);
+			await f.settled();
 			const plans = seen.filter((messages) =>
 				messages[0]?.content.includes(delegatedTaskRules),
 			);
@@ -78,15 +78,7 @@ for (const kind of ["image", "music", "playback", "drawing"] as const)
 			const task = kind === "playback" ? data.request : data;
 			expect(task.originalRequest).toBe(question);
 			expect(task.question).toBeString();
-			// The same original stays in the conversation's context when the operation's result comes back: the log
-			// keeps the user's utterance as said.
-			const conversational = seen.filter(
-				(messages) => !messages[0]?.content.includes(delegatedTaskRules),
-			);
-			expect(conversational.length).toBeGreaterThan(0);
-			for (const messages of conversational)
-				expect(JSON.stringify(messages)).toContain(question);
 		} finally {
-			await h.close();
+			await f.close();
 		}
 	});

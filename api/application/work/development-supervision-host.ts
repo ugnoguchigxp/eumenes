@@ -33,10 +33,7 @@ export function configureDevelopmentSupervision(input: {
 	markdown: MarkdownService;
 	dialogue: Pick<
 		DialogueService,
-		| "notifyInTransaction"
-		| "revokeExecutionNoticeInTransaction"
-		| "reportExecutionInTransaction"
-		| "confirmedRequestInTransaction"
+		"notifyInTransaction" | "revokeExecutionNoticeInTransaction"
 	>;
 	context: Pick<
 		Parameters<typeof supervisionBuildContext>[0],
@@ -98,8 +95,6 @@ export function configureDevelopmentSupervision(input: {
 		validReferenceInTransaction: execution.validReferenceInTransaction,
 		readReferenceInTransaction: execution.readReferenceInTransaction,
 		revokeInTransaction: dialogue.revokeExecutionNoticeInTransaction,
-		ledgerInTransaction: dialogue.reportExecutionInTransaction,
-		confirmedRequestInTransaction: dialogue.confirmedRequestInTransaction,
 		deliverInTransaction(db, view, eventId) {
 			if (!supervisor.task.viewInTransaction(db, view.id)) return false;
 			dialogue.notifyInTransaction(db, {

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
+import { assignmentFixture } from "./assignment.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 function wav() {
@@ -25,19 +26,6 @@ async function accept(h: Awaited<ReturnType<typeof harness>>) {
 			!!h.voice.get(id)?.runId ||
 			["completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
 	);
-	if (h.voice.get(id)?.runId && h.settings.get().voice.autoSpeak) {
-		await until(
-			() =>
-				!!h.voice.get(id)?.audioChunks?.length ||
-				h.voice.get(id)?.status === "failed",
-		);
-		const notice = h.voice.get(id)!.audioChunks?.[0];
-		if (h.dialogue.get(h.voice.get(id)!.runId!)?.announcement) {
-			// The router's hand-over is announced by the host.
-			expect(notice?.text).toBe("「タイマー」に頼みます。");
-			await h.voice.played(id, notice!.index);
-		}
-	}
 	return id;
 }
 test("silence completes without creating a dialogue, cancelling another run or synthesizing speech", async () => {
@@ -57,17 +45,24 @@ test("silence completes without creating a dialogue, cancelling another run or s
 	}
 });
 
-test("a committed timer result is reported by the agency, not by the turn: the notice is the only speech and the timer runs once", async () => {
-	const h = await harness({ timers: true, voiceText: "3分タイマー測って" });
+test("a voice request handed to the timer toolchain is the agent's assignment: the timer runs once and the agent reports it", async () => {
+	const f = await assignmentFixture({
+		timers: true,
+		voiceText: "3分タイマー測って",
+	});
+	const { h } = f;
 	try {
+		await f.attend("main");
 		const id = await accept(h);
-		await until(() =>
-			["played", "completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
-		);
-		expect(h.voice.get(id)?.status).toBe("played");
-		expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
-		expect(h.spoken).toEqual(["「タイマー」に頼みます。"]);
-		expect(h.reported()).toContain("180");
+		const turn = h.voice.get(id)!;
+		await f.assignRun(turn.runId!, "timers.manage");
+		await f.settled(1, "main");
+		expect(f.executions("main")).toMatchObject([{ status: "completed" }]);
+		expect(f.reported("main")).toContain("180");
+		// The agent reports the finished timer in its own words; the host speaks no announcement of its own (only the
+		// conversation's reply to the user's words was synthesized).
+		await f.until(() => f.notes("main").length === 1);
+		expect(h.spoken).toEqual(["承知しました。"]);
 		expect(
 			h.store.read((db) =>
 				db
@@ -78,6 +73,6 @@ test("a committed timer result is reported by the agency, not by the turn: the n
 			),
 		).toEqual({ n: 1 });
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });

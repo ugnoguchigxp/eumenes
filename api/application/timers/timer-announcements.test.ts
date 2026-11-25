@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { conversationSchema } from "../../domains/conversation/contracts";
 import { harness } from "../toolchain/toolchain.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
 import { createTimerAnnouncements } from "./timer-announcements";
 import { createConversationService } from "../../domains/conversation";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -8,20 +9,15 @@ import { waitFor } from "../../infrastructure/wait-for";
 test("a three-minute tool request posts one assistant completion at the deadline and survives recovery", async () => {
 	const startedAt = Date.now();
 	let now = startedAt;
-	const h = await harness({ timers: true, timerNow: () => now });
+	const f = await assignmentFixture({ timers: true, timerNow: () => now });
+	const { h } = f;
 	const messages = async () =>
 		conversationSchema.parse(
-			await (await h.request("/api/conversations/main")).json(),
+			await (await h.request(`/api/conversations/${f.conversationId}`)).json(),
 		).messages;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "3分タイマー測って",
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-		).toBe("completed");
+		await f.assign("3分タイマー測って", "timers.manage");
+		await f.settled();
 		now = startedAt + 179999;
 		await h.scheduler.tick();
 		expect(
@@ -53,7 +49,7 @@ test("a three-minute tool request posts one assistant completion at the deadline
 			),
 		).toHaveLength(1);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 

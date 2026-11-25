@@ -1,10 +1,10 @@
 import { createContinuityService } from "../../domains/continuity";
 import {
-	candidatesOf,
 	conversationByScript,
-	utteranceOf,
-	searchThenDelegate,
+	isNoticeRound,
 } from "../toolchain/conversation-script.fixture";
+import { configureTaskExecution } from "../toolchain/task-execution-port";
+import { waitFor } from "../../infrastructure/wait-for";
 import { afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -186,7 +186,6 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 	const settings = await createSettings(store, { dbPath });
 	const packets: Packet[] = [];
 	const workerMessages: string[] = [];
-	const offered: string[] = [];
 	let position = 0;
 	let hooks!: {
 		retractClaim(): Promise<void>;
@@ -208,16 +207,9 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			// The conversation finds the World query toolchain and hands over the question.
-			const conversationStep = (loop: typeof messages) => {
-				const candidates = candidatesOf(loop);
-				if (candidates) offered.push(JSON.stringify(candidates));
-				return searchThenDelegate(
-					(candidate) => candidate.id === "world.query",
-					utteranceOf(loop),
-					{ announcement: "照会します。", impact: "none" },
-				)(loop);
-			};
+			// The conversation answers the user's words in words: the question goes to World's toolchain as an
+			// execution the test starts (the agent's assignment starts it at its owner the same way).
+			const conversationStep = () => ({ text: "承知しました。" });
 			const conversation = conversationByScript(
 				callOptions,
 				messages,
@@ -232,6 +224,8 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 				if (!step) throw new Error("replay_extra_model_call");
 				return JSON.stringify(await step(packet, hooks));
 			}
+			// The finished execution's notice is answered with no words: the agent reports it, not this reply.
+			if (isNoticeRound(messages as never)) return "";
 			throw new Error("fixture_unexpected_model_call");
 		},
 	};
@@ -437,6 +431,19 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		worldContext: world.context,
 	} as never);
 	links.attachDialogue(dialogue);
+	configureTaskExecution({
+		store,
+		queue,
+		capabilities: toolchain.capabilities,
+		agents: toolchain.agents,
+		routing,
+		registry: toolchain.registry,
+		dialogue,
+		conversation,
+		inference,
+		memory,
+		childOperations: toolchain.childOperations,
+	});
 	toolchain.agents.start();
 	queue.start();
 	if (options.feed !== false) world.start();
@@ -450,14 +457,38 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		await store.close().catch(() => {});
 		rmSync(dir, { recursive: true, force: true });
 	});
+	/**
+	 * The user's words, handed to the World query toolchain the way the agent's assignment starts it: the execution
+	 * is started at its owner with the user's message as its source, and ends with its result.
+	 */
 	const ask = async (text: string) => {
 		const run = await dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
 			text,
 		});
-		const done = await dialogue.waitForTerminal(run.id, { timeoutMs: 10000 });
-		return { run, done };
+		await dialogue.waitForTerminal(run.id, { timeoutMs: 10000 });
+		const card = store
+			.read((db) => routing.catalogInTransaction(db))
+			.find((c) => c.id === "world.query");
+		if (!card) throw new Error("fixture_toolchain_missing: world.query");
+		const started = await store.write((db) =>
+			toolchain.agents.executions.startSelectedInTransaction(db, {
+				source: dialogue.executionSourceInTransaction(db, run.id)!,
+				chainRevisionId: card.revisionId,
+				request: text,
+				references: [],
+				deadline: Date.now() + 300_000,
+			}),
+		);
+		await waitFor(
+			() =>
+				!["queued", "deciding", "waiting_child", "waiting_user"].includes(
+					toolchain.agents.executions.get(started.id)?.status ?? "queued",
+				),
+			{ timeout: 10000 },
+		);
+		return { run, execution: toolchain.agents.executions.get(started.id)! };
 	};
 	return {
 		store,
@@ -467,21 +498,14 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		ask,
 		packets,
 		workerMessages,
-		/** The results of the conversation's finished TODOs, oldest first: what their notices tell. */
+		/** The results of the conversation's executions, oldest first: what the agent reports from. */
 		reported: () =>
 			JSON.stringify(
-				store
-					.read((db) =>
-						dialogue.todoPageInTransaction(db, "main", {
-							state: "archived",
-							pageIndex: 0,
-							pageSize: 50,
-						}),
-					)
-					.rows.reverse()
-					.map((row) => row.result),
+				toolchain.agents.executions
+					.list("main")
+					.reverse()
+					.map((e) => e.result),
 			),
-		offered,
 		hooks,
 	};
 }

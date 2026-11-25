@@ -22,6 +22,8 @@ export function singleExecution(ctx: ExecutionContext, ops: ExecutionOps) {
 				arguments?: Record<string, unknown>;
 				references: ExecutionReference[];
 				deadline: number;
+				/** Distinguishes starts from one source (several assignments asked in one utterance). */
+				startKey?: string;
 			},
 		) {
 			const port = ctx.port();
@@ -49,7 +51,9 @@ export function singleExecution(ctx: ExecutionContext, ops: ExecutionOps) {
 				)
 			)
 				throw new Error("execution_reference_invalid");
-			const key = `selected:${input.source.runId}:${input.source.digest}`;
+			const key = input.startKey
+				? `selected:key:${input.startKey}`
+				: `selected:${input.source.runId}:${input.source.digest}`;
 			const digest = hash(input);
 			const prior = db
 				.query("SELECT * FROM agent_executions WHERE start_key=?")

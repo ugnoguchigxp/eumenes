@@ -1,45 +1,54 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicLibraryFixture, playbackQuestion } from "./music-library.fixture";
-import { settle, waitFor } from "../../infrastructure/wait-for";
+import { settle } from "../../infrastructure/wait-for";
+import {
+	ask,
+	assignmentAgenda,
+	cancelAssignment,
+	ended,
+	notes,
+	plannedBy,
+	reportLine,
+	until,
+} from "./assignment.fixture";
+const agenda = (
+	f: ReturnType<typeof musicLibraryFixture>,
+	gateway: typeof f.gateway = f.gateway,
+) =>
+	assignmentAgenda({
+		harness: {
+			model: plannedBy({ library: f }),
+			musicGateway: gateway,
+		},
+	});
 const token = "Bearer fixture-token-for-toolchain-browser";
 test("playback planning corrects model JSON before the library request", async () => {
 	const f = musicLibraryFixture(true);
-	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const a = await agenda(f);
 	try {
-		const run = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: playbackQuestion,
-			})
-		).json();
-		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		expect(h.music!.playback.list("main")[0]).toMatchObject({
+		await a.start();
+		await ask(a, "music.library", playbackQuestion);
+		await until(a, () => ended(a));
+		expect(a.h.music!.playback.list("ao")[0]).toMatchObject({
 			state: "completed",
 			query: { tags: ["明るい", "ピアノ"] },
 		});
-		expect(f.stages).toEqual(["route", "plan"]);
+		expect(f.stages).toEqual(["plan"]);
 	} finally {
-		await h.close();
+		await a.close();
 	}
 });
 test("playback package routes through planning, saved references, parent answer and authenticated Range relay", async () => {
 	const f = musicLibraryFixture(),
-		h = await harness({ model: f.model, musicGateway: f.gateway });
+		a = await agenda(f),
+		h = a.h;
 	try {
-		const run = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: playbackQuestion,
-			})
-		).json();
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
+		await a.start();
+		const { source } = await ask(a, "music.library", playbackQuestion);
+		await until(a, () => ended(a));
 		const list = await (
-			await h.request("/api/music/playlists?conversationId=main")
+			await h.request("/api/music/playlists?conversationId=ao")
 		).json();
 		expect(list).toHaveLength(1);
 		expect(list[0]).toMatchObject({
@@ -48,8 +57,11 @@ test("playback package routes through planning, saved references, parent answer 
 			query: { tags: ["明るい", "ピアノ"] },
 			trackIds: ["two", "one"],
 		});
-		expect(f.stages).toEqual(["route", "plan"]);
-		expect(h.dialogue.answerText(run.id)).toBeNull();
+		// The playlist is the work of the user's words, and the agent reports it on its own.
+		expect(list[0]).toMatchObject({ runId: source.runId });
+		await until(a, () => !!reportLine(a));
+		expect(notes(a)).toHaveLength(1);
+		expect(f.stages).toEqual(["plan"]);
 		expect(await (await h.request("/api/music")).json()).toEqual([]);
 		expect(
 			f.requests.every(
@@ -81,7 +93,7 @@ test("playback package routes through planning, saved references, parent answer 
 		expect(bad.status).toBe(416);
 		expect(bad.headers.get("Content-Range")).toBe(`bytes */${f.audio.length}`);
 	} finally {
-		await h.close();
+		await a.close();
 	}
 });
 test("library pagination retains AND tags and sort; favorite, removal, global tags and contract errors are distinct", async () => {
@@ -139,7 +151,7 @@ test("library pagination retains AND tags and sort; favorite, removal, global ta
 		await h.close();
 	}
 });
-test("cancelled playback never adopts a late library response", async () => {
+test("a cancelled playback assignment never adopts a late library response", async () => {
 	const f = musicLibraryFixture();
 	let started = false,
 		release!: () => void;
@@ -159,29 +171,25 @@ test("cancelled playback never adopts a late library response", async () => {
 			},
 		};
 	};
-	const h = await harness({ model: f.model, musicGateway: gateway });
+	const a = await agenda(f, gateway);
 	try {
-		const r = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: playbackQuestion,
-			})
-		).json();
-		await waitFor(() => !!started);
+		await a.start();
+		const { id } = await ask(a, "music.library", playbackQuestion);
+		await until(a, () => started);
 		expect(started).toBe(true);
-		await h.dialogue.cancel(r.id);
+		await cancelAssignment(a, id);
 		release();
 		await settle();
-		expect(h.music!.playback.list("main")[0]?.state).toBe("cancelled");
-		expect(h.music!.playback.list("main")[0]?.trackIds).toEqual([]);
-		expect(h.dialogue.get(r.id)?.status).toBe("cancelled");
-		expect(f.stages).toEqual(["route", "plan"]);
+		await until(a, () => ended(a));
+		expect(a.h.music!.playback.list("ao")[0]?.state).toBe("cancelled");
+		expect(a.h.music!.playback.list("ao")[0]?.trackIds).toEqual([]);
+		expect(notes(a)).toHaveLength(0);
+		expect(f.stages).toEqual(["plan"]);
 	} finally {
 		release?.();
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 test("Bun streaming relay remains valid through Node HTTP proxies", async () => {
 	const f = musicLibraryFixture(),
 		h = await harness({ model: f.model, musicGateway: f.gateway });

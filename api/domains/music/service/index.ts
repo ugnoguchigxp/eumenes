@@ -8,7 +8,6 @@ import type { LarmPlayground } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import {
 	row,
-	byRun,
 	byTrack,
 	record,
 	patch,
@@ -30,10 +29,6 @@ export function createMusic(deps: {
 	inference: InferencePort;
 	capabilities: Capabilities;
 	gateway: () => LarmPlayground;
-	onJob: (db: Database, runId: string, jobId: string) => void;
-	onFinished: (db: Database, runId: string) => void;
-	/** Extends the conversation run's deadline for a capacity wait; its deadline afterwards, or null. */
-	onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
 	validateExecutionInTransaction?: (
 		db: Database,
 		child: ChildExecution,
@@ -43,7 +38,6 @@ export function createMusic(deps: {
 	function enqueue(
 		db: Database,
 		id: string,
-		runId: string,
 		deadline: number,
 		stage: "plan" | "generate",
 		wait?: { at: number; count: number },
@@ -64,8 +58,6 @@ export function createMusic(deps: {
 			job.id,
 			id,
 		);
-		if (!JSON.parse(row(db, id)!.request_json).execution)
-			deps.onJob(db, runId, job.id);
 		return job.id;
 	}
 	function fail(db: Database, id: string, code: string) {
@@ -73,7 +65,6 @@ export function createMusic(deps: {
 		if (!r || !active(record(r))) return;
 		const state = code === "provider_cancelled" ? "cancelled" : "failed";
 		patch(db, id, { state, errorCode: code, phase: state });
-		if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 	}
 	function cancel(db: Database, job: { payload: { id: string } }) {
 		const r = row(db, job.payload.id);
@@ -103,20 +94,15 @@ export function createMusic(deps: {
 				question: string;
 				originalRequest: string;
 				deadline: number;
-				execution?: ChildExecution;
+				execution: ChildExecution;
 			},
 		) {
-			const existing = input.execution
-				? row(db, input.execution.id)
-				: byRun(db, input.runId);
+			const id = input.execution.id;
+			const existing = row(db, id);
 			if (existing) return { id: existing.id, jobId: existing.queue_job_id! };
 			const request = musicRequest.parse({ question: input.question });
-			if (
-				input.execution &&
-				!deps.validateExecutionInTransaction?.(db, input.execution)
-			)
+			if (!deps.validateExecutionInTransaction?.(db, input.execution))
 				throw new Error("execution_changed");
-			const id = input.execution?.id ?? crypto.randomUUID();
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
@@ -151,21 +137,16 @@ export function createMusic(deps: {
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
-					...(input.execution
-						? { execution: input.execution, references: input.execution.refs }
-						: {}),
+					execution: input.execution,
+					references: input.execution.refs,
 				}),
 				JSON.stringify(prepared),
 				input.deadline,
 			);
 			return {
 				id,
-				jobId: enqueue(db, id, input.runId, input.deadline, "plan"),
+				jobId: enqueue(db, id, input.deadline, "plan"),
 			};
-		},
-		resultInTransaction(db: Database, runId: string) {
-			const r = byRun(db, runId);
-			return r ? record(r) : playback.resultInTransaction(db, runId);
 		},
 		purgeCallInTransaction(db: Database, id: string) {
 			db.query(

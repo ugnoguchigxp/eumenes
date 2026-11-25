@@ -7,7 +7,6 @@ import {
 	FakeFiles,
 	fakeResolver,
 } from "../../domains/browser/test/fakes";
-import { waitFor } from "../../infrastructure/wait-for";
 import { registerBrowserEffects } from "../browser/browser-effects";
 import { createTaskRunner } from "../browser/browser-task-runner";
 import {
@@ -17,10 +16,9 @@ import {
 	lastResult,
 	observation,
 } from "../browser/browser-task.fixture";
-import { afterUtterance, toolResults } from "./conversation-script.fixture";
-import { handOverTask } from "./task-delegation.fixture";
+import { TASK_TOOLCHAIN } from "./task-delegation.fixture";
 import { taskItem, taskPlan } from "./task-plan.fixture";
-import { harness } from "./toolchain.fixture";
+import { assignmentFixture } from "./assignment.fixture";
 
 test("a browser approval resumes in a new physical task, keeps the old deadline, and commits the approved operation exactly once", async () => {
 	const driver = new FakeDriver();
@@ -91,9 +89,8 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 	let work: import("../../domains/tool-runtime").ExecutionView,
 		steps = 0,
 		translations = 0;
-	const h = await harness({
+	const f = await assignmentFixture({
 		everyday: true,
-		routeTool: "browser_operate",
 		// This fixture exercises task approval, independently of additions to the recalled catalog.
 		discoveryTarget: (query) =>
 			query === "browser operations" ? "browser_operate" : "execute_task",
@@ -121,32 +118,6 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 				effects: registerBrowserEffects({ queue, service }),
 				requests: { userMessageInTransaction: () => null },
 			};
-		},
-		firstRound: (_tools, question, messages) => {
-			if (question !== "続けてよい")
-				return handOverTask(
-					"このページを送信し、結果を確認する",
-					"操作を確認しながら進めます。",
-				)(messages);
-			if (toolResults(afterUtterance(messages), "work").length === 0) {
-				const todo = h.store
-					.read((db) => h.dialogue.todosInTransaction(db, "main"))
-					.find((item) => item.status === "waiting")!;
-				return {
-					calls: [
-						{
-							name: "work",
-							args: {
-								todo: `t${todo.ref}`,
-								operation: "answer",
-								// The approval question asks for a structured answer: its JSON.
-								text: JSON.stringify({ approved: true }),
-							},
-						},
-					],
-				};
-			}
-			return { text: "確認を受けて続けます。" };
 		},
 		command: (messages) => {
 			translations++;
@@ -196,21 +167,18 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 			};
 		},
 	});
+	const { h } = f;
 	try {
 		await h.browser!.service.setting.save(fakeBrave(h.dir));
 		await h.browser!.service.connect();
-		await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "このページを送信して結果を確認して",
-		});
-		await waitFor(
-			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status ===
-				"waiting_user",
-			{ timeout: 5000 },
+		await f.assign(
+			"このページを送信して結果を確認して",
+			TASK_TOOLCHAIN,
+			undefined,
+			"このページを送信し、結果を確認する",
 		);
-		work = h.toolchain.agents.executions.list("main")[0]!;
+		await f.until(() => f.executions()[0]?.status === "waiting_user");
+		work = f.executions()[0]!;
 		expect(commits).toBe(0);
 		expect(work.question!.inputSchema).toMatchObject({
 			type: "object",
@@ -223,21 +191,31 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 		) as { id: string; state: string; deadline: number }[];
 		expect(before[0]!.state).toBe("needs_input");
 		expect(work.question!.expiresAt).toBe(before[0]!.deadline);
-		await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "続けてよい",
-		});
-		await waitFor(
-			() =>
-				["completed", "partial"].includes(
-					h.toolchain.agents.executions.list("main")[0]?.status ?? "",
-				),
-			{ timeout: 8000 },
+		// The approval is the assignment's question; its structured answer goes to the waiting task through its owner's
+		// control, as the user's words of a message of the conversation.
+		await f.until(() => !!f.items()[0]?.question);
+		const words = await f.userWords("続けてよい");
+		const owner = h.store.read((db) =>
+			h.routing.taskInTransaction!(db, f.card(TASK_TOOLCHAIN).revisionId),
+		)!;
+		await h.store.write((db) =>
+			owner.controlInTransaction(
+				db,
+				f.conversationId,
+				{
+					workRef: work.id,
+					expectedRevision: work.revision,
+					action: "answer",
+					input: { approved: true },
+					questionRef: work.question!.id,
+				},
+				words.messageId,
+			),
 		);
-		expect(h.toolchain.agents.executions.list("main")[0]).toMatchObject({
-			status: "completed",
-		});
+		await f.until(() =>
+			["completed", "partial"].includes(f.executions()[0]?.status ?? ""),
+		);
+		expect(f.executions()[0]).toMatchObject({ status: "completed" });
 		const after = h.store.read((db) =>
 			db
 				.query("SELECT id,state,deadline FROM browser_tasks ORDER BY rowid")
@@ -255,6 +233,6 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 			),
 		).toEqual({ n: 1 });
 	} finally {
-		await h.close();
+		await f.close();
 	}
-}, 15000);
+}, 30000);

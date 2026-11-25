@@ -1,10 +1,10 @@
-import { delegationContext } from "./confirmation-revisions";
+import { offerContext } from "./conversation-offers";
 import type { InputOrigin } from "../../../infrastructure/model-input";
 import { answerMessages } from "./answer-input";
 import { generatedImageLines } from "./generated-image-text";
+import { reservePendingImageObservations } from "./generated-images";
 import type { Database } from "bun:sqlite";
 import { recentDiagnostics } from "./diagnostic-evidence";
-import { reportNoticeInTransaction } from "./report-notice";
 import { getLogger } from "../../../infrastructure/logger";
 import type { WindowSnapshot } from "../../memory";
 import type { ConversationEvent } from "../../continuity";
@@ -17,7 +17,6 @@ import { exchangeEnd } from "../../../infrastructure/context-budget";
 import type { HandlerDefinition } from "../../queue";
 import { isSystemPrompt, type Run } from "../contracts";
 import { byId, transition } from "../repository";
-import { agencyWork } from "../repository/agency";
 import { liveSession } from "../repository/specialist";
 import { withAttachmentNotes } from "./attachment-context";
 import {
@@ -29,7 +28,6 @@ import {
 	type GeneratePayload,
 	type RoutedInput,
 } from "./context";
-import type { DocumentRefs } from "./work-items";
 import {
 	conversationPrefixFrom,
 	conversationSystem,
@@ -40,23 +38,14 @@ import {
 } from "./conversation-input";
 import { localHarness, routeConversation } from "./harness";
 import { INPUT_HEADINGS, dataText, lineText } from "./input-text";
+import { answerTicketInTransaction } from "./result-intake";
+import { endRun } from "./run-end";
 import {
-	consumeAnswer,
-	answerTicketInTransaction,
-	intakeInTransaction,
-} from "./result-intake";
-import { resultText } from "./result-text";
-import { acceptRunAnswer, endRun } from "./run-end";
-import { finishReportedWork } from "./generation-settle";
-import type { WorkRow } from "../repository/work";
-import {
-	madeOf,
 	stateProjectionInTransaction,
 	agencyStateLines,
 	stateText,
 } from "./state-text";
 import { ASK_STEP } from "./tool-exchange";
-import { taskTargets } from "./task-work";
 import { screenLinesInTransaction } from "./resource-context";
 import { preparedMemoryInTransaction } from "./memory-refs";
 import { recordPromptSources } from "./generation-prepare-sources";
@@ -180,7 +169,6 @@ function noticeLines(text: string): string[] {
 function noticeForAnswer(
 	notAdopted: boolean,
 	hostNote: string | null,
-	results: string[],
 	noticeText: string | null,
 	unresolved: ReadonlyArray<{ what: string }>,
 ) {
@@ -191,41 +179,12 @@ function noticeForAnswer(
 		),
 		...(notAdopted
 			? [
-					"前の返事は届けられませんでした。すでに頼んだ仕事は「## State」の仕事にあります。",
+					"前の返事は届けられませんでした。すでに頼んだ仕事は「## State」の assignments にあります。",
 				]
 			: []),
 		...(hostNote ? [dataText(hostNote)] : []),
-		...results,
 		...(noticeText !== null ? noticeLines(noticeText) : []),
 	];
-}
-
-/** The finished or asking work the host notice tells, one text each (the TODO's line and what it made). */
-function reportedTexts(
-	deps: DialogueDeps,
-	tx: Database,
-	conversationId: string,
-	reported: ReadonlyArray<WorkRow>,
-	refs: DocumentRefs,
-): string[] {
-	return reported.map(
-		(row) =>
-			resultText({
-				ref: refs.todo(row.id) ?? "t?",
-				title: row.title,
-				status: row.status,
-				...(row.outcome ? { outcome: row.outcome } : {}),
-				...(row.question ? { question: row.question } : {}),
-				result: row.result,
-				made: deps.work
-					? deps.work
-							.todosInTransaction(tx, conversationId)
-							.filter((todo) => todo.id === row.id)
-							.flatMap((todo) => madeOf(todo, refs))
-					: [],
-				resource: refs.resource,
-			}).text,
-	);
 }
 
 /** The specialist's hand-back as a line of the work (`## State`): who gave the words back, and on what. */
@@ -258,24 +217,18 @@ function ownUtterances(
 		);
 }
 
-/** The trigger of a generation: the TODOs that changed, the utterances it handles, or what a host notice says. */
+/** The trigger of a generation: the utterances it handles, or what a host notice says. */
 function triggerOf(
 	run: Run,
 	pending: readonly ConversationEvent[],
 	noticeText: string | null,
-	changed: readonly WorkRow[] | null,
 	hostNote: string | null,
 	notAdopted: boolean,
 ): Array<Record<string, unknown>> {
 	const trigger: Array<Record<string, unknown>> = [];
-	// The earlier generation acted and was not adopted (section 13): the log and the TODOs show what it did.
+	// The earlier generation acted and was not adopted (section 13): the log and the assignments show what it did.
 	if (notAdopted) trigger.push({ kind: "not_adopted" });
 	if (hostNote) trigger.push({ kind: "host_note", text: hostNote });
-	if (changed?.length)
-		trigger.push({
-			kind: "todo_changed",
-			todos: changed.map((row) => ({ id: row.id, status: row.status })),
-		});
 	if (pending.length)
 		trigger.push({
 			kind: "utterance",
@@ -298,28 +251,24 @@ function triggerOf(
 /** How long after the agent asked back the user's next words are taken as the answer to it. */
 const ASKED_MS = 5 * 60 * 1000;
 /**
- * The toolchains this generation may hand over to without a search: those of the work in progress, and the one a
- * hand-over waits for the user's word on (unsaved work stands in its way). The answer to that question ("discard
- * it") names nothing a search with its words would find.
+ * The toolchain a hand-over waits for the user's word on (unsaved work stands in its way), offered without a search.
+ * The answer to that question ("discard it") names nothing a search with its words would find.
  */
-function retainedInTransaction(
+function switchingCardInTransaction(
 	deps: DialogueDeps,
 	tx: Database,
 	conversationId: string,
-): GenerateInput["retained"] {
-	const retained = deps.work?.retainedInTransaction(tx, conversationId) ?? [];
+): GenerateInput["switching"] {
 	const switching = liveSession(tx, conversationId)?.pendingSwitch?.toolchainId;
-	if (!switching || retained.some((entry) => entry.card.id === switching))
-		return retained;
-	const revision = deps.toolchains
-		?.catalogInTransaction(tx)
-		.find((entry) => entry.id === switching)?.revisionId;
-	const card = revision
-		? deps.toolchains?.cardInTransaction(tx, revision)
+	const revision = switching
+		? deps.toolchains
+				?.catalogInTransaction(tx)
+				.find((entry) => entry.id === switching)?.revisionId
 		: undefined;
-	return card
-		? [...retained, { card, summary: card.summary, last: "" }]
-		: retained;
+	return (
+		(revision ? deps.toolchains?.cardInTransaction(tx, revision) : undefined) ??
+		null
+	);
 }
 
 /** The excerpts shown to argument extraction from the agent's reply and earlier user utterances. */
@@ -333,7 +282,6 @@ function routedInputInTransaction(
 		conversationId: string;
 		nowMs: number;
 		state: ReturnType<typeof stateProjectionInTransaction>;
-		revisions: RoutedInput["pending"]["revisions"];
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string; ref: string }[];
 		lastAgent: {
@@ -356,32 +304,6 @@ function routedInputInTransaction(
 			// A step it cannot read asks nothing.
 		}
 	}
-	const todos =
-		deps.work
-			?.todosInTransaction(tx, input.conversationId)
-			.filter((todo) => todo.status !== "done") ?? [];
-	// The finished work `## State` lists may be checked, as it shows them (a forgotten one has no title).
-	// The agency reports its own research in notes and keeps it outside the user's work controls.
-	const own = (row: { runId: string } | null | undefined) =>
-		!!row && !!agencyWork(tx, row.runId);
-	const finished = input.state.todos.flatMap((ref) => {
-		if (todos.some((todo) => todo.ref === ref)) return [];
-		const row = deps.work?.workByRefInTransaction(
-			tx,
-			input.conversationId,
-			ref,
-		);
-		return row?.title && !own(row)
-			? [
-					{
-						ref,
-						title: row.title,
-						open: false,
-						...taskTargets(deps, tx, row),
-					},
-				]
-			: [];
-	});
 	return {
 		memory: input.prefix.memory,
 		// Words with no text (a voice message left empty) name nothing a request could point to.
@@ -398,42 +320,6 @@ function routedInputInTransaction(
 			? lineText(lastAgent.text).slice(0, PREVIOUS_REPLY_CHARS)
 			: null,
 		asked,
-		pending: {
-			revisions: input.revisions,
-			confirmations: (
-				deps.work?.pendingConfirmationsInTransaction(
-					tx,
-					input.conversationId,
-				) ?? []
-			).map((c) => ({
-				ref: c.ref,
-				toolchain: c.toolchain,
-				request: c.request,
-				target: c.target,
-			})),
-			questions: todos.flatMap((todo) =>
-				todo.status === "waiting" && todo.question
-					? [{ ref: todo.ref, title: todo.title, question: todo.question }]
-					: [],
-			),
-		},
-		todos: [
-			...todos.flatMap((todo) => {
-				const row = deps.work?.workInTransaction(tx, todo.id);
-				return own(row)
-					? []
-					: [
-							{
-								ref: todo.ref,
-								title: todo.title,
-								request: row?.request,
-								open: true,
-								...taskTargets(deps, tx, row),
-							},
-						];
-			}),
-			...finished,
-		],
 		resources: input.state.resources,
 		switching:
 			liveSession(tx, input.conversationId)?.pendingSwitch?.toolchainId ?? null,
@@ -481,7 +367,7 @@ export function createPrepare(
 	GenerateInput,
 	unknown
 >["prepareInTransaction"] {
-	const { conversation, larm, clock, memory, agency } = deps;
+	const { conversation, larm, clock, memory } = deps;
 	const events = deps.continuity.events;
 	return (tx, claim) => {
 		const run = byId(tx, claim.payload.runId);
@@ -495,13 +381,6 @@ export function createPrepare(
 		const current = byId(tx, run.id) as Run;
 		const conversationId = run.conversationId;
 		const nowMs = Date.parse(clock());
-		// The work this run waited for, or a task's notice, reports into its TODO first (section 9.1).
-		const intake = intakeInTransaction(deps, tx, current, claim.payload);
-		const changed = intake?.rows ?? null;
-		if (changed && changed.length === 0) {
-			endRun(deps, tx, current, "cancelled", "work_report_stale");
-			return { status: "stale", reason: "work_report_stale" };
-		}
 		const agent = answerTicketInTransaction(deps, tx, current);
 		// A host notice speaks about what happened; a user's or a schedule's input is a pending utterance.
 		const notice = run.sourceKind === "notice";
@@ -515,32 +394,9 @@ export function createPrepare(
 			notAdopted && !notice && waiting.length === 0
 				? ownUtterances(events, tx, current)
 				: waiting;
-		// A host note the work did not take as its report (a specialist switch to confirm) is this run's trigger.
-		const hostNote = changed ? null : (claim.payload.commandNote ?? null);
-		// A TODO that changed runs no generation: finished work is told by its notice on screen, a question is the
-		// agency's to ask on its own opportunity. The sub-agent's answer is consumed here (one whose evidence changed
-		// drops its result).
-		if (changed?.length && !hostNote && !notAdopted && pending.length === 0) {
-			if (agent) consumeAnswer(deps, tx, current, agent);
-			// The report is recorded in the TODO already: a request that can no longer be accepted (settings changed,
-			// deadline passed) only means nothing stands on it, so what waits on it (a voice turn) ends; the run does not
-			// fail, nor is its TODO overwritten.
-			if (!acceptRunAnswer(deps, tx, current))
-				log.warn("dialogue.answer_request_not_accepted", {
-					runId: run.id,
-					reason: "permission_revoked",
-				});
-			finishReportedWork(deps, tx, current, notice ? intake : null);
-			agency?.workChangedInTransaction(tx, conversationId);
-			return { status: "stale", reason: "work_reported" };
-		}
-		if (
-			!notice &&
-			!changed &&
-			!hostNote &&
-			!notAdopted &&
-			pending.length === 0
-		) {
+		// A host note (a specialist switch to confirm) is this run's trigger.
+		const hostNote = claim.payload.commandNote ?? null;
+		if (!notice && !hostNote && !notAdopted && pending.length === 0) {
 			// An earlier generation handled this utterance already.
 			endRun(deps, tx, current, "cancelled", "utterance_handled");
 			return { status: "stale", reason: "utterance_handled" };
@@ -600,6 +456,8 @@ export function createPrepare(
 			pending,
 			deps.contextInputs?.enabled(),
 		);
+		// The images the agency's assignments made are looked at once; what was seen of them is told below.
+		if (!notice) reservePendingImageObservations(deps, tx, conversationId);
 		const media = notice
 			? []
 			: generatedImageLines(deps, tx, conversationId, prefix.since);
@@ -608,23 +466,6 @@ export function createPrepare(
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
 					.text ?? null)
 			: null;
-		const refs: DocumentRefs = deps.work?.refsInTransaction(
-			tx,
-			conversationId,
-		) ?? { todo: () => null, confirmation: () => null, resource: () => null };
-		// The questions this generation was triggered by: the host notice shows them, this call only. Finished work
-		// is archived as it finishes and told by its notice on screen, never here.
-		const reported = (changed ?? []).filter(
-			(row) => row.status === "waiting" && !row.archivedAt,
-		);
-		// The reply to them follows their notice in the recent conversation (section 5.5 #4).
-		const reportNotice = reportNoticeInTransaction(
-			deps,
-			tx,
-			conversationId,
-			reported.map((row) => row.id),
-		);
-		const results = reportedTexts(deps, tx, conversationId, reported, refs);
 		// What the agency could not settle of the user's forgets and corrections: told once, nothing was changed.
 		const unresolved =
 			deps.steward?.takeUnresolvedTargetsInTransaction(tx, conversationId) ??
@@ -632,7 +473,6 @@ export function createPrepare(
 		const noticeBody = noticeForAnswer(
 			notAdopted,
 			hostNote,
-			results,
 			noticeText,
 			unresolved,
 		);
@@ -646,7 +486,6 @@ export function createPrepare(
 			agencyLines: [],
 			nowMs,
 			lastAt: prefix.lastAt,
-			since: prefix.since,
 			lastAgent,
 			state: deps.conversation.input.latestStateInTransaction(
 				tx,
@@ -655,16 +494,15 @@ export function createPrepare(
 			...(claim.payload.specialistHandoff
 				? { handoff: handoffLine(claim.payload.specialistHandoff) }
 				: {}),
-			refs,
 		});
 		const diagnostics = notice
 			? []
 			: recentDiagnostics(deps, tx, conversationId);
 		const userTurn =
 			final.kind === "utterances" && !isSystemPrompt(current.sourceKind);
-		const { offers, revisions, sources } = userTurn
-			? delegationContext(deps, tx, conversationId, state.lines)
-			: { offers: [], revisions: [], sources: [] };
+		const { offers, sources } = userTurn
+			? offerContext(deps, tx, conversationId, state.lines)
+			: { offers: [], sources: [] };
 		recordPromptSources(deps, tx, {
 			runId: run.id,
 			conversationId,
@@ -679,7 +517,6 @@ export function createPrepare(
 					conversationId,
 					nowMs,
 					state,
-					revisions,
 					media,
 					diagnostics,
 					lastAgent,
@@ -726,27 +563,13 @@ export function createPrepare(
 				utterances: texts,
 				...(routed ? { routed } : {}),
 				final,
-				trigger: triggerOf(
-					current,
-					pending,
-					noticeText,
-					changed,
-					hostNote,
-					notAdopted,
-				),
+				trigger: triggerOf(current, pending, noticeText, hostNote, notAdopted),
 				...(agent ? { agent } : {}),
-				shown: { todos: reported.map((row) => row.id) },
-				...(reportNotice ? { notice: reportNotice } : {}),
 				memoryItemIds: prefix.memoryItemIds,
 				cut: placed.reason,
 				inputRevision: prefix.cut?.revision ?? 0,
-				todoRevisions: Object.fromEntries(
-					(deps.work?.todoRevisionsInTransaction(tx, conversationId) ?? []).map(
-						(row) => [row.id, row.revision],
-					),
-				),
 				offers,
-				retained: retainedInTransaction(deps, tx, conversationId),
+				switching: switchingCardInTransaction(deps, tx, conversationId),
 				sessionContext: answerSessionContext(prefix),
 				...(window && memory && prefix.refsKey
 					? {

@@ -232,7 +232,6 @@ export function planWork(
 		].join("\n"),
 		data: {
 			originalRequest: parent.source.request,
-			confirmedRequest: parent.confirmation?.request ?? null,
 			request: parent.request,
 			verifiedAmendments: parent.controls,
 			replanTaskId: parent.pendingTaskId,
@@ -293,7 +292,6 @@ export function judgeWork(
 		].join("\n"),
 		data: {
 			originalRequest: parent.source.request,
-			confirmedRequest: parent.confirmation?.request ?? null,
 			design,
 			task: task.proposal,
 			readEvidence: task.readEvidence,
@@ -362,13 +360,12 @@ export function inferAuthority(
 		signal,
 		schema: ceilingSchema,
 		rules: [
-			"Classify the highest ordinary development action actually authorized in the human utterances below. Use the human utterances and any explicitly confirmed request shown below. Research and the later plan are deliberately absent.",
+			"Classify the highest ordinary development action actually authorized in the human utterances below. Use the human utterances shown below. Research and the later plan are deliberately absent.",
 			"design permits preparation and presentation of a design; read permits read-only repository investigation; verify permits running checks on a repository; edit permits source changes and checks.",
 			"Distinguish an explicit request to change code from a request to draft, review, discuss or inspect. Interpret follow-up instructions in the scope of the named task. When approval is unclear choose the lower level. No category allows deployment, external publication, destructive changes, commits or pushes.",
 		].join("\n"),
 		data: {
 			request: parent.source.request,
-			confirmedRequest: parent.confirmation?.request ?? null,
 			amendments: parent.controls
 				.filter(
 					({ taskId }) => taskId === null || taskId === parent.pendingTaskId,

@@ -11,7 +11,6 @@ import type { useDraftActions } from "./draft-actions";
 import { draftStoreFor } from "./drafts";
 import { receiptOf } from "./messages";
 import { navigationDestination } from "./navigation";
-import type { useAnswer } from "./questions";
 import type { GetLatest } from "./screen-state";
 
 /**
@@ -43,7 +42,6 @@ export function useScreenDispatch({
 	collectionEvent,
 	draftAction,
 	applyDraft,
-	answer,
 	describe,
 	dispatcherRef,
 	reveal,
@@ -56,7 +54,6 @@ export function useScreenDispatch({
 	collectionEvent: ReturnType<typeof useCollectionActions>;
 	draftAction: ReturnType<typeof useDraftActions>["draftAction"];
 	applyDraft: ReturnType<typeof useDraftActions>["applyDraft"];
-	answer: ReturnType<typeof useAnswer>;
 	describe: Parameters<typeof receiptOf>[1];
 	dispatcherRef: MutableRefObject<ActionDispatcher | null>;
 	/** A settled write returned a value to show once (never stored). */
@@ -102,7 +99,6 @@ export function useScreenDispatch({
 					? { status: "accepted", message: "" }
 					: { status: "rejected", message: "この画面は現在利用できません" };
 			}
-			if (binding.answer) return answer(event);
 			if (binding.draftDocument) return applyDraft(binding, event);
 			const timing = { sent: performance.now(), sentAt: Date.now() };
 			const dispatcher = dispatcherRef.current;
@@ -128,7 +124,6 @@ export function useScreenDispatch({
 			artifact,
 			documents,
 			client.identity,
-			answer,
 			describe,
 			draftAction,
 			applyDraft,

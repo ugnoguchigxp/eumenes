@@ -355,7 +355,6 @@ for (const adopted of [true, false])
 			},
 			undefined,
 			{
-				workChangedInTransaction: () => {},
 				replyInputInTransaction: () => ({ sources: [], complete }),
 			},
 		);

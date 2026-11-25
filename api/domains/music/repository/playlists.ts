@@ -14,13 +14,6 @@ export function playlistRow(db: Database, id: string) {
 		.query("SELECT * FROM music_playlists WHERE id=?")
 		.get(id) as PlaylistRow | null;
 }
-export function playlistByRun(db: Database, id: string) {
-	return db
-		.query(
-			"SELECT * FROM music_playlists WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
-		)
-		.get(id) as PlaylistRow | null;
-}
 export function playlistRecordOf(row: PlaylistRow): PlaylistRecord {
 	return JSON.parse(row.record_json);
 }

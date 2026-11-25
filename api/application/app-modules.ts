@@ -53,7 +53,6 @@ import {
 } from "../domains/conversation";
 import {
 	type DialogueService,
-	registerCommandInteractions,
 	registerDialogue,
 } from "../domains/dialogue";
 import { type LarmPort, registerLarmStatus } from "../domains/larm";
@@ -312,7 +311,6 @@ export function appModules(services: AppServices): AppModule[] {
 		},
 		{ mount: (app) => registerConversation(app, s.conversation) },
 		{ mount: (app) => registerDialogue(app, s.dialogue) },
-		{ mount: (app) => registerCommandInteractions(app, s.dialogue) },
 		{ mount: (app) => registerVoiceDialogue(app, s.voice) },
 		{ mount: (app) => registerQueue(app, s.queue) },
 		{ mount: (app) => registerScheduler(app, s.scheduler) },

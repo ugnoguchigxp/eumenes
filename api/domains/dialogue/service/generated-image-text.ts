@@ -1,11 +1,9 @@
 import type { Database } from "bun:sqlite";
 import {
-	imageObservation,
+	imageResourcesOfRoots,
 	recentImageObservations,
 	type ImageObservation,
 } from "../repository/generated-images";
-import { workLinksOf } from "../repository/resources";
-import { workById } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import {
 	imageObservationCurrent,
@@ -18,7 +16,7 @@ function observationText(
 	db: Database,
 	record: ImageObservation,
 ) {
-	if (!imageObservationCurrent(deps, db, record)) return undefined;
+	if (!imageObservationCurrent(db, record)) return undefined;
 	if (!imageVersionsCurrent(deps, db, record)) return "原本を確認できません";
 	const job = record.jobId
 		? deps.queue.getInTransaction(db, record.jobId)
@@ -45,15 +43,6 @@ function observationText(
 	}
 }
 
-export function imageObservationText(
-	deps: DialogueDeps,
-	db: Database,
-	workId: string,
-) {
-	const record = imageObservation(db, workId);
-	return record ? observationText(deps, db, record) : undefined;
-}
-
 export function generatedImageLines(
 	deps: DialogueDeps,
 	db: Database,
@@ -62,29 +51,29 @@ export function generatedImageLines(
 ) {
 	if (!deps.generatedImages) return [];
 	const records = recentImageObservations(db, conversationId);
-	const links = workLinksOf(
+	const resources = imageResourcesOfRoots(
 		db,
-		records.map(({ workId }) => workId),
+		conversationId,
+		records.map(({ rootId }) => rootId),
 	);
 	const numbers = deps.resourceLedger?.numbersInTransaction(db, conversationId);
 	return records.flatMap((record) => {
-		const work = workById(db, record.workId);
+		const own = resources.filter(({ rootId }) => rootId === record.rootId);
+		// Images made before the recent conversation begins are no part of this input.
 		if (
-			!work?.archivedAt ||
-			(since !== null && Date.parse(work.archivedAt) < since)
+			!own.length ||
+			(since !== null &&
+				Math.max(...own.map(({ createdAt }) => Date.parse(createdAt))) < since)
 		)
 			return [];
 		const text = observationText(deps, db, record);
-		const refs = (links.get(record.workId) ?? []).flatMap(({ kind, uri }) =>
-			kind === "image" && numbers?.has(uri) ? [`a${numbers.get(uri)}`] : [],
+		const refs = own.flatMap(({ uri }) =>
+			numbers?.has(uri) ? [`a${numbers.get(uri)}`] : [],
 		);
 		if (!text || !refs.length) return [];
 		const observed = new Set(record.result?.inputs.map(({ uri }) => uri));
-		const unchecked = (links.get(record.workId) ?? []).flatMap(
-			({ kind, uri }) =>
-				kind === "image" && !observed.has(uri) && numbers?.has(uri)
-					? [`a${numbers.get(uri)}`]
-					: [],
+		const unchecked = own.flatMap(({ uri }) =>
+			!observed.has(uri) && numbers?.has(uri) ? [`a${numbers.get(uri)}`] : [],
 		);
 		const rest =
 			record.state === "observed" && unchecked.length
@@ -92,7 +81,7 @@ export function generatedImageLines(
 				: "";
 		return [
 			{
-				workId: record.workId,
+				rootId: record.rootId,
 				line: `- ${refs.join("、")} ${lineText(text)}${rest}`,
 			},
 		];

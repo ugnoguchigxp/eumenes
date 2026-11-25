@@ -14,7 +14,11 @@ import {
 test("workspace migration preserves quarantined legacy holders and only allows one read and one edit in either order", () => {
 	const db = new Database(":memory:");
 	try {
-		for (const migration of migrations.slice(0, -1)) db.exec(migration.sql!);
+		const holders = migrations.findIndex(
+			(m) => m.id === "kanban/0006-workspace-holders",
+		);
+		for (const migration of migrations.slice(0, holders))
+			db.exec(migration.sql!);
 		db.query("INSERT INTO kanban_workspace_guards VALUES(?,?,?,?,?)").run(
 			"legacy",
 			"owner",
@@ -22,7 +26,7 @@ test("workspace migration preserves quarantined legacy holders and only allows o
 			"epoch",
 			"unknown",
 		);
-		db.exec(migrations.at(-1)!.sql!);
+		db.exec(migrations[holders]!.sql!);
 		const legacy = readWorkspaceGuards(db, "legacy");
 		expect(legacy).toEqual([
 			{

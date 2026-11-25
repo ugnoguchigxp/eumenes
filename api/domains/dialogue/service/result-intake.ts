@@ -1,220 +1,8 @@
-import { taskForWork } from "./task-work";
 import type { Database } from "bun:sqlite";
 import type { AnswerTicket } from "../../agent-runtime";
-import {
-	executionNoticeResult,
-	type ExecutionStatus,
-	type ExecutionView,
-} from "../../tool-runtime";
-import type { SelectionOutcome } from "../../toolchain-history";
 import type { Run } from "../contracts";
 import { researchCitations } from "./research-citations";
-import type { DialogueDeps, GenerateInput, GeneratePayload } from "./context";
-import type { WorkOutcome, WorkRow } from "../repository/work";
-
-type Report =
-	| { status: "waiting"; questionId: string; question: string }
-	| {
-			status: "done";
-			outcome: WorkOutcome;
-			result: unknown;
-			/** Resource URIs the sub-agents reported as made (checked against the registry when recorded). */
-			links?: readonly string[];
-	  };
-
-export type ReportedWork = {
-	rows: WorkRow[];
-	displayAnswer?: string;
-	conversationText?: string;
-};
-
-const executionOutcome: Partial<Record<ExecutionStatus, WorkOutcome>> = {
-	completed: "succeeded",
-	partial: "partial",
-	failed: "failed",
-	cancelled: "cancelled",
-	interrupted: "interrupted",
-};
-
-const reportOutcome: Record<string, WorkOutcome> = {
-	answered: "succeeded",
-	partial: "partial",
-	not_found: "partial",
-	failed: "failed",
-};
-
-/** The outcome a toolchain's own record says it ended with (a media job's state or error). */
-function recordOutcome(result: unknown): WorkOutcome {
-	const record = (result ?? {}) as { state?: unknown; errorCode?: unknown };
-	if (record.errorCode) return "failed";
-	return record.state === "failed"
-		? "failed"
-		: record.state === "cancelled"
-			? "cancelled"
-			: "succeeded";
-}
-
-/** A research or action sub-agent's answer as one result (section 9.2); its ticket is consumed by the adoption. */
-function agentReport(ticket: AnswerTicket): Report {
-	if (ticket.failureCode)
-		return {
-			status: "done",
-			outcome: "failed",
-			result: { code: ticket.failureCode },
-		};
-	if (ticket.actionPayload)
-		return {
-			status: "done",
-			outcome: ticket.actionFailure ? "failed" : "succeeded",
-			result: JSON.parse(ticket.actionPayload) as unknown,
-		};
-	const projection = ticket.projection
-		? (JSON.parse(ticket.projection) as { outcome?: string })
-		: null;
-	return {
-		status: "done",
-		outcome: reportOutcome[projection?.outcome ?? ""] ?? "succeeded",
-		result: projection,
-	};
-}
-
-const selectionOutcome: Record<WorkOutcome, SelectionOutcome> = {
-	succeeded: "completed",
-	partial: "partial",
-	failed: "failed",
-	cancelled: "cancelled",
-	interrupted: "failed",
-};
-
-/**
- * What the work this run waited for brought back (the ContextWindow specification, sections 9.1 and 9.3): each
- * owner's record is reported into its TODO, whose result slot (`active`) the conversation then reads. Returns the
- * TODOs that changed (none: nothing new to speak about), or null when the run reports no work at all.
- */
-export function intakeInTransaction(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	payload: GeneratePayload,
-): ReportedWork | null {
-	const ledger = deps.work;
-	if (!ledger) return null;
-	const changed: WorkRow[] = [];
-	const report = (row: WorkRow, next: Report) => {
-		const saved = ledger.reportInTransaction(tx, row.id, next);
-		if (!saved) return;
-		changed.push(saved);
-		if (next.status === "done")
-			deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
-				outcome: selectionOutcome[next.outcome],
-			});
-	};
-	if (run.sourceKind === "notice") {
-		const notice = taskNotice(deps, tx, run);
-		if (!notice) return null;
-		const row = ledger.workOfSourceInTransaction(tx, notice.workRef);
-		if (row && notice.conversationText)
-			return { rows: [row], conversationText: notice.conversationText };
-		if (row && notice.report) report(row, notice.report);
-		return { rows: changed, displayAnswer: notice.displayAnswer };
-	}
-	const waiting = ledger.waitingOfRunInTransaction(tx, run.id);
-	if (waiting.length === 0) return null;
-	for (const row of waiting) {
-		const next = runReport(deps, tx, run, row, payload);
-		if (next) report(row, next);
-	}
-	return { rows: changed };
-}
-
-/** A registered owner mirrors its one parent TODO in the same transaction as its board. */
-export function reportExecutionInTransaction(
-	deps: DialogueDeps,
-	db: Database,
-	view: ExecutionView,
-) {
-	const row = deps.work?.workOfSourceInTransaction(db, view.id);
-	if (!row || row.conversationId !== view.conversationId || row.archivedAt)
-		return;
-	const report = reportOfView(view);
-	if (
-		report?.status === "waiting" &&
-		row.status === "waiting" &&
-		row.questionId === report.questionId
-	)
-		return;
-	if (report) deps.work!.reportInTransaction(db, row.id, report);
-	else if (row.status === "waiting")
-		deps.work!.reportInTransaction(db, row.id, { status: "todo" });
-}
-
-function reportOfView(view: ExecutionView): Report | null {
-	if (view.status === "waiting_user" && view.question)
-		return {
-			status: "waiting",
-			questionId: view.question.id,
-			question: view.question.prompt,
-		};
-	const outcome = executionOutcome[view.status];
-	return outcome
-		? {
-				status: "done",
-				outcome,
-				result: executionNoticeResult(view.result),
-				...(view.result?.links?.length ? { links: view.result.links } : {}),
-			}
-		: null;
-}
-
-/** The report of one piece of run-centric work, or null while its owner has nothing new. */
-function runReport(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	row: WorkRow,
-	payload: GeneratePayload,
-): Report | null {
-	const media =
-		row.execution === "excalidraw"
-			? deps.excalidraw
-			: row.execution === "image"
-				? deps.image
-				: row.execution === "music-create" || row.execution === "music-playback"
-					? deps.music
-					: undefined;
-	if (media) {
-		const result =
-			("referenceInTransaction" in media
-				? media.referenceInTransaction?.(tx, run.id)
-				: null) ?? media.resultInTransaction(tx, run.id);
-		return result === null || result === undefined
-			? null
-			: { status: "done", outcome: recordOutcome(result), result };
-	}
-	if (row.execution === "command" && payload.commandNote) {
-		const asked = deps.interactions?.questionOfRunInTransaction(tx, run.id);
-		return asked
-			? {
-					status: "waiting",
-					questionId: asked.questionId,
-					question: asked.prompt,
-				}
-			: {
-					status: "done",
-					outcome: "partial",
-					result: { question: payload.commandNote },
-				};
-	}
-	const recognized = deps.objectRecognition?.resultInTransaction(tx, run.id);
-	if (recognized)
-		return {
-			status: "done",
-			outcome: recordOutcome(recognized),
-			result: recognized,
-		};
-	const ticket = answerTicketInTransaction(deps, tx, run);
-	return ticket ? agentReport(ticket) : null;
-}
+import type { DialogueDeps, GenerateInput } from "./context";
 
 /** The run's sub-agent answer waiting to be spoken about, or null (none, or its evidence no longer holds). */
 export function answerTicketInTransaction(
@@ -228,60 +16,6 @@ export function answerTicketInTransaction(
 	} catch {
 		return null;
 	}
-}
-
-/** A task execution's notice (a host notice run): its question or its result, by the execution's id. */
-function taskNotice(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-): {
-	workRef: string;
-	report: Report | null;
-	displayAnswer?: string;
-	conversationText?: string;
-} | null {
-	const text = deps.conversation.messageInTransaction(tx, run.inputMessageId)
-		?.message.text;
-	let raw: {
-		kind?: unknown;
-		workRef?: unknown;
-		revision?: unknown;
-		questionId?: unknown;
-	};
-	try {
-		raw = JSON.parse(text ?? "") as { kind?: unknown; workRef?: unknown };
-	} catch {
-		return null;
-	}
-	if (
-		(raw.kind !== "task_question" &&
-			raw.kind !== "task_result" &&
-			raw.kind !== "supervised_update") ||
-		typeof raw.workRef !== "string"
-	)
-		return null;
-	const work = deps.work?.workOfSourceInTransaction(tx, raw.workRef);
-	const view = taskForWork(deps, tx, work)?.viewInTransaction(tx, raw.workRef);
-	if (!view || view.conversationId !== run.conversationId)
-		return { workRef: raw.workRef, report: null };
-	if (raw.kind === "supervised_update") {
-		if (
-			work?.toolchainId !== "development-supervision.request" ||
-			(raw.questionId
-				? view.question?.id !== raw.questionId
-				: raw.revision !== view.revision)
-		)
-			return { workRef: view.id, report: null };
-		const text =
-			view.question?.prompt ?? view.result?.summary ?? view.progress?.summary;
-		return { workRef: view.id, report: null, conversationText: text };
-	}
-	return {
-		workRef: view.id,
-		report: reportOfView(view),
-		displayAnswer: view.result?.displayAnswer,
-	};
 }
 
 /**
@@ -305,64 +39,30 @@ export async function refreshAgentAnswer(
 }
 
 /**
- * The links of a reply that may report TODO results (those this generation was triggered by and those whose result
- * the window shows) are kept to what the results grant: a research report's own sources, written in the canonical
- * form; none for a result that has no sources. A reply with no result in view is left as it is.
+ * The links of a reply that looked something up are kept to the sources the lookup returned, written in the canonical
+ * form. A reply that looked nothing up is left as it is.
  */
 export function reportedLinks(
-	deps: DialogueDeps,
-	input: GenerateInput,
 	text: string,
 	lookupSources: Array<{ url: string }> = [],
 ): string {
-	const ledger = deps.work;
-	if (!text) return text;
-	const triggered = input.trigger.flatMap((trigger) =>
-		trigger.kind === "todo_changed" && Array.isArray(trigger.todos)
-			? (trigger.todos as Array<{ id?: unknown }>).flatMap((todo) =>
-					typeof todo.id === "string" ? [todo.id] : [],
-				)
-			: [],
-	);
-	const ids = [...new Set([...triggered, ...input.shown.todos])];
-	if (ids.length === 0 && !lookupSources.length) return text;
-	const results =
-		ledger && ids.length
-			? deps.store.read((db) =>
-					ids.flatMap((id) => {
-						const row = ledger.workInTransaction(db, id);
-						return row?.status === "done" ? [row.result] : [];
-					}),
-				)
-			: [];
-	if (results.length === 0 && !lookupSources.length) return text;
-	const reports = results.filter(
-		(result): result is { sources: unknown[]; claims?: unknown[] } =>
-			!!result &&
-			typeof result === "object" &&
-			Array.isArray((result as { sources?: unknown }).sources),
-	);
-	if (reports.length === 0 && !lookupSources.length)
-		return researchCitations(text, null, { preserveLinkLabels: false });
+	if (!text || !lookupSources.length) return text;
 	const verified = lookupSources.map(({ url }, index) => ({
 		url,
 		sourceId: `lookup-${index}`,
 	}));
 	const projection = JSON.stringify({
-		sources: [...reports.flatMap((report) => report.sources), ...verified],
-		claims: [
-			...reports.flatMap((report) => report.claims ?? []),
-			{ sourceIds: verified.map(({ sourceId }) => sourceId) },
-		],
+		sources: verified,
+		claims: [{ sourceIds: verified.map(({ sourceId }) => sourceId) }],
 	});
 	return researchCitations(text, projection, { requireSources: true });
 }
 
-/** Consumes the sub-agent's answer an adopted generation spoke of; one no longer valid drops its result. */
+/** Consumes the sub-agent's answer an adopted generation spoke of; one no longer valid is not adopted. */
 export function consumeAnswer(
 	deps: DialogueDeps,
 	tx: Database,
-	run: Run,
+	_run: Run,
 	ticket: AnswerTicket,
 ): boolean {
 	const agents = deps.agents;
@@ -372,7 +72,6 @@ export function consumeAnswer(
 		agents.completeAnswerInTransaction(tx, ticket);
 		return true;
 	} catch {
-		deps.work?.dropRunResultsInTransaction(tx, run.id);
 		return false;
 	}
 }

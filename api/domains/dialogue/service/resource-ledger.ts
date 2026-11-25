@@ -18,9 +18,9 @@ import {
 	resourceByRef,
 	resourceByUri,
 	resourcesOfMessage,
+	resourcesOfWorks,
 	touchResource,
 	usedResources,
-	workLinksOf,
 } from "../repository/resources";
 import type { DialogueDeps } from "./context";
 
@@ -57,7 +57,7 @@ export function createResourceLedger(deps: Pick<DialogueDeps, "clock" | "id">) {
 					usedAt: at,
 					createdAt: at,
 				});
-			// The TODO that made a resource is its origin; a shown one keeps the origin it had.
+			// The work that made a resource is its origin; a shown one keeps the origin it had.
 			const fromWork = input.source === "work" && !!input.workId;
 			// Forgotten stays forgotten: finding or viewing it again never brings back its number and label.
 			if (known.forgottenAt && !fromWork) return known;
@@ -97,7 +97,7 @@ export function createResourceLedger(deps: Pick<DialogueDeps, "clock" | "id">) {
 				if (!row.forgottenAt) numbers.set(row.uri, row.ref);
 			return numbers;
 		},
-		/** Enters a TODO's links into the ledger, keeping the order they have. */
+		/** Enters a work's links into the ledger, keeping the order they have. */
 		enterLinksInTransaction(
 			db: Database,
 			input: { conversationId: string; workId: string; links: WorkLink[] },
@@ -113,24 +113,14 @@ export function createResourceLedger(deps: Pick<DialogueDeps, "clock" | "id">) {
 				}),
 			);
 		},
-		/**
-		 * Links the resources of these TODOs to a message: what a report of them shows as chips. A TODO without
-		 * links, or whose resource was forgotten, adds none.
-		 */
-		linkMessageToWorkInTransaction(
+		/** Links the resources entered under these works (the agency's work roots) to a message. */
+		linkMessageToWorkResourcesInTransaction(
 			db: Database,
 			conversationId: string,
 			messageId: string,
 			workIds: readonly string[],
 		) {
-			const links = workLinksOf(db, workIds);
-			const ids: string[] = [];
-			for (const workId of workIds)
-				for (const link of links.get(workId) ?? []) {
-					const row = resourceByUri(db, conversationId, link.uri);
-					if (row && !row.forgottenAt && !ids.includes(row.id))
-						ids.push(row.id);
-				}
+			const ids = resourcesOfWorks(db, conversationId, workIds);
 			if (ids.length) port.linkMessageInTransaction(db, messageId, ids);
 		},
 		/** `GET /api/conversations/:id/resources`: the ledger as the Web shows it, and each message's chips. */

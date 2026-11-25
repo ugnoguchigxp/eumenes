@@ -6,7 +6,6 @@ export function registerVideoAdmission(app: Hono, video: VideoService) {
 	const routes = [
 		"/api/runs",
 		"/api/conversations/:conversationId/messages/:messageId/resubmit",
-		"/api/toolchain-interactions/:id/answers",
 		"/api/voice/sessions",
 		"/api/voice/turns",
 		"/api/voice/turns/:id/commit",

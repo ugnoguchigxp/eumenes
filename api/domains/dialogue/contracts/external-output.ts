@@ -11,12 +11,7 @@ export type ExternalOutputPort = {
 	): void;
 	owns(db: Database, runId: string): boolean;
 	assertCurrent(db: Database, runId: string): void;
-	offer(db: Database, run: Run, text: string, confirmation?: boolean): boolean;
-	/** A settled delegated work result, independent of later conversational input versions. */
-	report?(
-		db: Database,
-		input: { id: string; runId: string; conversationId: string; text: string },
-	): boolean;
+	offer(db: Database, run: Run, text: string): boolean;
 	announce(
 		run: Run,
 		text: string,

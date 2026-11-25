@@ -376,6 +376,11 @@ export const settingsSchema = z
 					.regex(/^[A-Za-z0-9_-]{1,128}$/)
 					.nullable()
 					.default(null),
+				/** The Live2D drawing area's `#rrggbb` colour; absent keeps the built-in gradient. Never tints the model. */
+				avatarBackgroundColor: z
+					.string()
+					.regex(/^#[0-9a-f]{6}$/)
+					.optional(),
 				...spatialSettingsShape,
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})

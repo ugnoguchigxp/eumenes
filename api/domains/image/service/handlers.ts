@@ -38,11 +38,9 @@ function waitForCapacity(
 	r: Row,
 	retryAfterMs: number | null,
 	ports: {
-		onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
 		enqueue: (
 			db: Database,
 			id: string,
-			runId: string,
 			deadline: number,
 			stage: "generate",
 			wait: { at: number; count: number },
@@ -50,9 +48,7 @@ function waitForCapacity(
 		fail: (db: Database, id: string, code: string) => void;
 	},
 ) {
-	const execution = JSON.parse(r.request_json).execution;
-	const { onWaiting } = ports;
-	// A child execution's deadline is fixed by its caller; a run's deadline is extended or the wait ends.
+	// The execution's deadline is fixed by its caller; the wait ends at it.
 	settleCapacityWait({
 		domain: "image",
 		subjectId: r.id,
@@ -60,22 +56,14 @@ function waitForCapacity(
 		previous: record(r).capacityWait,
 		retryAfterMs,
 		budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
-		limitAt: execution ? r.deadline : null,
-		extend:
-			execution || !onWaiting
-				? undefined
-				: (deadline) => onWaiting(db, r.run_id, deadline),
+		limitAt: r.deadline,
 		expire: () => ports.fail(db, r.id, LARM_CAPACITY_TIMEOUT),
 		schedule(plan) {
-			db.query("UPDATE image_generations SET deadline=? WHERE id=?").run(
-				plan.deadline,
-				r.id,
-			);
 			patch(db, r.id, {
 				phase: LARM_CAPACITY_WAITING,
 				capacityWait: { startedAt: plan.startedAt, count: plan.count },
 			});
-			return ports.enqueue(db, r.id, r.run_id, plan.deadline, "generate", {
+			return ports.enqueue(db, r.id, plan.deadline, "generate", {
 				at: plan.at,
 				count: plan.count,
 			});
@@ -87,7 +75,6 @@ export function registerImageHandlers(
 		enqueue: (
 			db: Database,
 			id: string,
-			runId: string,
 			deadline: number,
 			stage: "plan" | "generate",
 			wait?: { at: number; count: number },
@@ -101,7 +88,7 @@ export function registerImageHandlers(
 		id: string;
 		requestId: string;
 		prepared: Prepared;
-		execution?: ChildExecution;
+		execution: ChildExecution;
 		context: ReturnType<typeof imageContext>;
 	};
 	const planHandler: HandlerDefinition<
@@ -118,12 +105,15 @@ export function registerImageHandlers(
 			const r = row(db, claim.payload.id);
 			if (!r || record(r).state !== "planning")
 				return { status: "stale", reason: "image_not_planning" };
-			if (!inference.captureControlInTransaction || !inference.executeControl)
+			if (
+				!inference.captureUserControlInTransaction ||
+				!inference.executeControl
+			)
 				throw new Error("image_inference_unavailable");
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
-			const execution = JSON.parse(r.request_json).execution;
-			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+			const execution = JSON.parse(r.request_json).execution as ChildExecution;
+			if (!deps.validateExecutionInTransaction?.(db, execution))
 				throw new Error("execution_changed");
 			const capture = {
 				subject: `image:${r.id}:plan`,
@@ -131,12 +121,10 @@ export function registerImageHandlers(
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
 				maxOutputTokens: 4096,
 			};
-			const requestId = execution
-				? inference.captureUserControlInTransaction!(db, {
-						...capture,
-						subject: `image-task:${r.id}-plan`,
-					})
-				: inference.captureControlInTransaction(db, capture);
+			const requestId = inference.captureUserControlInTransaction(db, {
+				...capture,
+				subject: `image-task:${r.id}-plan`,
+			});
 			return {
 				status: "ready",
 				input: {
@@ -154,7 +142,7 @@ export function registerImageHandlers(
 				input.context.messages,
 				signal,
 				input.context.control,
-				input.execution ? executionCallSession(input.execution) : undefined,
+				executionCallSession(input.execution),
 			);
 			let value: unknown;
 			try {
@@ -201,10 +189,7 @@ export function registerImageHandlers(
 				state: plan.action === "generate" ? "generating" : "completed",
 				phase: plan.action === "generate" ? "queued" : "completed",
 			});
-			if (plan.action === "generate")
-				enqueue(db, r.id, r.run_id, r.deadline, "generate");
-			else if (!JSON.parse(r.request_json).execution)
-				deps.onFinished(db, r.run_id);
+			if (plan.action === "generate") enqueue(db, r.id, r.deadline, "generate");
 			return "applied";
 		},
 		cancelInTransaction: cancel,
@@ -213,7 +198,6 @@ export function registerImageHandlers(
 		id: string;
 		plan: z.infer<typeof imagePlanV2>;
 		prepared: Prepared;
-		execution?: ChildExecution;
 		deadline: number;
 	};
 	/** LARM had no free memory: the generate stage waits and is queued again, never sent from here. */
@@ -330,7 +314,6 @@ export function registerImageHandlers(
 					return "applied";
 				}
 				waitForCapacity(db, r, outcome.result.capacityWait, {
-					onWaiting: deps.onWaiting,
 					enqueue,
 					fail,
 				});
@@ -369,7 +352,6 @@ export function registerImageHandlers(
 					output.artifact?.actualModel ??
 					record(r).actualModel,
 			});
-			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,

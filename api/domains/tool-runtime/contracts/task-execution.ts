@@ -321,7 +321,6 @@ export interface TaskLifecyclePort {
 			source: ExecutionSource;
 			request: string;
 			references: ExecutionReference[];
-			confirmationId?: string;
 			toolchainRevisionId?: string;
 			bindingRevisionId?: string;
 			deadline?: number;

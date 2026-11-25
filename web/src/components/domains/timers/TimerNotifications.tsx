@@ -9,7 +9,6 @@ import { useNotificationArchive } from "./useNotificationArchive";
 import {
 	NotificationCenter,
 	type KanbanNotifications,
-	type TodoNotifications,
 } from "./NotificationCenter";
 
 type Attempt = {
@@ -36,7 +35,6 @@ type TimerNotificationsProps = {
 	prepareAudio?: () => Promise<void>;
 	repeatTone?: (signal: AbortSignal) => Promise<void>;
 	kanban?: KanbanNotifications;
-	todo?: TodoNotifications;
 };
 
 /**
@@ -123,7 +121,6 @@ export function TimerNotifications({
 	prepareAudio,
 	repeatTone,
 	kanban,
-	todo,
 }: TimerNotificationsProps) {
 	const cache = useQueryClient();
 	const archive = useNotificationArchive(client);
@@ -403,7 +400,6 @@ export function TimerNotifications({
 		<NotificationCenter
 			notices={notices}
 			kanban={kanban}
-			todo={todo}
 			ringingId={canRing ? ringingId : null}
 			stoppingIds={stoppingIds}
 			onStop={stop}

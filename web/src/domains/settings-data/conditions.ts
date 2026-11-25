@@ -56,4 +56,7 @@ export const settingsConditions: Readonly<
 	/** The model chosen as the field's target is a conversation (LLM) model. */
 	"condition:settings.resource-llm@1": (c) =>
 		c.effective.resources.find((x) => x.id === c.target)?.purpose === "llm",
+	/** The conversation background (draft included) is the Live2D model. */
+	"condition:settings.background-live2d@1": (c) =>
+		c.effective.general.background === "live2d-hiyori",
 };

@@ -19,7 +19,7 @@ export function styleOf(turn: Turn): string {
 	);
 }
 
-/** A toolchain of the work in progress as a candidate: what its session works on stays its target (a change of it is confirmed). */
+/** A toolchain already offered as a candidate: what its session works on stays its target. */
 export function retainedChoice(
 	turn: Turn,
 	card: ToolchainCard,
@@ -37,9 +37,8 @@ export function retainedChoice(
 export function switchingOf(
 	turn: Turn,
 ): { id: string; title: string; card: ToolchainCard } | null {
-	const id = turn.routed?.switching;
-	const card = id
-		? turn.input.retained.find((entry) => entry.card.id === id)?.card
-		: undefined;
-	return card ? { id: card.id, title: card.title, card } : null;
+	const card = turn.input.switching;
+	return card && card.id === turn.routed?.switching
+		? { id: card.id, title: card.title, card }
+		: null;
 }

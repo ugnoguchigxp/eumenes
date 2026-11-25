@@ -1,9 +1,36 @@
 import { expect, test } from "bun:test";
-import { harness } from "../toolchain/toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
 import { musicFixture, musicQuestion } from "./music.fixture";
-import { isUtteranceRound } from "../toolchain/conversation-script.fixture";
-import { waitFor } from "../../infrastructure/wait-for";
+import {
+	ask,
+	assignmentAgenda,
+	cancelAssignment,
+	ended,
+	executions,
+	items,
+	notes,
+	plannedBy,
+	reportLine,
+	resources,
+	until,
+	works,
+} from "./assignment.fixture";
+
+const generations = (f: ReturnType<typeof imageFixture>) =>
+	f.requests.filter(
+		(r) => r.method === "POST" && r.path === "/v1/images/generations",
+	);
+const artifactValues = (model: string) => ({
+	prompt: "窓辺で眠る猫の写真",
+	model,
+	width: 768,
+	height: 768,
+	seed: 42,
+	format: "webp",
+});
+const artifactText = (values: object) =>
+	`制作条件をそのまま使って画像を1枚生成してください。\n\n${JSON.stringify(values)}`;
+
 for (const mode of [
 	"success",
 	"failure",
@@ -12,32 +39,33 @@ for (const mode of [
 	"studio",
 	"fetch-failure",
 ] as const)
-	test(`image pipeline ${mode}: routing, plan, result and authenticated content`, async () => {
+	test(`image pipeline ${mode}: assignment, plan, result and authenticated content`, async () => {
 		const f = imageFixture(mode);
-		const h = await harness({ model: f.model, imageGateway: f.gateway });
+		const a = await assignmentAgenda({
+			media: f,
+			harness: { model: plannedBy({ image: f }) },
+		});
 		try {
-			const id = crypto.randomUUID();
-			const input = {
-				requestId: id,
-				conversationId: "main",
-				text: imageQuestion,
-			};
-			const submitted = await (await h.request("/api/runs", input)).json();
-			const duplicate = await (await h.request("/api/runs", input)).json();
-			expect(duplicate.id).toBe(submitted.id);
-			expect(
-				(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 }))
-					?.status,
-			).toBe("completed");
+			await a.start();
+			await ask(a, "image.create", imageQuestion);
+			await until(a, () => ended(a));
+			// The user's words started one execution at its owner, and the agent's work row holds it.
+			expect(executions(a)).toHaveLength(1);
+			expect(works(a)).toMatchObject([
+				{
+					toolchain_revision_id: expect.stringMatching(
+						/^toolchain:image\.create@/,
+					),
+				},
+			]);
+			expect(works(a)[0]!.execution_id).toBe(executions(a)[0]!.id);
 			const records = await (
-				await h.request("/api/images/generations?conversationId=main")
+				await a.h.request("/api/images/generations?conversationId=ao")
 			).json();
 			expect(records).toHaveLength(1);
 			const success = ["success", "library", "studio"].includes(mode);
 			expect(records[0].state).toBe(success ? "completed" : "failed");
-			const posts = f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			);
+			const posts = generations(f);
 			expect(posts).toHaveLength(
 				["invalid-plan", "library", "studio"].includes(mode) ? 0 : 1,
 			);
@@ -52,15 +80,26 @@ for (const mode of [
 					format: "png",
 				});
 			}
-			expect(f.stages).toEqual(["route", "plan"]);
-			const library = await (await h.request("/api/images/library")).json();
+			expect(f.stages).toEqual(["plan"]);
+			if (mode === "success") {
+				// The agent reports on its own: a work report note, and a line whose chip is the image.
+				await until(a, () => !!reportLine(a));
+				expect(notes(a)).toHaveLength(1);
+				expect(items(a)).toHaveLength(0);
+				const made = await resources(a);
+				expect(made.resources.map((r) => r.kind)).toContain("image");
+				expect(made.messages).toContainEqual(
+					expect.objectContaining({ messageId: reportLine(a)!.id }),
+				);
+			}
+			const library = await (await a.h.request("/api/images/library")).json();
 			expect(
-				library.images.some((a: { id: string }) => a.id === "past-image"),
+				library.images.some((x: { id: string }) => x.id === "past-image"),
 			).toBe(true);
 			expect(
-				(await h.app.request("/api/images/past-image/content")).status,
+				(await a.h.app.request("/api/images/past-image/content")).status,
 			).toBe(401);
-			const content = await h.request("/api/images/past-image/content");
+			const content = await a.h.request("/api/images/past-image/content");
 			expect(content.status).toBe(200);
 			expect(content.headers.get("content-type")).toBe("image/png");
 			expect(new Uint8Array(await content.arrayBuffer())).toEqual(
@@ -75,301 +114,191 @@ for (const mode of [
 				expect(posts).toHaveLength(1);
 			}
 		} finally {
-			await h.close();
+			await a.close();
 		}
+	}, 30_000);
+
+test("cancelling the assignment discards a late synchronous image response and never resubmits", async () => {
+	const gate = Promise.withResolvers<void>();
+	const f = imageFixture("success", gate.promise);
+	const a = await assignmentAgenda({
+		media: f,
+		harness: { model: plannedBy({ image: f }) },
 	});
-test("cancelled image generation discards a late synchronous response and never resubmits", async () => {
-	let release!: () => void;
-	const gate = new Promise<void>((r) => {
-		release = r;
-	});
-	const f = imageFixture("success", gate);
-	const h = await harness({ model: f.model, imageGateway: f.gateway });
 	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: imageQuestion,
-			})
-		).json();
-		await waitFor(() =>
-			f.requests.some(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
-		);
+		await a.start();
+		const { id } = await ask(a, "image.create", imageQuestion);
+		await until(a, () => generations(f).length === 1);
+		const { seen } = await cancelAssignment(a, id);
 		expect(
-			f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
+			seen[1]!.filter((m) => m.role === "tool").map((m) => m.content),
 		).toHaveLength(1);
-		await h.dialogue.cancel(submitted.id);
-		release();
+		gate.resolve();
+		await until(a, () => ended(a));
 		// A negative check: a late result must have real time to (not) be adopted.
 		await Bun.sleep(50);
-		expect(h.image!.list("main")[0]!.state).toBe("cancelled");
-		expect(h.image!.list("main")[0]!.artifactId).toBeNull();
-		expect(
-			f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
-		).toHaveLength(1);
+		expect(executions(a)[0]).toMatchObject({ status: "cancelled" });
+		expect(a.h.image!.list("ao")[0]!.state).toBe("cancelled");
+		expect(a.h.image!.list("ao")[0]!.artifactId).toBeNull();
+		expect(generations(f)).toHaveLength(1);
+		// A stopped assignment is no open item and has no report note: the user stopped it.
+		expect(items(a)).toHaveLength(0);
+		expect(notes(a)).toHaveLength(0);
 	} finally {
-		release();
-		await h.close();
+		gate.resolve();
+		await a.close();
 	}
-});
-
-test("artifact image input keeps exact generation data without showing an internal chat utterance", async () => {
-	const f = imageFixture("success");
-	const h = await harness({ model: f.model, imageGateway: f.gateway });
-	try {
-		const request = {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: imageQuestion,
-			presentation: "artifact",
-		};
-		const submitted = await (await h.request("/api/runs", request)).json();
-		const replayed = await (await h.request("/api/runs", request)).json();
-		expect(replayed.id).toBe(submitted.id);
-		await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-		const conversation = await (
-			await h.request("/api/conversations/main")
-		).json();
-		const input = conversation.messages.find(
-			(message: { id: string }) => message.id === submitted.inputMessageId,
-		);
-		expect(input).toMatchObject({
-			text: imageQuestion,
-			presentation: "artifact",
-		});
-		expect(h.image!.list("main")[0]?.state).toBe("completed");
-	} finally {
-		await h.close();
-	}
-});
+}, 30_000);
 
 test("capability revocation rejects a generated result at adoption", async () => {
-	let release!: () => void;
-	const gate = new Promise<void>((r) => {
-		release = r;
+	const gate = Promise.withResolvers<void>();
+	const f = imageFixture("success", gate.promise);
+	const a = await assignmentAgenda({
+		media: f,
+		harness: { model: plannedBy({ image: f }) },
 	});
-	const f = imageFixture("success", gate);
-	const h = await harness({ model: f.model, imageGateway: f.gateway });
 	try {
-		const run = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: imageQuestion,
-			})
-		).json();
-		await waitFor(() =>
-			f.requests.some(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
-		);
-		expect(
-			f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
-		).toHaveLength(1);
-		await h.store.write((db) =>
-			h.toolchain.capabilities.setEnabledInTransaction(
+		await a.start();
+		await ask(a, "image.create", imageQuestion);
+		await until(a, () => generations(f).length === 1);
+		await a.h.store.write((db) =>
+			a.h.toolchain.capabilities.setEnabledInTransaction(
 				db,
 				"tool",
 				"image.generate",
 				false,
 			),
 		);
-		release();
-		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		expect(h.image!.list("main")[0]!.state).toBe("failed");
-		expect(h.image!.list("main")[0]!.errorCode).toBe("capability_revoked");
-		expect(
-			f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
-		).toHaveLength(1);
+		gate.resolve();
+		await until(a, () => a.h.image!.list("ao")[0]!.state !== "generating");
+		// A late response is not adopted: the revoked toolchain's work stops, and nothing is resubmitted.
+		await Bun.sleep(50);
+		expect(["cancelled", "failed"]).toContain(a.h.image!.list("ao")[0]!.state);
+		expect(a.h.image!.list("ao")[0]!.artifactId).toBeNull();
+		expect(generations(f)).toHaveLength(1);
+		expect(notes(a)).toHaveLength(0);
 	} finally {
-		release();
-		await h.close();
+		gate.resolve();
+		await a.close();
 	}
-});
+}, 30_000);
 
-test("an image screen submit generates an image though the conversation earlier used only another toolchain", async () => {
+test("an image assignment starts though the conversation earlier used only another toolchain", async () => {
 	const image = imageFixture("success");
 	const music = musicFixture("success");
-	let phase: "music" | "screen" = "music";
-	let screenAnalysis = 0;
-	const model = {
-		...image.model,
-		answer: async (...args: Parameters<typeof image.model.answer>) => {
-			if (phase === "music") return music.model.answer(...args);
-			if (isUtteranceRound(args[2])) screenAnalysis++;
-			return image.model.answer(...args);
+	const a = await assignmentAgenda({
+		media: image,
+		harness: {
+			model: plannedBy({ image, music }),
+			musicGateway: music.gateway,
 		},
-	};
-	const h = await harness({
-		model,
-		imageGateway: image.gateway,
-		musicGateway: music.gateway,
+		catalog: (id) =>
+			id.startsWith("toolchain:image.create@") ||
+			id.startsWith("toolchain:music.create@"),
 	});
 	try {
-		const earlier = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: musicQuestion,
-			})
-		).json();
-		expect(
-			(await h.dialogue.waitForTerminal(earlier.id, { timeoutMs: 5000 }))
-				?.status,
-		).toBe("completed");
-		expect(h.music!.list("main")).toHaveLength(1);
-		phase = "screen";
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: imageQuestion,
-				presentation: "artifact",
-				toolchainId: "image.create",
-			})
-		).json();
-		expect(submitted.pinnedToolchainId).toBe("image.create");
-		expect(
-			(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 }))
-				?.status,
-		).toBe("completed");
+		await a.start();
+		await ask(a, "music.create", musicQuestion);
+		await until(a, () => ended(a));
+		expect(a.h.music!.list("ao")).toHaveLength(1);
+		await ask(a, "image.create", imageQuestion);
+		await until(a, () => ended(a, 2));
 		const records = await (
-			await h.request("/api/images/generations?conversationId=main")
+			await a.h.request("/api/images/generations?conversationId=ao")
 		).json();
 		expect(records).toHaveLength(1);
 		expect(records[0].state).toBe("completed");
-		// The screen's own toolchain took the request: no selection round, and no track was made.
-		expect(screenAnalysis).toBe(0);
+		// Each assignment started its own toolchain: no second track was made for the image.
 		expect(image.stages).toEqual(["plan"]);
-		expect(h.music!.list("main")).toHaveLength(1);
-		expect(
-			image.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			),
-		).toHaveLength(1);
+		expect(a.h.music!.list("ao")).toHaveLength(1);
+		expect(generations(image)).toHaveLength(1);
+		expect(works(a).map((w) => w.toolchain_revision_id.split("@")[0])).toEqual([
+			"toolchain:music.create",
+			"toolchain:image.create",
+		]);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);
 
 for (const model of ["qwen-image-2.1-turbo", "flux-3-image-klein"])
-	test(`artifact submit carries ${model} through planning, storage and the authenticated LARM POST`, async () => {
+	test(`the artifact form's request carries ${model} through planning, storage and the authenticated LARM POST`, async () => {
 		const f = imageFixture("success");
-		const h = await harness({ model: f.model, imageGateway: f.gateway });
+		const a = await assignmentAgenda({
+			media: f,
+			harness: { model: plannedBy({ image: f }) },
+		});
 		try {
-			const values = {
-				prompt: "窓辺で眠る猫の写真",
-				model,
-				width: 768,
-				height: 768,
-				seed: 42,
-				format: "webp",
-			};
-			const submitted = await (
-				await h.request("/api/runs", {
-					requestId: crypto.randomUUID(),
-					conversationId: "main",
-					presentation: "artifact",
-					toolchainId: "image.create",
-					text: `制作条件をそのまま使って画像を1枚生成してください。\n\n${JSON.stringify(values)}`,
-				})
-			).json();
-			await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-			const record = h.image!.list("main")[0]!;
+			await a.start();
+			const values = artifactValues(model);
+			await ask(a, "image.create", artifactText(values));
+			await until(a, () => ended(a));
+			const record = a.h.image!.list("ao")[0]!;
 			expect(record).toMatchObject({
 				state: "completed",
 				model,
 				actualModel: model,
 			});
-			const posts = f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			);
+			const posts = generations(f);
 			expect(posts).toHaveLength(1);
 			expect(posts[0]!.body).toEqual(values);
 			expect(posts[0]!.auth).toBe("Bearer fixture-image-secret");
 		} finally {
-			await h.close();
+			await a.close();
 		}
-	});
+	}, 30_000);
 
 for (const [status, code] of [
 	[503, "image_model_unavailable"],
 	[409, "media_variant_busy"],
 	[400, "invalid_model"],
 ] as const)
-	test(`artifact image ${code} settles as failed with a single POST and no model switch`, async () => {
+	test(`artifact image form ${code} settles as failed with a single POST and no model switch`, async () => {
 		const f = imageFixture("success", undefined, undefined, { status, code });
-		const h = await harness({ model: f.model, imageGateway: f.gateway });
+		const a = await assignmentAgenda({
+			media: f,
+			harness: { model: plannedBy({ image: f }) },
+		});
 		try {
-			const values = {
-				prompt: "窓辺で眠る猫の写真",
-				model: "flux-3-image-klein",
-				width: 768,
-				height: 768,
-				seed: 42,
-				format: "webp",
-			};
-			const submitted = await (
-				await h.request("/api/runs", {
-					requestId: crypto.randomUUID(),
-					conversationId: "main",
-					presentation: "artifact",
-					toolchainId: "image.create",
-					text: `制作条件をそのまま使って画像を1枚生成してください。\n\n${JSON.stringify(values)}`,
-				})
-			).json();
-			await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
-			expect(h.image!.list("main")[0]).toMatchObject({
+			await a.start();
+			const values = artifactValues("flux-3-image-klein");
+			await ask(a, "image.create", artifactText(values));
+			await until(a, () => ended(a));
+			expect(a.h.image!.list("ao")[0]).toMatchObject({
 				state: "failed",
 				model: values.model,
 				artifactId: null,
 				errorCode: status === 400 ? "larm_http_400" : code,
 			});
-			const posts = f.requests.filter(
-				(r) => r.method === "POST" && r.path === "/v1/images/generations",
-			);
+			const posts = generations(f);
 			expect(posts).toHaveLength(1);
 			expect(posts[0]!.body).toEqual(values);
 		} finally {
-			await h.close();
+			await a.close();
 		}
-	});
+	}, 30_000);
 
-test("LARM's free-memory refusal puts the image into a wait: connection released, one POST, run kept open, cancel stops it", async () => {
+test("LARM's free-memory refusal puts the image into a wait: connection released, one POST, assignment kept open, cancel stops it", async () => {
 	const f = imageFixture("success", undefined, undefined, {
 		status: 503,
 		code: "resource_exhausted",
 		resource: "memory",
 	});
-	const h = await harness({ model: f.model, imageGateway: f.gateway });
-	const posts = () =>
-		f.requests.filter(
-			(r) => r.method === "POST" && r.path === "/v1/images/generations",
-		);
+	const a = await assignmentAgenda({
+		media: f,
+		harness: { model: plannedBy({ image: f }) },
+	});
 	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: imageQuestion,
-			})
-		).json();
-		await waitFor(() => h.image!.list("main")[0]?.phase === "waiting_capacity");
-		const record = h.image!.list("main")[0]!;
+		await a.start();
+		const { id } = await ask(a, "image.create", imageQuestion);
+		await until(
+			a,
+			() => a.h.image!.list("ao")[0]?.phase === "waiting_capacity",
+		);
+		const record = a.h.image!.list("ao")[0]!;
 		expect(record).toMatchObject({ state: "generating" });
 		expect(record.capacityWait?.count).toBe(1);
-		expect(posts()).toHaveLength(1);
+		expect(generations(f)).toHaveLength(1);
 		// The connection was released before the wait began.
 		expect(
 			f.requests.some(
@@ -378,15 +307,15 @@ test("LARM's free-memory refusal puts the image into a wait: connection released
 					r.path === "/v1/agent-connections/image-connection",
 			),
 		).toBe(true);
-		// The run stays open while the image waits.
-		const run = await (await h.request(`/api/runs/${submitted.id}`)).json();
-		expect(["queued", "running"]).toContain(run.status);
-		// Cancelling the run cancels the waiting job; nothing is sent afterwards.
-		await h.dialogue.cancel(submitted.id);
-		await waitFor(() => h.image!.list("main")[0]!.state === "cancelled");
+		// The assignment stays open while the image waits: still an item of the agent, not ended at its owner.
+		expect(items(a)).toHaveLength(1);
+		expect(ended(a)).toBe(false);
+		// Cancelling the assignment cancels the waiting job; nothing is sent afterwards.
+		await cancelAssignment(a, id);
+		await until(a, () => a.h.image!.list("ao")[0]!.state === "cancelled");
 		await Bun.sleep(50);
-		expect(posts()).toHaveLength(1);
+		expect(generations(f)).toHaveLength(1);
 	} finally {
-		await h.close();
+		await a.close();
 	}
-});
+}, 30_000);

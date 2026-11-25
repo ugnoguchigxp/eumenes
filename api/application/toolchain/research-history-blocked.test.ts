@@ -53,7 +53,10 @@ function ports(blockedIds: string[]) {
 		{ savedBodies: { validate: () => true } } as never,
 		conversation as never,
 		() =>
-			({ authorizeReadOwnerInTransaction: () => ({ deadline: 1 }) }) as never,
+			({
+				authorizeReadOwnerInTransaction: () => ({ deadline: 1 }),
+				executionOriginInTransaction: () => null,
+			}) as never,
 		{
 			blockedMessageIdsInTransaction: (_db, ids) =>
 				new Set([...ids].filter((id) => blockedIds.includes(id))),

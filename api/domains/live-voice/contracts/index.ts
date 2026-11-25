@@ -30,7 +30,7 @@ export const liveSegmentSchema = z.object({
 export const liveNoticeSchema = z.object({
 	id: z.string(),
 	text: z.string(),
-	kind: z.enum(["announcement", "confirmation"]),
+	kind: z.literal("announcement"),
 	displayed: z.boolean(),
 });
 export const liveSnapshotSchema = z.object({

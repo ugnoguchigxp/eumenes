@@ -37,10 +37,7 @@ import { createComputeAdapter } from "../compute/compute-adapter";
 import { createModel3dAdapter } from "../media/model3d-adapter";
 import { createBrowserAdapter } from "../browser/browser-adapter";
 import { createInteractAdapter } from "../browser/interact-adapter";
-import {
-	createTaskAdapter,
-	type TodoLedgerPort,
-} from "./task-execution-adapter";
+import { createTaskAdapter } from "./task-execution-adapter";
 import { createPipelinesAdapter } from "../pipelines/pipelines-adapter";
 import { createCollaborationHost } from "../collaboration/collaboration-host";
 import type { BrowserAssembly } from "../browser/browser-composition";
@@ -116,8 +113,6 @@ type ToolchainOptions = {
 	dotsWork?: import("../work/dots-work").DotsWork;
 	dotsConfiguration?: import("../work/dots-tasks").DotsTasks["config"];
 	dotsMessages?: import("../work/dots-messages").DotsMessages;
-	/** The conversation's TODO ledger the TODO screen pages and archives (absent until dialogue is attached). */
-	todos?: () => TodoLedgerPort | undefined;
 	dots?: boolean;
 	kanbanSdk?: ReturnType<typeof createKanbanSdkHost>;
 	music?: boolean;
@@ -193,10 +188,6 @@ type ToolchainOptions = {
 	serviceTests?: ServiceTestsPorts;
 	/** Key for HMAC digests of secret-bearing UI actions (absent: such actions are refused). */
 	secretKey?: () => Uint8Array | undefined;
-	/** Open toolchain interactions for the timer question source (dialogue, created later). */
-	interactions?: NonNullable<
-		Parameters<typeof createTimerAdapter>[1]
-	>["interactions"];
 };
 
 /**
@@ -350,7 +341,7 @@ export async function createToolchain(
 			: []),
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		...(options.canvasAdapter ? [options.canvasAdapter] : []),
-		createTaskAdapter(() => taskRuntime, options.todos),
+		createTaskAdapter(() => taskRuntime),
 		...createWebNoteAdapters(() => webNoteRuntime),
 		createClaudeCodeTaskAdapter(() => claudeCode),
 		createSupervisionAdapter(() => supervision),
@@ -433,9 +424,7 @@ export async function createToolchain(
 			: []),
 		...(options.timers
 			? [
-					createTimerAdapter(options.timers, {
-						interactions: options.interactions,
-					}),
+					createTimerAdapter(options.timers),
 				]
 			: []),
 		...(options.settings

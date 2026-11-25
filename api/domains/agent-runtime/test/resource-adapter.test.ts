@@ -193,16 +193,16 @@ test("ids outside the agent prefix are rejected: get is null, read throws item_n
 	);
 });
 
-test("the view names the TODO screen, offers read first and previews the request", async () => {
+test("the view offers read only and previews the request", async () => {
 	const { store, adapter, add } = setup();
 	await add({ id: "t1", report: report() });
 	const view = store.read((db) => adapter.getInTransaction(db, "agent:t1"))!;
 	expect(view).toMatchObject({
 		uri: "eumenes://report/agent%3At1",
 		label: "エージェント設計の講演の要点。",
-		adapterRef: "adapter:task-execution@1",
+		adapterRef: "adapter:agent-runtime@1",
 		targetRef: "t1",
-		actions: ["read", "open"],
+		actions: ["read"],
 		preview: "エージェント設計の講演を調べる",
 	});
 	await add({ id: "t2", report: report({ summary: "\n  \n" } as never) });

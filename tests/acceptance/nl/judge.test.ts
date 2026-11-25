@@ -198,17 +198,12 @@ describe("criteria hygiene", () => {
 	});
 });
 
-function snap(
-	seq: number,
-	timers: HostSnapshot["timers"],
-	interactions: HostSnapshot["interactions"] = null,
-): HostSnapshot {
+function snap(seq: number, timers: HostSnapshot["timers"]): HostSnapshot {
 	return {
 		seq,
 		atMs: T0 + seq * 1000,
 		serverNowMs: T0 + seq * 1000,
 		timers,
-		interactions,
 	};
 }
 const tea = (revision: number, state: "active" | "paused" | "cancelled") => ({
@@ -322,52 +317,5 @@ describe("other cases", () => {
 		);
 		expect(r.verdict).toBe("failure");
 		expect(byId(r, "C1").code).toBe("extra_timers");
-	});
-
-	test("question continuation: waiting_input then completed across a reload", () => {
-		const c = criteriaOf("timer-question-continuation-01");
-		const timer = {
-			...tea(0, "active"),
-			label: "タイマー",
-			durationSeconds: 180,
-			originRunId: "run-2",
-		};
-		const waiting = {
-			id: "i1",
-			status: "waiting_input",
-			questionCount: 1,
-			hasReceiptRef: false,
-		};
-		const done = {
-			id: "i1",
-			status: "completed",
-			questionCount: 1,
-			hasReceiptRef: true,
-		};
-		const series = [
-			snap(0, [], []),
-			snap(2, [], [waiting]),
-			snap(6, [timer], [done]),
-		];
-		const ok = judge(
-			c,
-			evidenceOf(
-				c.caseId,
-				series,
-				{ reason: "done" },
-				{ reloads: [T0 + 4000] },
-			),
-		);
-		expect(ok.verdict).toBe("success");
-		const noReload = judge(c, evidenceOf(c.caseId, series));
-		expect(byId(noReload, "C2").code).toBe("no_reload_while_waiting");
-		const unread = judge(
-			c,
-			evidenceOf(c.caseId, [snap(0, []), snap(6, [timer])]),
-		);
-		expect([unread.verdict, unread.failureClass]).toEqual([
-			"inconclusive",
-			"environment",
-		]);
 	});
 });

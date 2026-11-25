@@ -67,7 +67,6 @@ export function writeEvent(
 	} else if (seed.type === "said" && seed.by === "agent") {
 		const id = message("assistant", seed.text);
 		const about = seed.about ? (resolve(seed.about) as string[]) : [];
-		const todoRefs = seed.todoRefs ? (resolve(seed.todoRefs) as string[]) : [];
 		const said = add({
 			conversationId: CONVERSATION_ID,
 			at,
@@ -76,7 +75,6 @@ export function writeEvent(
 			fields: {
 				text: seed.text,
 				...(seed.origin === "reply" ? {} : { origin: seed.origin }),
-				...(todoRefs.length ? { todoRefs } : {}),
 				...(about.length ? { about } : {}),
 			},
 			messageIds: [id],

@@ -4,32 +4,16 @@ import { waitFor } from "../../../infrastructure/wait-for";
 import { registerDialogue } from "..";
 import type { ConversationResourcesResponse } from "../../resources";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
-import { insertWork, workById } from "../repository/work";
-import {
-	confirmationResourceUris,
-	forgetWorkResources,
-	saveConfirmationRefs,
-	workLinksOf,
-} from "../repository/resources";
+import { forgetWorkResources } from "../repository/resources";
 import { resolveDelegateRefs } from "../service/delegate-refs";
 import { createResourceLedger } from "../service/resource-ledger";
-import { madeOf } from "../service/state-text";
-import { createWorkLedger } from "../service/work-ledger";
-import { recordWorkLinksInTransaction } from "../service/work-links";
-import {
-	IMAGE,
-	INSTANT,
-	MUSIC,
-	choice,
-	setup,
-	type Harness,
-} from "./generation.fixture";
+import { INSTANT, choice, setup, type Harness } from "./generation.fixture";
 import { fakeResources } from "./resource.fixture";
 import { openDialogueStore, removeDialogueStore } from "./store.fixture";
 
 /**
  * The conversation's resource ledger and what is built on it (spec resource-uri-implementation-plan-2026-10-25.md
- * sections 4.1, 4.2, 6.2, 7.1 and 9): the stable `a<n>` numbers, the links a finished TODO keeps, the state and
+ * sections 4.1, 4.2, 6.2, 7.1 and 9): the stable `a<n>` numbers, the resources an assignment made, the state and
  * `<now>` lines, the resources `delegate` hands over and the HTTP response.
  */
 let h: Harness | undefined;
@@ -159,76 +143,6 @@ test("a message links resources in order, once each", async () => {
 	}
 });
 
-test("an image result becomes the TODO's link, which the state names by its number", async () => {
-	const { dir, store, deps, ledger } = ledgerStore();
-	const resources = fakeResources();
-	try {
-		const uri = resources.make("image", "image_1", "夜のドライブ");
-		const track = resources.make("music.track", "music_1", "日曜日の午後");
-		await store.write((db) => {
-			const full = {
-				...deps,
-				resources: resources.access,
-				resourceLedger: ledger,
-			};
-			const work = createWorkLedger({
-				...full,
-				continuity: undefined as never,
-				toolchains: undefined,
-			});
-			const row = insertWork(db, {
-				id: "work-3",
-				conversationId: "main",
-				runId: "run-1",
-				toolchainId: "fake.image",
-				toolchainRevisionId: "toolchain:fake.image@1",
-				execution: "image",
-				request: "夜のドライブの絵",
-				title: "夜のドライブの絵",
-				sourceRef: null,
-				dedupeKey: "k1",
-				createdAt: "2026-10-25T09:00:00.000Z",
-				messageIds: [],
-			});
-			const links = recordWorkLinksInTransaction(
-				full,
-				db,
-				row,
-				{ state: "completed", resourceId: "image_1" },
-				{ conversationId: "main", runId: "run-1", workId: row.id },
-			);
-			expect(links).toEqual([{ uri, kind: "image", label: "夜のドライブ" }]);
-			expect(workLinksOf(db, [row.id]).get(row.id)).toEqual(links);
-			// A track found in the history joins the ledger too.
-			ledger.enterInTransaction(db, {
-				conversationId: "main",
-				uri: track,
-				kind: "music.track",
-				label: "日曜日の午後",
-				source: "found",
-			});
-			// A result that names nothing the owner has makes no link; the sub-agent's links are checked.
-			expect(
-				recordWorkLinksInTransaction(
-					full,
-					db,
-					{ ...row, id: "work-x" },
-					{ resourceId: "missing" },
-					{ conversationId: "main", workId: "work-x" },
-					["eumenes://image/missing", "not a uri", track],
-				),
-			).toEqual([{ uri: track, kind: "music.track", label: "日曜日の午後" }]);
-			const refs = work.refsInTransaction(db, "main");
-			expect(refs.resource(uri)).toBe("a1");
-			const [todo] = work.todosInTransaction(db, "main");
-			// The TODO's line names what it made by number and name, never the URI.
-			expect(madeOf(todo!, refs)).toEqual(["a1「夜のドライブ」"]);
-		});
-	} finally {
-		removeDialogueStore(dir);
-	}
-});
-
 test("delegate refs: a number in the ledger becomes a reference with the owner's text; an unknown or forgotten one is refused", async () => {
 	const { dir, store, ledger } = ledgerStore();
 	const resources = fakeResources();
@@ -304,88 +218,6 @@ async function askTime(text = "東京は今何時？") {
 	h!.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
 	return h!.say(text);
 }
-
-/** An image TODO done with the resource its owner made, the way a finished job reports it. */
-async function doneImage(resources: ReturnType<typeof fakeResources>) {
-	const uri = resources.make("image", "image_1", "夜のドライブ");
-	// The router hands the user's words over: the TODO is titled by them.
-	h!.state.steps.push(choice({ choice: IMAGE.id }));
-	const waiting = await h!.say("夜のドライブの絵", "queued");
-	const done = await h!.finishImage(waiting.id, {
-		state: "completed",
-		title: "夜のドライブ",
-		resourceId: "image_1",
-	});
-	return { uri, done };
-}
-
-/**
- * The lines of `## State` in the last message of the newest fill call (the talk turn shows the time alone, so the fill
- * of the toolchain the router decided is where the TODOs and resources are named).
- */
-const stateOfLastCall = () => {
-	const last = h!.state.calls
-		.filter((call) => call.session?.outputSchema)
-		.at(-1)!
-		.messages.at(-1)!.content;
-	const start = last.indexOf("## State\n") + "## State\n".length;
-	const end = last.indexOf("\n\n", start);
-	return last.slice(start, end < 0 ? undefined : end).split("\n");
-};
-
-test("a finished image TODO links its image, its notice and a message citing it show it, and the next prompt shows its number", async () => {
-	const resources = fakeResources({ [IMAGE.id]: ["image"], [MUSIC.id]: [] });
-	h = await setup({ resources: resources.access });
-	const { uri } = await doneImage(resources);
-	const [todo] = h.archived();
-	expect(todo).toMatchObject({ toolchainId: IMAGE.id });
-	expect(h.notices().notices[0]).toMatchObject({
-		id: todo!.id,
-		links: [{ uri, kind: "image", label: "夜のドライブ" }],
-	});
-	const hono = new Hono();
-	registerDialogue(hono, h.dialogue);
-	const get = async () =>
-		(await (
-			await hono.request("/api/conversations/main/resources")
-		).json()) as ConversationResourcesResponse;
-	const image: ConversationResourcesResponse["resources"][number] = {
-		ref: "a1",
-		uri,
-		kind: "image",
-		kindLabel: "画像",
-		label: "夜のドライブ",
-		actions: ["open", "read"],
-		forgotten: false,
-	};
-	expect(await get()).toEqual({ resources: [image], messages: [] });
-	// The conversation reads the numbers, never the URI.
-	await askTime();
-	const lines = stateOfLastCall();
-	expect(lines).toContain("- t1 夜のドライブの絵 通知済み a1「夜のドライブ」");
-	expect(
-		h.state.calls
-			.slice(-2)
-			.flatMap((call) => call.messages)
-			.some((m) => m.content.includes("eumenes://")),
-	).toBe(false);
-	// A reply is not a report: its notice told the work, so no reply shows the image as a chip.
-	expect((await get()).messages).toEqual([]);
-	// An agency utterance that cites the TODO is linked when it is stored.
-	await h.store.write((db) =>
-		h!.dialogue.recordSpontaneousInTransaction(db, {
-			conversationId: "main",
-			messageId: "agency-1",
-			text: "絵ができました。",
-			at: "2026-10-25T10:00:00.000Z",
-			todoRefs: [todo!.id],
-		}),
-	);
-	expect((await get()).messages).toContainEqual({
-		messageId: "agency-1",
-		uris: [uri],
-	});
-});
 
 test("the resource on screen is shown in the state by its number and joins the ledger as viewed", async () => {
 	const resources = fakeResources();
@@ -485,51 +317,60 @@ test("the candidates tell what a toolchain makes, in the kinds' display names", 
 	]);
 });
 
-test("forgetting the messages a TODO came from empties its links and hides the resources it made", async () => {
-	const resources = fakeResources({ [IMAGE.id]: ["image"] });
+/**
+ * The resources an assignment made are entered under the agency's work root (`source = 'work'`), and its report shows
+ * them as chips; forgetting the root hides them.
+ */
+test("the resources an assignment made are numbered under its work root, shown as chips of its report, and hidden when it is forgotten", async () => {
+	const resources = fakeResources({});
 	h = await setup({ resources: resources.access });
-	await doneImage(resources);
-	const [todo] = h.archived();
-	expect(h.notices().notices).toHaveLength(1);
-	const messageIds = h.store.read((db) => workById(db, todo!.id)!.messageIds);
-	expect(messageIds.length).toBeGreaterThan(0);
-	await h.store.write((db) => {
-		createWorkLedger({
-			clock: () => new Date().toISOString(),
-			id: () => crypto.randomUUID(),
-			continuity: h!.continuity,
-			toolchains: undefined,
-		}).forgetInTransaction(db, messageIds);
+	const uri = resources.make("image", "image_1", "夜のドライブ");
+	const ledger = createResourceLedger({
+		clock: () => new Date().toISOString(),
+		id: () => crypto.randomUUID(),
 	});
-	expect(
-		h.store.read((db) => workLinksOf(db, [todo!.id]).get(todo!.id)),
-	).toBeUndefined();
-	const response = h.dialogue.conversationResources("main");
-	expect(response).toEqual({ resources: [], messages: [] });
-	// A forgotten TODO's notice goes with it.
-	expect(h.notices()).toEqual({ notices: [], unread: 0 });
-	await askTime();
-	expect(stateOfLastCall().some((line) => line.startsWith("a1 "))).toBe(false);
-	// A forgotten TODO is never named in the state, not even as notified.
-	expect(stateOfLastCall().some((line) => line.startsWith("- t1 "))).toBe(
-		false,
-	);
-});
-
-test("the resources a confirmation was issued with are kept with it", async () => {
-	const { dir, store } = ledgerStore();
-	try {
-		await store.write((db) => {
-			db.query(
-				"INSERT INTO dialogue_confirmations (id, conversation_id, toolchain_id, toolchain_revision_id, request, impact, statement_delivery_key, issued_at, expires_at) VALUES ('c-1','main','t','t@1','r','create','k','2026-10-25T00:00:00Z','2026-10-25T00:10:00Z')",
-			).run();
-			expect(confirmationResourceUris(db, "c-1")).toEqual([]);
-			saveConfirmationRefs(db, "c-1", ["eumenes://image/a"]);
-			expect(confirmationResourceUris(db, "c-1")).toEqual([
-				"eumenes://image/a",
-			]);
+	await h.store.write((db) => {
+		ledger.enterLinksInTransaction(db, {
+			conversationId: "main",
+			workId: "root-1",
+			links: [{ uri, kind: "image", label: "夜のドライブ" }],
 		});
-	} finally {
-		removeDialogueStore(dir);
-	}
+		ledger.linkMessageToWorkResourcesInTransaction(db, "main", "agency-1", [
+			"root-1",
+		]);
+	});
+	const hono = new Hono();
+	registerDialogue(hono, h.dialogue);
+	const get = async () =>
+		(await (
+			await hono.request("/api/conversations/main/resources")
+		).json()) as ConversationResourcesResponse;
+	expect(await get()).toEqual({
+		resources: [
+			{
+				ref: "a1",
+				uri,
+				kind: "image",
+				kindLabel: "画像",
+				label: "夜のドライブ",
+				actions: ["open", "read"],
+				forgotten: false,
+			},
+		],
+		messages: [{ messageId: "agency-1", uris: [uri] }],
+	});
+	// The conversation reads the number, never the URI.
+	await askTime();
+	expect(
+		h.state.calls
+			.flatMap((call) => call.messages)
+			.some((m) => m.content.includes("eumenes://")),
+	).toBe(false);
+	await h.store.write((db) => {
+		forgetWorkResources(db, [{ id: "root-1" }], new Date().toISOString());
+	});
+	expect(h.dialogue.conversationResources("main")).toEqual({
+		resources: [],
+		messages: [],
+	});
 });

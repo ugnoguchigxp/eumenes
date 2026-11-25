@@ -1,13 +1,6 @@
 import { z } from "zod";
 import { artifactDefinitionV1 } from "../api/domains/capabilities/contracts";
 import {
-	interactionAnswer,
-	interactionQuestion,
-	interactionStatuses,
-	type InteractionAnswer,
-	type InteractionView,
-} from "../api/domains/dialogue/contracts";
-import {
 	toolchainActionEventV1,
 	type ActionRequestView,
 	type ToolchainActionEventV1,
@@ -120,26 +113,6 @@ const sourceResponse = z.looseObject({
 	data: z.unknown(),
 });
 
-const interactionView = z.looseObject({
-	id: z.string(),
-	conversationId: z.string(),
-	status: z.enum(interactionStatuses),
-	revision: z.number().int().min(0),
-	chainRevisionId: z.string(),
-	artifactRevisionId: z.string().nullable(),
-	question: interactionQuestion.nullable(),
-	questionCount: z.number().int().min(0),
-	receiptRef: receiptRef.nullable(),
-	expiresAt: iso,
-	createdAt: iso,
-	updatedAt: iso,
-});
-const answerResult = z.looseObject({
-	interaction: interactionView,
-	runId: z.string(),
-	replay: z.boolean(),
-});
-
 /** The submit answer: 200 is settled, 202 is accepted for later settlement. */
 export type SubmittedAction = { httpStatus: number; view: ActionRequestView };
 
@@ -229,29 +202,5 @@ export function toolchainActionsClient(transport: Transport) {
 				),
 				{ signal },
 			),
-		toolchainInteractions: async (
-			query: { conversationId: string; status?: string },
-			signal?: AbortSignal,
-		) =>
-			(await callJson(
-				transport,
-				z.array(interactionView),
-				withQuery("/api/toolchain-interactions", {
-					conversationId: query.conversationId,
-					status: query.status || undefined,
-				}),
-				{ signal },
-			)) as InteractionView[],
-		answerToolchainInteraction: async (
-			id: string,
-			input: InteractionAnswer,
-			signal?: AbortSignal,
-		) =>
-			(await callJson(
-				transport,
-				answerResult,
-				`/api/toolchain-interactions/${encodeURIComponent(id)}/answers`,
-				{ ...json(interactionAnswer.parse(input)), signal },
-			)) as { interaction: InteractionView; runId: string; replay: boolean },
 	};
 }

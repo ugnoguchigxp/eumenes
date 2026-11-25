@@ -1,13 +1,12 @@
 import { expect, test } from "bun:test";
 import { createDocling, documentDigests } from "../../domains/docling";
 import { markdownArchive } from "./markdown-composition";
-import { waitFor } from "../../infrastructure/wait-for";
-import { harness, workerPacket } from "../toolchain/toolchain.fixture";
+import { workerPacket } from "../toolchain/toolchain.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
 
 const title = "沿岸観測所の運用手順";
 const finding = "交換間隔は17週間。";
 const request = `LARMの保存文書「${title}」で交換間隔を確認して`;
-const followup = "さっきの調査結果の版と根拠を教えて";
 const entry = {
 	sourceId: "wiki-0123456789abcdef0123456789abcdef",
 	title,
@@ -87,28 +86,12 @@ function archiveFixture() {
 	};
 }
 
-test("conversation delegates remote-only document search and cites the version and later body range", async () => {
+test("the agent's assignment searches remote-only documents and reports the version and later body range", async () => {
 	const fixture = archiveFixture();
 	let workerCalls = 0;
-	const h = await harness({
+	const f = await assignmentFixture({
 		markdown: fixture.archive,
 		pipelines: true,
-		routeTool: "resource_research",
-		discoveryTarget: () => "resource_research",
-		firstRound(_tools, question, messages) {
-			if (question !== followup) return undefined;
-			if (messages.some((message) => message.content.includes("原文位置")))
-				return { text: `${finding} 参照「${title}」${entry.revision}。` };
-			return {
-				calls: [{ name: "work", args: { operation: "check", todo: "t1" } }],
-			};
-		},
-		parent(messages) {
-			const message = messages.find((m) => m.content.includes("原文位置"));
-			return message
-				? `${finding} 参照「${title}」${entry.revision}。`
-				: "お調べします。";
-		},
 		control(messages) {
 			const data = workerPacket(messages);
 			const invoke = (tool: string, args: object) =>
@@ -151,15 +134,17 @@ test("conversation delegates remote-only document search and cites the version a
 			});
 		},
 	});
+	const { h } = f;
 	try {
-		const response = await h.request("/api/runs", {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: request,
-		});
-		expect(response.status).toBe(202);
-		await waitFor(() => !!h.reported(), { timeout: 5000 });
-		const reported = JSON.parse(h.reported());
+		const { result } = await f.assign(request, "resource.research");
+		expect(result).toMatchObject({ status: "accepted" });
+		await f.until(() => f.notes().length === 1, 15_000);
+		expect(f.executions()).toMatchObject([{ status: "completed" }]);
+		const reported = JSON.parse(f.reported());
+		// The agent's report is a note of the result; the assignment is no longer open.
+		expect(f.notes()[0]!.summary).toBe(finding);
+		expect(f.notes()[0]!.markdown).toContain(finding);
+		expect(f.items()).toHaveLength(0);
 		const schema = h.store.read((db) =>
 			h.toolchain.capabilities.schemaInTransaction(
 				db,
@@ -177,24 +162,6 @@ test("conversation delegates remote-only document search and cites the version a
 			}),
 		]);
 		expect(JSON.stringify(reported)).not.toContain("fixture-larm-backend-only");
-		const notices = await (await h.request("/api/todo-notices")).json();
-		expect(notices.notices[0].summary).toContain(finding);
-		expect(notices.notices[0].summary).toContain("版");
-		expect(notices.notices[0].summary).toContain(
-			`原文位置 ${first.length}–${first.length + second.length}`,
-		);
-		const consulted = await h.request("/api/runs", {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: followup,
-		});
-		expect(consulted.status).toBe(202);
-		const { id } = (await consulted.json()) as { id: string };
-		await waitFor(() => !!h.dialogue.answerText(id), { timeout: 5000 });
-		expect(h.dialogue.answerText(id)).toContain(finding);
-		expect(h.parentContexts.join("\n")).toContain(
-			`原文位置 ${first.length}–${first.length + second.length}`,
-		);
 		expect(h.commandContexts).toHaveLength(0);
 		expect(workerCalls).toBe(5);
 		expect(fixture.calls).toEqual([
@@ -211,15 +178,13 @@ test("conversation delegates remote-only document search and cites the version a
 	} finally {
 		await h.close();
 	}
-}, 18000);
+}, 30000);
 
 test("the selected worker cannot use an unissued document reference", async () => {
 	const fixture = archiveFixture();
-	const h = await harness({
+	const f = await assignmentFixture({
 		markdown: fixture.archive,
 		pipelines: true,
-		routeTool: "resource_research",
-		discoveryTarget: () => "resource_research",
 		control: () =>
 			JSON.stringify({
 				action: "invoke",
@@ -228,27 +193,20 @@ test("the selected worker cannot use an unissued document reference", async () =
 			}),
 	});
 	try {
-		const response = await h.request("/api/runs", {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: request,
-		});
-		expect(response.status).toBe(202);
-		await waitFor(() => !!h.reported(), { timeout: 5000 });
-		expect(JSON.parse(h.reported())).toMatchObject({ status: "failed" });
+		await f.assign(request, "resource.research");
+		await f.until(() => f.executions()[0]?.status === "failed", 15_000);
+		expect(JSON.parse(f.reported())).toMatchObject({ status: "failed" });
 		expect(fixture.calls).toEqual([]);
 	} finally {
-		await h.close();
+		await f.close();
 	}
-}, 9000);
+}, 30000);
 
 test("a connection change invalidates body evidence before the worker result can be adopted", async () => {
 	const fixture = archiveFixture();
-	const h = await harness({
+	const f = await assignmentFixture({
 		markdown: fixture.archive,
 		pipelines: true,
-		routeTool: "resource_research",
-		discoveryTarget: () => "resource_research",
 		control(messages) {
 			const data = workerPacket(messages);
 			const calls = data.operations;
@@ -286,18 +244,13 @@ test("a connection change invalidates body evidence before the worker result can
 		},
 	});
 	try {
-		const response = await h.request("/api/runs", {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: request,
-		});
-		expect(response.status).toBe(202);
-		await waitFor(() => !!h.reported(), { timeout: 5000 });
-		expect(JSON.parse(h.reported())).toMatchObject({
+		await f.assign(request, "resource.research");
+		await f.until(() => f.executions()[0]?.status === "failed", 15_000);
+		expect(JSON.parse(f.reported())).toMatchObject({
 			status: "failed",
 			code: "evidence_invalidated",
 		});
-		expect(h.reported()).not.toContain(finding);
+		expect(f.reported()).not.toContain(finding);
 		expect(fixture.calls).toEqual([
 			"capabilities",
 			"list:first",
@@ -305,6 +258,6 @@ test("a connection change invalidates body evidence before the worker result can
 			`read:${entry.sourceId}`,
 		]);
 	} finally {
-		await h.close();
+		await f.close();
 	}
-}, 9000);
+}, 30000);

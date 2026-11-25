@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { reply, setup, type Harness } from "./generation.fixture";
+import { agencyWith, reply, setup, type Harness } from "./generation.fixture";
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -15,10 +15,9 @@ afterEach(async () => {
 async function twoUtterances(taken: string[]) {
 	h = await setup({
 		autoStart: false,
-		agency: {
-			workChangedInTransaction: () => {},
+		agency: agencyWith({
 			steeredInTransaction: () => taken,
-		},
+		}),
 	});
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
@@ -69,10 +68,9 @@ test("an utterance no model call took gets its own reply", async () => {
 test("what the agency gave the reply is gone by adoption: the reply is written again once, then not adopted", async () => {
 	let complete = false;
 	h = await setup({
-		agency: {
-			workChangedInTransaction: () => {},
+		agency: agencyWith({
 			replyInputInTransaction: () => ({ sources: ["gone"], complete }),
-		},
+		}),
 	});
 	h.state.steps.push(...reply("一度目。"), ...reply("二度目。"));
 	// Incomplete at adoption: written again with the host's note, and incomplete again: it fails.
@@ -83,10 +81,9 @@ test("what the agency gave the reply is gone by adoption: the reply is written a
 
 test("a reply whose given input is whole is adopted", async () => {
 	h = await setup({
-		agency: {
-			workChangedInTransaction: () => {},
+		agency: agencyWith({
 			replyInputInTransaction: () => ({ sources: ["kept"], complete: true }),
-		},
+		}),
 	});
 	h.state.steps.push(...reply("お答えします。"));
 	const run = await h.say("こんにちは");
@@ -97,13 +94,12 @@ test("an adopted retry records the retry's sources instead of inheriting rejecte
 	let prepared = 0;
 	h = await setup({
 		memory: true,
-		agency: {
-			workChangedInTransaction: () => {},
+		agency: agencyWith({
 			replyInputInTransaction: () =>
 				++prepared === 1
 					? { sources: ["rejected-source"], complete: false }
 					: { sources: ["accepted-source"], complete: true },
-		},
+		}),
 	});
 	h.state.steps.push(...reply("一度目。"), ...reply("書き直した返事。"));
 	const run = await h.say("こんにちは");
@@ -167,10 +163,9 @@ test("the non-streaming call answers over the call's own messages (steered words
 
 test("when the agency serves the replies, a reply's tool calls and the conversation's first words stay in the history", async () => {
 	h = await setup({
-		agency: {
-			workChangedInTransaction: () => {},
+		agency: agencyWith({
 			servesRepliesInTransaction: () => true,
-		},
+		}),
 		conversationAgent: {
 			system: () => ({ base: "" }),
 			async respond(input) {

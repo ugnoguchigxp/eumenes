@@ -21,8 +21,6 @@ export function settleCapacityWait(input: {
 	budgetMs: number;
 	/** A deadline the caller fixed (a delegated task's budget); the wait never passes it. */
 	limitAt?: number | null;
-	/** Extends the owning run to `deadline`; returns the run's deadline afterwards, or null when it ended. */
-	extend?: (deadline: number) => number | null;
 	/** Ends the request with `larm_capacity_timeout`. */
 	expire: () => void;
 	/** Marks the record as waiting and enqueues the next try; returns the new job's id. */
@@ -31,10 +29,7 @@ export function settleCapacityWait(input: {
 	const log = getLogger(input.domain);
 	const waitedMs = input.now - (input.previous?.startedAt ?? input.now);
 	const plan = planCapacityWait(input);
-	if (
-		!plan ||
-		(input.extend && (input.extend(plan.deadline) ?? 0) < plan.deadline)
-	) {
+	if (!plan) {
 		log.warn(`${input.domain}.capacity_wait_expired`, {
 			subjectId: input.subjectId,
 			reason: LARM_CAPACITY_TIMEOUT,

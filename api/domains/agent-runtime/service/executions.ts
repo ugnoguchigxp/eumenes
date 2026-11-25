@@ -77,7 +77,7 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 			);
 			for (const row of rows) {
 				const state = executionState(row);
-				const valid = store.read(
+				const valid = store.readSnapshot(
 					(db) =>
 						port!.validSourceInTransaction(db, executionSource(row)) &&
 						state.refs.every((ref) =>
@@ -115,7 +115,7 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 					continue;
 				let result: import("../../tool-runtime").ChildResult;
 				try {
-					result = store.read((db) =>
+					result = store.readSnapshot((db) =>
 						port!.currentInTransaction(
 							db,
 							state.pending!.child,

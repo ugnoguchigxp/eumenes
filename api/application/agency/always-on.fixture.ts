@@ -16,6 +16,8 @@ import {
 	goalForgetDeps,
 } from "./goal-agenda";
 import { join } from "node:path";
+import { backgroundPlanSchema } from "./background-plan";
+import { planSchema } from "eumenes-agency/agenda";
 
 export type CallKind =
 	| "plan"
@@ -84,6 +86,10 @@ export async function agendaFixture(
 			signal: AbortSignal,
 		): unknown | Promise<unknown>;
 		media?: ReturnType<typeof imageFixture>;
+		/** More of the toolchain harness's own seams (a music gateway, a model that answers more than one media plan). */
+		harness?: NonNullable<Parameters<typeof harness>[0]>;
+		/** Which toolchains the agenda's catalog shows (with `media`: the image one). */
+		catalog?: (revisionId: string) => boolean;
 		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
 		steering?: boolean;
 		webNote?: NonNullable<Parameters<typeof harness>[0]>["webNote"];
@@ -92,7 +98,6 @@ export async function agendaFixture(
 			"voiceText" | "firstRound"
 		>;
 		backgroundPaused?: AgencyHostDeps["backgroundPaused"];
-		awaitingWorkConfirmation?: AgencyHostDeps["awaitingWorkConfirmation"];
 		goals?: Pick<
 			NonNullable<AgencyHostDeps["agendaGoals"]>,
 			"designer" | "analysisMs" | "trace"
@@ -120,6 +125,7 @@ export async function agendaFixture(
 		...(options.media
 			? { model: options.media.model, imageGateway: options.media.gateway }
 			: {}),
+		...options.harness,
 	});
 	const config = h.settings.get();
 	config.agency.emotion = false;
@@ -156,6 +162,7 @@ export async function agendaFixture(
 		resources: h.resources,
 		producesInTransaction: h.toolchain.capabilities.producesInTransaction,
 		memory: h.memory!,
+		queue: h.queue,
 		now: () => now,
 	});
 	const catalogOf = (db: Parameters<typeof port.catalogInTransaction>[0]) =>
@@ -163,7 +170,9 @@ export async function agendaFixture(
 			.catalogInTransaction(db)
 			.filter(
 				(c) =>
-					!options.media || c.revisionId.startsWith("toolchain:image.create@"),
+					options.catalog?.(c.revisionId) ??
+					(!options.media ||
+						c.revisionId.startsWith("toolchain:image.create@")),
 			);
 	/** The Markdown domain's side of a shown note, in memory: saved after `noteSavingPolls` looks, then linked. */
 	const documents = {
@@ -261,12 +270,23 @@ export async function agendaFixture(
 				requests.push(request as LlmRequest<unknown>);
 				kinds.push(kind);
 				signals.push(signal);
-				const value = await (options.script?.(
+				let value = await (options.script?.(
 					kind,
 					request as LlmRequest<unknown>,
 					requests.length,
 					signal,
 				) ?? fallback(kind));
+				if (Object.is(request.schema, backgroundPlanSchema)) {
+					const plain = planSchema.safeParse(value);
+					if (plain.success)
+						value = {
+							...plain.data,
+							add: plain.data.add.map((item) => ({
+								...item,
+								researchSource: item.kind === "research" ? "public" : null,
+							})),
+						};
+				}
 				signal.throwIfAborted();
 				return {
 					value: request.schema.parse(value),
@@ -280,7 +300,6 @@ export async function agendaFixture(
 		}),
 		conversationBusy: () => false,
 		backgroundPaused: options.backgroundPaused,
-		awaitingWorkConfirmation: options.awaitingWorkConfirmation,
 		recordSpokeInTransaction: () => {},
 		publish: () => {
 			published++;

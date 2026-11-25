@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import {
 	OTHER,
-	approve,
 	choice,
 	OTHER_REVISION,
 	STUDIO,
@@ -9,7 +8,6 @@ import {
 	setup,
 	type Harness,
 } from "./specialist.fixture";
-import { forgetWork } from "../repository/work";
 
 /**
  * A session toolchain takes the conversation over (the ContextWindow specification, section 6.8): the conversation
@@ -349,6 +347,7 @@ test("a target the host did not issue is refused before anything starts", async 
 test("a saved item starts the session from it; the fill offers exactly the issued items, and the screen's viewing is shown when issued", async () => {
 	const h = await harness();
 	h.handOver({ request: "これを直して", target: "item-1" });
+	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-1" },
 	});
@@ -363,13 +362,10 @@ test("a saved item starts the session from it; the fill offers exactly the issue
 		"item-1",
 		"item-2",
 	]);
-	// Changing a saved item is confirmed first; the approval starts the session from it.
-	expect(await h.session()).toBeNull();
-	h.state.steps.push(approve());
-	h.state.specialist.push(reply("開きました"));
-	await h.ask("お願い");
+	// Changing a saved item is handed over at once, with no confirmation: the session starts from it.
 	expect(await h.session()).toMatchObject({ label: "保存済み item-1" });
 	expect(h.work()[0]!.savedRef).toBe("item-1");
+	expect(h.rows("SELECT id FROM dialogue_confirmations")).toEqual([]);
 });
 
 test("an item on screen the host did not issue is not shown", async () => {
@@ -381,7 +377,7 @@ test("an item on screen the host did not issue is not shown", async () => {
 	expect(stateLine(h, h.lastChoice(), "- 制作担当「")).toBeUndefined();
 });
 
-test("a change of a saved item is confirmed naming the item, and the approval opens that same item", async () => {
+test("a change of a saved item is handed over at once, naming the item and asking no confirmation", async () => {
 	const h = await harness();
 	h.state.steps.push(
 		choice({
@@ -391,18 +387,10 @@ test("a change of a saved item is confirmed naming the item, and the approval op
 			target: "item-2",
 		}),
 	);
-	const asked = await h.ask("保存済み2の見出しを直して");
-	expect(h.answerText(asked.id)).toBe(
-		"制作担当に、保存済み2について「見出しを直す」を頼みます。今あるものを変えます。よろしいですか？",
-	);
-	expect(await h.session()).toBeNull();
-	h.state.steps.push(approve());
 	h.state.specialist.push(reply("開きました"));
-	await h.ask("お願い");
-	const approving = h.state.calls.findLast(({ tools }) =>
-		tools.includes("approve_confirmation"),
-	)!;
-	expect(approving.messages.at(-1)!.content).toContain("対象「保存済み2」");
+	const asked = await h.ask("保存済み2の見出しを直して");
+	expect(asked.announcement).toBe("「制作担当」に頼みます。");
+	expect(h.rows("SELECT id FROM dialogue_confirmations")).toEqual([]);
 	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
 	expect(h.work()[0]!.savedRef).toBe("item-2");
 });
@@ -425,92 +413,20 @@ test("a request to make something new is handed to the specialist at once, on a 
 	expect(h.state.specialistPrompts).toHaveLength(1);
 });
 
-/** The routed turn's choice that asks to change `target` in the studio (confirmed first). */
-const confirmOn = (target: string) =>
-	choice({
-		choice: STUDIO.id,
-		say: "直します。",
-		request: "見出しを直す",
-		target,
-	});
-
-test("a confirmation keeps its target: the same request on two items stays two confirmations, and the approved one opens its item", async () => {
+test("an item the host never issued is refused: nothing starts and no confirmation is asked", async () => {
 	const h = await harness();
-	h.state.steps.push(confirmOn("item-1"));
-	await h.ask("保存済み1の見出しを直して");
-	// The second request comes while the first is open: the router decides the studio again, which confirms.
-	h.state.steps.push(confirmOn("item-2"));
-	await h.ask("保存済み2も直して");
-	expect(
-		h.rows(
-			"SELECT ref, target, superseded_at AS superseded FROM dialogue_confirmations ORDER BY ref",
-		),
-	).toEqual([
-		{ ref: 1, target: "item-1", superseded: null },
-		{ ref: 2, target: "item-2", superseded: null },
-	]);
-	h.state.steps.push(approve(2));
-	h.state.specialist.push(reply("開きました"));
-	await h.ask("2つ目をお願い");
-	const approving = h.state.calls.findLast(({ tools }) =>
-		tools.includes("approve_confirmation"),
-	)!;
-	const prompts = approving.messages.at(-1)!.content;
-	expect(prompts).toContain(
-		"c1 確認待ち fake.studio「見出しを直す」 対象「保存済み1」",
+	h.state.steps.push(
+		choice({
+			choice: STUDIO.id,
+			say: "直します。",
+			request: "見出しを直す",
+			target: "item-9",
+		}),
 	);
-	expect(prompts).toContain(
-		"c2 確認待ち fake.studio「見出しを直す」 対象「保存済み2」",
-	);
-	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
-	expect(h.work()[0]!.savedRef).toBe("item-2");
-});
-
-test("an item that is gone is refused when confirmed, and a confirmation whose item went since is closed before anything is announced", async () => {
-	const h = await harness();
-	// A fill that names an item the host never issued is refused: nothing is confirmed, the host says it could not.
-	h.state.steps.push(confirmOn("item-9"));
 	const refused = await h.ask("見出しを直して");
 	expect(h.answerText(refused.id)).toBe("その依頼は今の担当で実行できません。");
 	expect(h.rows("SELECT ref FROM dialogue_confirmations")).toEqual([]);
-	h.state.steps.push(confirmOn("item-2"));
-	await h.ask("保存済み2の見出しを直して");
-	expect(
-		h.rows(
-			"SELECT ref, target, target_label AS label FROM dialogue_confirmations",
-		),
-	).toEqual([{ ref: 1, target: "item-2", label: "保存済み2" }]);
-	h.state.gone.add("item-2");
-	h.state.steps.push(approve());
-	const approved = await h.ask("お願い");
-	// Nothing is announced: the host says it could not ask for it.
-	expect(h.answerText(approved.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
-	);
-	expect(approved.announcement ?? null).toBeNull();
-	expect(
-		h.rows(
-			"SELECT superseded_at IS NOT NULL AS closed, used_at FROM dialogue_confirmations",
-		),
-	).toEqual([{ closed: 1, used_at: null }]);
 	expect(await h.session()).toBeNull();
 	expect(h.work()).toHaveLength(0);
 	expect(h.state.specialistPrompts).toHaveLength(0);
-});
-
-test("forgetting the words a confirmation came from clears its target with its request", async () => {
-	const h = await harness();
-	h.state.steps.push(confirmOn("item-1"));
-	await h.ask("見出しを直して");
-	const [row] = h.rows(
-		"SELECT message_ids_json AS ids FROM dialogue_confirmations",
-	);
-	await h.store.write((db) =>
-		forgetWork(db, JSON.parse(row.ids), "2026-10-30T12:00:00.000Z"),
-	);
-	expect(
-		h.rows(
-			"SELECT request, target, target_label AS label, resolve_unsaved AS resolve FROM dialogue_confirmations",
-		),
-	).toEqual([{ request: "", target: null, label: null, resolve: null }]);
 });

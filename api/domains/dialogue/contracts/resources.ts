@@ -23,7 +23,7 @@ export type ConversationResource = {
 	forgottenAt: string | null;
 };
 
-/** A TODO's links (`dialogue_work.links_json`): what the finished work made. */
+/** What a finished work made: the resource, its kind and label. */
 export type WorkLink = { uri: string; kind: string; label: string };
 
 /** What the other parts of the host use of the ledger. */

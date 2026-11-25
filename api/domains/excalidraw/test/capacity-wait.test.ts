@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Hono } from "hono";
-import type { Database } from "bun:sqlite";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import { createLocalServices } from "../../larm";
@@ -38,11 +37,7 @@ const refusal = (retryAfter?: string) =>
 		},
 	);
 
-async function setup(
-	options: {
-		onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
-	} = {},
-) {
+async function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-drawing-wait-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db"), [...queueMigrations, ...migrations]);
@@ -80,9 +75,6 @@ async function setup(
 		pollMs: 1,
 		clock: () => clock.t,
 	});
-	const linked: string[] = [],
-		finished: string[] = [],
-		extended: number[] = [];
 	const operations = registerDrawingOperations({
 		store,
 		queue,
@@ -90,14 +82,6 @@ async function setup(
 		capabilities: { validateInTransaction() {} } as never,
 		service,
 		clock: () => clock.t,
-		onJob: (_db, _runId, jobId) => linked.push(jobId),
-		onFinished: (_db, runId) => finished.push(runId),
-		onWaiting:
-			options.onWaiting ??
-			((_db, _runId, untilMs) => {
-				extended.push(untilMs);
-				return untilMs;
-			}),
 	});
 	// A saved drawing the operation opens.
 	const first = await service.session({
@@ -116,12 +100,10 @@ async function setup(
 	void doc;
 	leaseRequests.length = 0;
 	f.requests.length = 0;
-	async function start(
-		input: { delegated?: boolean; deadlineMs?: number } = {},
-	) {
+	async function start(input: { deadlineMs?: number } = {}) {
 		const id = crypto.randomUUID(),
 			runId = `run-${id}`,
-			deadline = clock.t + (input.deadlineMs ?? 300_000);
+			deadline = clock.t + (input.deadlineMs ?? 3 * 3600_000);
 		await store.write((db) => {
 			db.query("INSERT INTO excalidraw_operations VALUES(?,?,?,?,?,?,?,?)").run(
 				id,
@@ -144,9 +126,7 @@ async function setup(
 					referenceId,
 					revision: null,
 					title: "図",
-					...(input.delegated
-						? { execution: { id, refs: [], erased: false } }
-						: {}),
+					execution: { id, refs: [], erased: false },
 				}),
 				"{}",
 				deadline,
@@ -203,9 +183,6 @@ async function setup(
 		service,
 		operations,
 		queue,
-		linked,
-		finished,
-		extended,
 		start,
 		record,
 		job,
@@ -218,7 +195,7 @@ async function setup(
 test("T1/T10: a refused start waits as waiting_capacity, sends nothing until the planned time, then sends once and completes", async () => {
 	const h = await setup();
 	h.refuse.on = true;
-	const { id, runId } = await h.start();
+	const { id, runId, deadline } = await h.start();
 	const t0 = h.clock.t;
 	await h.run();
 	const waiting = h.record(id);
@@ -230,16 +207,12 @@ test("T1/T10: a refused start waits as waiting_capacity, sends nothing until the
 		deadline: t0 + 30_000 + 180_000,
 	});
 	expect(h.leaseRequests).toHaveLength(1);
-	// The run is kept open past the next try, and the new job replaces the one cancel would target.
-	expect(h.extended).toEqual([t0 + 210_000]);
-	expect(waiting.deadline).toBe(t0 + 210_000);
-	expect(h.linked).toHaveLength(1);
-	expect(waiting.jobId).toBe(h.linked[0]!);
+	// The caller's deadline is kept, and the new job replaces the one cancel would target.
+	expect(waiting.deadline).toBe(deadline);
 	expect(h.job(waiting.jobId)).toEqual({
 		state: "queued",
 		available_at_ms: t0 + 30_000,
 	});
-	expect(h.finished).toEqual([]);
 	// Nothing reaches LARM before the planned time.
 	h.clock.t = t0 + 29_000;
 	await h.run();
@@ -284,7 +257,6 @@ test("T3: a refusal that never ends stops at 30 minutes with larm_capacity_timeo
 	const failed = h.record(id);
 	expect(failed.state).toBe("failed");
 	expect(failed.errorCode).toBe("larm_capacity_timeout");
-	expect(h.finished).toEqual([failed.runId]);
 	expect(h.leaseRequests.at(-1)! - t0).toBeLessThanOrEqual(30 * 60_000);
 	// 30 s apart, exactly one request each.
 	expect(h.leaseRequests).toHaveLength(61);
@@ -325,32 +297,16 @@ test("T4: cancelling while waiting cancels the queued job and nothing is sent af
 	expect(h.record(id).state).toBe("cancelled");
 });
 
-test("T5: a delegated task or a run whose deadline is fixed never extends its deadline and ends with larm_capacity_timeout", async () => {
-	const delegated = await setup();
-	delegated.refuse.on = true;
-	const task = await delegated.start({ delegated: true, deadlineMs: 100_000 });
-	await delegated.run();
-	const failed = delegated.record(task.id);
+test("T5: a task keeps its caller's deadline and ends with larm_capacity_timeout once the next try does not fit", async () => {
+	const h = await setup();
+	h.refuse.on = true;
+	const task = await h.start({ deadlineMs: 100_000 });
+	await h.run();
+	const failed = h.record(task.id);
 	expect(failed.state).toBe("failed");
 	expect(failed.errorCode).toBe("larm_capacity_timeout");
 	expect(failed.deadline).toBe(task.deadline);
-	expect(delegated.extended).toEqual([]);
-	expect(delegated.leaseRequests).toHaveLength(1);
-
-	// A conversation run whose caller fixed the deadline: the dialogue refuses to extend it.
-	const fixed = await setup({ onWaiting: () => null });
-	fixed.refuse.on = true;
-	const op = await fixed.start();
-	await fixed.run();
-	expect(fixed.record(op.id).errorCode).toBe("larm_capacity_timeout");
-	expect(fixed.record(op.id).deadline).toBe(op.deadline);
-	expect(fixed.leaseRequests).toHaveLength(1);
-	// A deadline below the next try cannot be extended either.
-	const short = await setup({ onWaiting: (_db, _run, until) => until - 1 });
-	short.refuse.on = true;
-	const op2 = await short.start();
-	await short.run();
-	expect(short.record(op2.id).errorCode).toBe("larm_capacity_timeout");
+	expect(h.leaseRequests).toHaveLength(1);
 });
 
 test("T10: a refused session start fails once as larm_capacity_busy; ready() and activity never send it again, and the routes answer 503", async () => {

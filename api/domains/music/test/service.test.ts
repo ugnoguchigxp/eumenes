@@ -98,7 +98,7 @@ type Options = {
 	trackIds?: string[];
 	v2?: boolean;
 };
-const execution = (id: string, uris: string[]) =>
+const execution = (id: string, uris: string[], conversationId = "main") =>
 	({
 		id,
 		executionId: "exec-1",
@@ -117,9 +117,9 @@ const execution = (id: string, uris: string[]) =>
 			preview: "",
 		})),
 		source: {
-			conversationId: "main",
+			conversationId,
 			messageId: "m1",
-			runId: "run-d",
+			runId: id,
 			request: "この曲を流して",
 			digest: "d",
 		},
@@ -138,8 +138,6 @@ function setup(options: Options = {}) {
 	const executed: Array<Record<string, unknown>> = [];
 	const removed: string[] = [];
 	const trackQueries: unknown[] = [];
-	const jobs: Array<[string, string]> = [];
-	const finished: string[] = [];
 	let nextValue = options.planValue;
 	const inference = {
 		captureControlInTransaction: () => "request-1",
@@ -215,17 +213,20 @@ function setup(options: Options = {}) {
 		inference,
 		capabilities,
 		gateway: () => gateway,
-		onJob: (_db, runId, jobId) => jobs.push([runId, jobId]),
-		onFinished: (_db, runId) => finished.push(runId),
 		validateExecutionInTransaction: () => true,
 	});
 	queue.start();
-	const input = (runId: string, conversationId: string) => ({
+	const input = (
+		runId: string,
+		conversationId: string,
+		uris: string[] = [],
+	) => ({
 		runId,
 		conversationId,
 		question: "雨の日の曲",
 		originalRequest: "雨の日の曲",
 		deadline: Date.now() + 120_000,
+		execution: execution(runId, uris, conversationId),
 	});
 	return {
 		store,
@@ -234,8 +235,6 @@ function setup(options: Options = {}) {
 		executed,
 		removed,
 		trackQueries,
-		jobs,
-		finished,
 		setPlan: (value: string) => (nextValue = value),
 		start: (runId = "run-1", conversationId = "main") =>
 			store.write((db) =>
@@ -244,18 +243,7 @@ function setup(options: Options = {}) {
 		/** A delegated playback: the request carries `uris` as resource references. */
 		startPlaybackWith: (uris: string[], runId = "run-d") =>
 			store.write((db) =>
-				music.startPlaybackInTransaction(db, {
-					...input(runId, "main"),
-					execution: execution(runId, uris),
-				}),
-			),
-		/** A direct request of the conversation, with the tracks it handed over (`delegate` refs). */
-		startPlaybackHanded: (uris: string[], runId = "run-h") =>
-			store.write((db) =>
-				music.startPlaybackInTransaction(db, {
-					...input(runId, "main"),
-					references: execution(runId, uris).refs,
-				}),
+				music.startPlaybackInTransaction(db, input(runId, "main", uris)),
 			),
 		startPlayback: (runId = "run-p", conversationId = "main") =>
 			store.write((db) =>
@@ -280,11 +268,11 @@ const completed = async (h: Harness, runId = "run-1") => {
 	return id;
 };
 
-test("start is idempotent per run and records one plan job", async () => {
+test("start is idempotent per execution and records one plan job", async () => {
 	const h = setup();
 	const first = await h.start();
 	expect(await h.start()).toEqual(first);
-	expect(h.jobs).toEqual([["run-1", first.jobId]]);
+	expect(first.jobId).toBeString();
 	expect(h.music.get(first.id)).toMatchObject({
 		state: "planning",
 		prompt: null,
@@ -332,12 +320,11 @@ test("plan then generate stores the audio and exposes it only when completed", a
 		mime: "audio/mpeg",
 	});
 	expect(h.music.audio("missing")).toBeNull();
-	expect(h.finished).toEqual(["run-1"]);
 	expect(
-		h.store.read((db) => h.music.resultInTransaction(db, "run-1")),
+		h.store.read((db) => h.music.resultForCallInTransaction(db, id)),
 	).toEqual(h.music.get(id));
 	expect(
-		h.store.read((db) => h.music.resultInTransaction(db, "none")),
+		h.store.read((db) => h.music.resultForCallInTransaction(db, "none")),
 	).toBeNull();
 	await h.queue.close(100);
 });
@@ -387,7 +374,6 @@ test("an invalid plan or generation result fails the record with a stable code",
 			errorCode: code,
 		});
 		expect(h.music.audio(id)).toBeNull();
-		expect(h.finished).toEqual(["run-1"]);
 		await h.queue.close(100);
 	}
 });
@@ -440,15 +426,10 @@ test("playback builds a playlist from the library query and selects the first tr
 	});
 	expect(h.trackQueries).toHaveLength(1);
 	expect(h.trackQueries[0]).not.toHaveProperty("favorite");
-	expect(h.finished).toEqual(["run-p"]);
 	expect(h.music.playback.list("main")).toHaveLength(1);
 	expect(h.music.playback.list("none")).toEqual([]);
 	expect(
-		h.store.read((db) => h.music.playback.resultInTransaction(db, "run-p")),
-	).toEqual(h.music.playback.get(id)!);
-	// A playback run is also visible through the generic result lookup.
-	expect(
-		h.store.read((db) => h.music.resultInTransaction(db, "run-p")),
+		h.store.read((db) => h.music.resultForCallInTransaction(db, id)),
 	).toEqual(h.music.playback.get(id)!);
 	expect(await h.startPlayback()).toEqual({ id, jobId: expect.any(String) });
 	await h.queue.close(100);
@@ -712,20 +693,6 @@ test("playback V2 opens exactly the tracks the request carried without searching
 	expect(h.music.playback.get(id)).toMatchObject({
 		state: "completed",
 		trackIds: ["t7", "t9"],
-		currentId: "t7",
-	});
-	expect(h.trackQueries).toEqual([]);
-	await h.queue.close(100);
-});
-
-test("playback V2 opens the tracks a direct request of the conversation handed over", async () => {
-	const uris = [trackUri("t7")];
-	const h = setup({ v2: true, playbackValue: JSON.stringify(v2Plan(uris)) });
-	const { id } = await h.startPlaybackHanded(uris);
-	await until(playlistDone(h, id));
-	expect(h.music.playback.get(id)).toMatchObject({
-		state: "completed",
-		trackIds: ["t7"],
 		currentId: "t7",
 	});
 	expect(h.trackQueries).toEqual([]);

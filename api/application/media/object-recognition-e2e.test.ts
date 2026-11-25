@@ -1,31 +1,57 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { objectRecognitionFixture } from "./object-recognition.fixture";
+import { hash } from "../../domains/capabilities";
 import { waitFor } from "../../infrastructure/wait-for";
+import {
+	assign,
+	ask,
+	assignmentAgenda,
+	ended,
+	executions,
+	plannedBy,
+	until,
+} from "./assignment.fixture";
+
+/** What the recognition command of each execution answered (the call that ran it, and its result). */
+const commandResults = (h: { store: { read: Function } }) =>
+	(
+		h.store.read((db: import("bun:sqlite").Database) =>
+			db
+				.query(
+					"SELECT call_id, result_json FROM object_recognition_execution_commands ORDER BY rowid",
+				)
+				.all(),
+		) as Array<{ call_id: string; result_json: string }>
+	).map((row) => ({ callId: row.call_id, ...JSON.parse(row.result_json) }));
 test("authenticated upload → detection → stored source → chat attachment with detections; command package opens the artifact", async () => {
 	const f = objectRecognitionFixture();
-	const h = await harness({ model: f.model, recognitionFetcher: f.fetcher });
+	const a = await assignmentAgenda({
+		harness: {
+			model: plannedBy({ other: f }),
+			recognitionFetcher: f.fetcher,
+		},
+	});
+	const h = a.h;
 	try {
 		await h.settings.configureObjectRecognition({
 			expectedRevision: 0,
 			baseUrl: "http://127.0.0.1:18786",
 			credential: "fixture-only-recognition-credential",
 		});
-		const raw = {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "カメラの物体を調べる画面を開いて",
-		};
-		const run = await (await h.request("/api/runs", raw)).json();
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
-		expect(f.stages).toEqual(["route", "command"]);
-		expect(
-			await (
-				await h.request("/api/object-recognition/commands?conversationId=main")
-			).json(),
-		).toContain(run.id);
+		await a.start();
+		await ask(
+			a,
+			"object-recognition.manage",
+			"カメラの物体を調べる画面を開いて",
+		);
+		await until(a, () => ended(a));
+		expect(executions(a)).toHaveLength(1);
+		expect(f.stages).toEqual(["command"]);
+		// The command ran as the assignment's own execution: its result is kept under its call.
+		expect(commandResults(h)).toMatchObject([
+			{ action: "open", state: "ready_for_input" },
+		]);
 		expect(f.calls).toEqual([]);
 		const id = crypto.randomUUID();
 		const form = new FormData();
@@ -193,26 +219,27 @@ test("an agreed capture request: the screen's still and its detections become on
 		source: "camera",
 		question: "今日の服装を見てほしい",
 	});
-	const h = await harness({ model: f.model, recognitionFetcher: f.fetcher });
+	const a = await assignmentAgenda({
+		harness: {
+			model: plannedBy({ other: f }),
+			recognitionFetcher: f.fetcher,
+		},
+	});
+	const h = a.h;
 	try {
+		await a.start();
 		await h.settings.configureObjectRecognition({
 			expectedRevision: 0,
 			baseUrl: "http://127.0.0.1:18786",
 			credential: "fixture-only-recognition-credential",
 		});
-		const run = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: "いいよ、撮って",
-			})
-		).json();
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
+		await ask(a, "object-recognition.manage", "いいよ、撮って");
+		await until(a, () => ended(a));
 		const pending = await (
-			await h.request("/api/object-recognition/handoffs?conversationId=main")
+			await h.request("/api/object-recognition/handoffs?conversationId=ao")
 		).json();
+		// The handoff is the assignment's command call: the screen's still goes to it.
+		const run = { id: commandResults(h)[0]!.callId };
 		expect(pending).toMatchObject([
 			{ id: run.id, source: "camera", state: "pending" },
 		]);
@@ -227,7 +254,7 @@ test("an agreed capture request: the screen's still and its detections become on
 		expect(
 			(
 				await h.app.request(
-					`/api/object-recognition?requestId=${id}&conversationId=main&origin=camera`,
+					`/api/object-recognition?requestId=${id}&conversationId=ao&origin=camera`,
 					{
 						method: "POST",
 						headers: {
@@ -248,28 +275,34 @@ test("an agreed capture request: the screen's still and its detections become on
 		const sent = await (await send()).json();
 		expect((await (await send()).json()).id).toBe(sent.id);
 		const message = h.conversation
-			.get("main")
+			.get("ao")
 			.messages.find((m) => m.id === sent.inputMessageId);
 		expect(message?.text).toBe("今日の服装を見てほしい");
 		expect(message?.attachments?.[0]?.annotation).toMatchObject({
 			source: "object-recognition",
 			data: { captureSource: "camera", recognitionId: id },
 		});
-		// The fixture model picks capture again for the sent message, but that message already
+		// The assignment of the sent message asks to capture again, but that message already
 		// carries the image: the host shows it instead of asking for another still.
-		await h.dialogue.waitForTerminal(sent.id, { timeoutMs: 5000 });
+		const words = {
+			conversationId: "ao",
+			messageId: sent.inputMessageId,
+			runId: sent.id,
+			request: message!.text,
+			digest: hash(message!.text),
+		};
+		await a.h.dialogue.waitForTerminal(sent.id, { timeoutMs: 5000 });
+		await assign(a, words, "object-recognition.manage");
+		await until(a, () => ended(a, 2));
 		expect(
 			await (
-				await h.request("/api/object-recognition/handoffs?conversationId=main")
+				await h.request("/api/object-recognition/handoffs?conversationId=ao")
 			).json(),
 		).toEqual([]);
-		expect(
-			h.store.read((db) =>
-				h
-					.objectRecognition!.port("local:owner")
-					.resultInTransaction(db, sent.id),
-			),
-		).toEqual({ action: "capture", state: "already_attached" });
+		expect(commandResults(h)[1]).toMatchObject({
+			action: "capture",
+			state: "already_attached",
+		});
 		const cancelled = await h.request(
 			`/api/object-recognition/handoffs/${run.id}/cancel`,
 			{},

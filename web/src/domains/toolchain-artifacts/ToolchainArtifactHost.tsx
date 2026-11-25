@@ -26,7 +26,6 @@ import {
 import { dirtyEntries } from "./documents";
 import { genericWebAdapter } from "./generic-adapter";
 import { toolchainArtifactsQuery } from "./launcher";
-import { useAnswer, useOpenQuestion } from "./questions";
 import { useScreenDispatch } from "./screen-dispatch";
 import { SecretNotice, useSecretNotice } from "./secret-notice";
 import { useScreenObservation } from "./screen-observation";
@@ -191,12 +190,6 @@ function AdapterScreen({
 		(id: string) => deleteLibraryImage(cache, client, id),
 		[cache, client],
 	);
-	const { question, questionSource } = useOpenQuestion(
-		client,
-		artifact,
-		artifactRevisionId,
-		conversationId,
-	);
 	const catalogQuery = useQuery({
 		...toolchainArtifactsQuery(client),
 		// Navigation labels and a document's other screens come from the published list.
@@ -263,7 +256,7 @@ function AdapterScreen({
 			reload();
 		},
 	};
-	const withLists = useMemo<Snapshot>(
+	const snapshot = useMemo<Snapshot>(
 		() =>
 			withEditingState(
 				{ ...own.snapshot, ...collections.resources },
@@ -277,34 +270,13 @@ function AdapterScreen({
 		artifactId,
 		artifact,
 	);
-	const snapshot = useMemo<Snapshot>(
-		() =>
-			questionSource && question
-				? {
-						...withLists,
-						[questionSource]: {
-							kind: "question",
-							revision: question.revision,
-							status: "open",
-							question: {
-								prompt: question.prompt,
-								...(question.choices?.length
-									? { options: question.choices.map((c) => c.label) }
-									: {}),
-							},
-						},
-					}
-				: withLists,
-		[withLists, questionSource, question],
-	);
 	const latest = useRef({
 		state,
 		snapshot,
-		question,
 		documentFields,
 	});
 	useEffect(() => {
-		latest.current = { state, snapshot, question, documentFields };
+		latest.current = { state, snapshot, documentFields };
 	});
 	const getLatest = useCallback(() => latest.current, []);
 	const { describe, dispatcherRef, notice, setNotice, settledEpoch } =
@@ -319,7 +291,6 @@ function AdapterScreen({
 	useEffect(() => {
 		noticeRef.current = setNotice;
 	}, [setNotice]);
-	const answer = useAnswer(client, getLatest);
 	const { token: secretToken, reveal, close: closeSecret } = useSecretNotice();
 	const collectionEvent = useCollectionActions({
 		client,
@@ -346,7 +317,6 @@ function AdapterScreen({
 		collectionEvent,
 		draftAction,
 		applyDraft,
-		answer,
 		describe,
 		dispatcherRef,
 		reveal,
@@ -364,15 +334,8 @@ function AdapterScreen({
 		...(variant && state.phase.kind === "ready" ? own.screenState : {}),
 	});
 	const definition = useMemo(
-		() =>
-			variant
-				? JSON.stringify(
-						question && variant.questionDefinition
-							? variant.questionDefinition
-							: variant.definition,
-					)
-				: null,
-		[variant, question],
+		() => (variant ? JSON.stringify(variant.definition) : null),
+		[variant],
 	);
 	const hostViews = useMemo(() => hostViewsFor(client), [client]);
 	const runtime = useMemo<ArtifactRuntime>(

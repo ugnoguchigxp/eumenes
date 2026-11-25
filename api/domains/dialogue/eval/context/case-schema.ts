@@ -1,7 +1,7 @@
 /**
  * context-eval cases (spec: spec/context-window-spec-2026-10-24.md section 21.2).
  * A case is seed DATA, not a ContextWindow: materialize writes it into the real services (the continuity events, the
- * memory State, the work ledger) and runs the production prepare, so the messages are the product's own.
+ * memory State) and runs the production prepare, so the messages are the product's own.
  * Offline evaluation only; product code never imports this folder.
  */
 import { z } from "zod";
@@ -97,15 +97,8 @@ const seedEvent = z.union([
 			by: z.literal("agent"),
 			at: isoTime,
 			text,
-			origin: z.enum([
-				"reply",
-				"spontaneous",
-				"report",
-				"announcement",
-				"confirmation",
-			]),
+			origin: z.enum(["reply", "spontaneous", "report", "announcement"]),
 			about: z.array(eventRef).optional(),
-			todoRefs: z.array(eventRef).optional(),
 			/** How much of it reached the user. A `delivered` event follows the utterance; null: none yet. */
 			heard: heard.nullable().default("full"),
 			deliveredText: z.string().optional(),
@@ -157,39 +150,6 @@ const seedEpisode = z
 
 const seedPending = z.object({ at: isoTime, text }).strict();
 
-/**
- * A TODO as the ledger holds it. `result` is whatever the sub-agent reported (a done TODO's slot in `active`);
- * `waiting` carries the question.
- */
-const seedWork = z
-	.object({
-		key: text,
-		toolchain: text,
-		request: text,
-		at: isoTime,
-		/** When the owner reported (done, waiting); absent: `at`. */
-		updatedAt: isoTime.optional(),
-		status: z.enum(["todo", "waiting", "done"]),
-		outcome: z
-			.enum(["succeeded", "partial", "failed", "cancelled", "interrupted"])
-			.optional(),
-		result: z.unknown().optional(),
-		questionId: text.optional(),
-		question: text.optional(),
-		/**
-		 * Written by cases from before finished work was archived as it finishes (2026-10-29); every done TODO is
-		 * archived now, so the seed ignores it.
-		 */
-		archived: z.boolean().optional(),
-	})
-	.strict();
-const seedConfirmation = z
-	.object({
-		toolchain: text,
-		request: text,
-		impact: z.enum(["modify_existing", "irreversible"]),
-	})
-	.strict();
 const seedGoal = z
 	.object({ text, priority: z.number().int().min(0).max(100).default(50) })
 	.strict();
@@ -211,8 +171,6 @@ const seedSchema = z
 		events: z.array(seedEvent).optional(),
 		/** Earlier utterances no generation has handled yet; they are shown as newest messages with `input`. */
 		pending: z.array(seedPending).optional(),
-		work: z.array(seedWork).optional(),
-		confirmations: z.array(seedConfirmation).optional(),
 		goals: z.array(seedGoal).optional(),
 		/** Known World targets this turn's wording mentions (names only, as the production hint shows them). */
 		world: z.array(z.object({ name: text }).strict()).optional(),
@@ -268,7 +226,7 @@ export const caseSchema = z
 		seed: seedSchema,
 		/** The user's newest utterance. Null: the generation has none (the host's fixed text) and `trigger` says why. */
 		input: text.nullable(),
-		/** `now.trigger` of a generation without an utterance: what happened (a TODO changed, a notice). */
+		/** `now.trigger` of a generation without an utterance: what happened (a notice, a timer). */
 		trigger: z.record(z.string(), z.unknown()).optional(),
 		expect: z
 			.object({
@@ -320,16 +278,11 @@ export function caseIssues(candidate: ContextCase): string[] {
 	if (candidate.input !== null && candidate.trigger)
 		issues.push(`${candidate.id}: trigger_with_input`);
 	const events = seedEventsOf(candidate.seed);
-	const keys = [
-		...events.flatMap((e) => (e.key ? [e.key] : [])),
-		...(candidate.seed.work ?? []).map((w) => w.key),
-	];
+	const keys = events.flatMap((e) => (e.key ? [e.key] : []));
 	if (new Set(keys).size !== keys.length)
 		issues.push(`${candidate.id}: duplicate_key`);
 	const known = new Set(keys.map((key) => `@${key}`));
-	for (const ref of new Set(
-		refsIn([events, candidate.seed.work, candidate.trigger]),
-	))
+	for (const ref of new Set(refsIn([events, candidate.trigger])))
 		if (!known.has(ref)) issues.push(`${candidate.id}: unknown_ref:${ref}`);
 	for (const event of events)
 		if (event.type === "said" && event.by === "agent") {
@@ -347,14 +300,6 @@ export function caseIssues(candidate: ContextCase): string[] {
 		for (const key of item.from)
 			if (!(candidate.seed.longTerm ?? []).some((i) => i.key === key))
 				issues.push(`${candidate.id}: tendency_from_unknown_item:${key}`);
-	for (const work of candidate.seed.work ?? []) {
-		if (work.status === "done" && !work.outcome)
-			issues.push(`${candidate.id}: done_work_without_outcome:${work.key}`);
-		if (work.status === "waiting" && !(work.questionId && work.question))
-			issues.push(`${candidate.id}: waiting_work_without_question:${work.key}`);
-		if (work.archived && work.status !== "done")
-			issues.push(`${candidate.id}: archived_work_not_done:${work.key}`);
-	}
 	const seedText = JSON.stringify([
 		candidate.seed,
 		candidate.input,

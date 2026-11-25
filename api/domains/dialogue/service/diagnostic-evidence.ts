@@ -211,14 +211,3 @@ export function backgroundDiagnostic(
 		digest: hash(facts),
 	};
 }
-
-export function diagnosticRepairPrompt(
-	evidence: NonNullable<ReturnType<typeof verifiedDiagnostic>>,
-) {
-	return [
-		"Eumenes の予約について、下の観測記録から実際に起きたことを調べてください。",
-		"関連コードと記録を照合し、隔離した条件で再現し、原因・改善案・完了条件を報告してください。今回の作業範囲は分析までです。製品の編集・サーバーの操作・commit・push は行わないでください。",
-		"予約の登録、実行、成果の保存を区別してください。記録が欠ける場合は確認範囲と未確認の点を示してください。失敗・中断した会話実行が記録にある場合は、既存の CLI の error-report を参照できます。",
-		`Eumenes が確認した記録\n${JSON.stringify(evidence)}`,
-	].join("\n\n");
-}

@@ -76,6 +76,7 @@ function observationReferences(
 export function agencyForgetting(deps: {
 	agents?: AgentRuntime;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
+	queue?: import("./agency-actions").AgencyActionDeps["queue"];
 	memory?: Pick<MemoryService, "referenceInputs">;
 	now(): number;
 }) {
@@ -160,7 +161,7 @@ export function agencyForgetting(deps: {
 								))
 						) {
 							if (w.execution_id) {
-								eraseAgencyActionWork(db, w.execution_id, deps.now());
+								eraseAgencyActionWork(db, w, deps.now());
 								stopAgencyExecution(deps, db, w, true);
 							}
 							deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
@@ -194,8 +195,7 @@ export function agencyForgetting(deps: {
 				) {
 					if (!record.sourceRefs.some((ref) => refs.has(ref))) continue;
 					for (const work of agencyWorks(db, record.conversationId, true)) {
-						if (work.execution_id)
-							eraseAgencyActionWork(db, work.execution_id, deps.now());
+						if (work.execution_id) eraseAgencyActionWork(db, work, deps.now());
 						if (work.execution_id) stopAgencyExecution(deps, db, work, true);
 						deps.agents?.deleteTaskDataInTransaction(db, work.root_id);
 					}
@@ -220,8 +220,7 @@ export function agencyForgetting(deps: {
 								refs.has(ref),
 							))
 					) {
-						if (work.execution_id)
-							eraseAgencyActionWork(db, work.execution_id, deps.now());
+						if (work.execution_id) eraseAgencyActionWork(db, work, deps.now());
 						if (work.execution_id) stopAgencyExecution(deps, db, work, true);
 						deps.agents?.deleteTaskDataInTransaction(db, work.root_id);
 						revokeAgencyWork(db, work.root_id);

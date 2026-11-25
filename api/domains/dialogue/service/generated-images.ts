@@ -6,19 +6,19 @@ import { attachmentLimits } from "../../conversation/contracts";
 import type { ChatImage, Messages, Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import { parseResourceUri } from "../../resources";
-import type { WorkLink } from "../contracts/resources";
-import { byId } from "../repository";
+import { agencyWork } from "../repository/agency";
 import {
 	deleteImageObservation,
 	imageObservation,
+	imageResourcesOfRoots,
+	revokedImageRoots,
 	saveImageObservation,
+	unobservedImageRoots,
+	userRunIdsOfConversation,
 	type ImageObservation,
 } from "../repository/generated-images";
-import { workById, type WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
-import { executionSourceInTransaction } from "./execution-source";
 import { routeConversation } from "./harness";
-import { workContextCurrent } from "./work-context-input";
 
 export type GeneratedImagePort = {
 	versionInTransaction(
@@ -35,38 +35,64 @@ export type GeneratedImagePort = {
 
 const KIND = "dialogue.generated-image";
 const TIMEOUT_MS = 150_000;
-const payload = z.object({ workId: z.uuid() });
+const payload = z.object({ rootId: z.string().min(1) });
+/** How many of the newest assignments' images are looked at when none was observed yet. */
+const RESERVE_ROOTS = 4;
+/** How many of the conversation's newest user runs are tried when an image is not under its work root. */
+const SOURCE_RUNS = 200;
 type Output = {
 	receipt: Receipt;
 	result: NonNullable<ImageObservation["result"]>;
 };
 
-function originDigest(deps: DialogueDeps, db: Database, work: WorkRow) {
-	const run = byId(db, work.runId);
-	if (!run || ["cancelled", "interrupted", "failed"].includes(run.status))
-		return null;
-	const source = executionSourceInTransaction(deps, db, work.runId);
-	return source?.conversationId === work.conversationId ? source.digest : null;
-}
-
+/** The assignment the images came from is still the agency's, in this conversation (a forgotten one is revoked). */
 export function imageObservationCurrent(
-	deps: DialogueDeps,
 	db: Database,
 	record: ImageObservation,
 ) {
-	const work = workById(db, record.workId);
+	const work = agencyWork(db, record.rootId);
 	return (
-		!!work &&
-		work.revision === record.revision &&
-		originDigest(deps, db, work) === record.originDigest &&
-		workContextCurrent(
-			deps,
-			db,
-			work.conversationId,
-			work.id,
-			"image-observation",
-		)
+		!!work && !work.revoked && work.conversation_id === record.conversationId
 	);
+}
+
+/** The reference inputs the observation stands on: what the assignment's agenda item was made from. */
+export function imageObservationInput(db: Database, rootId: string) {
+	const work = agencyWork(db, rootId);
+	return work && !work.revoked
+		? {
+				sources: JSON.parse(work.source_refs_json) as string[],
+				complete: true,
+			}
+		: null;
+}
+
+/**
+ * The version of an image the agency's work made and the run its row carries. The image row is keyed by the run its
+ * execution was started from: the work root for the agent's own research, the run of the user's words for an
+ * assignment. The work root is asked first, then the conversation's user runs (an image id names one image).
+ */
+function generatedVersion(
+	deps: DialogueDeps,
+	db: Database,
+	conversationId: string,
+	rootId: string,
+	artifactId: string,
+): { runId: string; version: string } | null {
+	const images = deps.generatedImages;
+	if (!images) return null;
+	for (const runId of [
+		rootId,
+		...userRunIdsOfConversation(db, conversationId, SOURCE_RUNS),
+	]) {
+		const version = images.versionInTransaction(db, {
+			conversationId,
+			runId,
+			artifactId,
+		});
+		if (version) return { runId, version };
+	}
+	return null;
 }
 
 export function imageVersionsCurrent(
@@ -74,61 +100,54 @@ export function imageVersionsCurrent(
 	db: Database,
 	record: ImageObservation,
 ) {
-	const work = workById(db, record.workId);
 	const images = deps.generatedImages;
 	return (
-		!!work &&
 		!!images &&
 		record.images.every(
-			({ id, version }) =>
+			({ id, version, runId }) =>
 				images.isConnectionCurrent(version) &&
 				images.versionInTransaction(db, {
-					conversationId: work.conversationId,
-					runId: work.runId,
+					conversationId: record.conversationId,
+					runId: runId ?? record.rootId,
 					artifactId: id,
 				}) === version,
 		)
 	);
 }
 
-export function reserveGeneratedImages(
+/**
+ * Takes the images an assignment made (the resources entered under its work root) to be looked at once, in the
+ * background. Nothing tells dialogue when the agency enters them, so the next generation of the conversation finds the
+ * ones no observation covers (`reservePendingImageObservations`).
+ */
+function reserveGeneratedImages(
 	deps: DialogueDeps,
 	db: Database,
-	work: WorkRow,
-	links: readonly WorkLink[],
+	conversationId: string,
+	rootId: string,
+	uris: readonly string[],
 ) {
 	const { generatedImages, larm, queue } = deps;
-	if (
-		!generatedImages ||
-		!links.some(({ kind }) => kind === "image") ||
-		imageObservation(db, work.id)
-	)
-		return;
-	const digest = originDigest(deps, db, work);
-	if (!digest) return;
-	const images = links
-		.flatMap(({ uri, kind }) => {
+	if (!generatedImages || imageObservation(db, rootId)) return;
+	const images = uris
+		.flatMap((uri) => {
 			const ref = parseResourceUri(uri);
-			if (kind !== "image" || !ref) return [];
-			const version = generatedImages.versionInTransaction(db, {
-				conversationId: work.conversationId,
-				runId: work.runId,
-				artifactId: ref.id,
-			});
-			return version ? [{ uri, id: ref.id, version }] : [];
+			if (!ref) return [];
+			const found = generatedVersion(deps, db, conversationId, rootId, ref.id);
+			return found
+				? [{ uri, id: ref.id, version: found.version, runId: found.runId }]
+				: [];
 		})
 		.slice(0, attachmentLimits.maxImages);
 	if (!images.length) return;
 	const record: ImageObservation = {
-		workId: work.id,
-		conversationId: work.conversationId,
-		revision: work.revision,
-		originDigest: digest,
+		rootId,
+		conversationId,
 		images,
 		state: "pending",
 	};
 	const snapshot =
-		larm.snapshotFor?.(db, work.runId) ?? larm.snapshotInTransaction?.(db);
+		larm.snapshotFor?.(db, rootId) ?? larm.snapshotInTransaction?.(db);
 	if (!snapshot || !larm.captureInTransaction) {
 		saveImageObservation(db, {
 			...record,
@@ -144,7 +163,7 @@ export function reserveGeneratedImages(
 		routeConversation(snapshot);
 		const requestId = larm.captureInTransaction(
 			db,
-			`generated-image:${work.id}`,
+			`generated-image:${rootId}`,
 			"llm",
 			deadline,
 			snapshot,
@@ -152,9 +171,9 @@ export function reserveGeneratedImages(
 		const { job } = queue.enqueueInTransaction(db, {
 			scope: "dialogue",
 			kind: KIND,
-			subjectRef: work.id,
-			dedupeKey: work.id,
-			payload: { workId: work.id },
+			subjectRef: rootId,
+			dedupeKey: rootId,
+			payload: { rootId },
 			lane: "background",
 			resourceKey: "inference.llm",
 			deadlineAtMs: deadline,
@@ -173,14 +192,38 @@ export function reserveGeneratedImages(
 	}
 }
 
-export function forgetGeneratedImages(
+/**
+ * Run at the start of a generation: the observations of assignments the agency forgot are dropped (with their model
+ * call), and the images of the newest assignments no observation covers yet are reserved.
+ */
+export function reservePendingImageObservations(
 	deps: DialogueDeps,
 	db: Database,
-	workId: string,
+	conversationId: string,
 ) {
-	const record = imageObservation(db, workId);
+	if (!deps.generatedImages) return;
+	for (const rootId of revokedImageRoots(db, conversationId))
+		forgetGeneratedImages(deps, db, rootId);
+	const roots = unobservedImageRoots(db, conversationId, RESERVE_ROOTS);
+	const uris = new Map<string, string[]>();
+	for (const { rootId, uri } of imageResourcesOfRoots(
+		db,
+		conversationId,
+		roots,
+	))
+		uris.set(rootId, [...(uris.get(rootId) ?? []), uri]);
+	for (const [rootId, own] of uris)
+		reserveGeneratedImages(deps, db, conversationId, rootId, own);
+}
+
+function forgetGeneratedImages(
+	deps: DialogueDeps,
+	db: Database,
+	rootId: string,
+) {
+	const record = imageObservation(db, rootId);
 	if (!record) return;
-	deleteImageObservation(db, workId);
+	deleteImageObservation(db, rootId);
 	if (record.requestId)
 		deps.larm.cancelRequestsInTransaction?.(db, [record.requestId]);
 	if (record.jobId)
@@ -230,11 +273,11 @@ export function registerGeneratedImageObservation(deps: DialogueDeps) {
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
 		prepareInTransaction(db, claim) {
-			const record = imageObservation(db, claim.payload.workId);
+			const record = imageObservation(db, claim.payload.rootId);
 			if (
 				!record?.requestId ||
 				record.state !== "pending" ||
-				!imageObservationCurrent(deps, db, record)
+				!imageObservationCurrent(db, record)
 			)
 				return { status: "stale", reason: "image_source_changed" };
 			if (!imageVersionsCurrent(deps, db, record))
@@ -272,7 +315,7 @@ export function registerGeneratedImageObservation(deps: DialogueDeps) {
 			const valid = () =>
 				store.read(
 					(db) =>
-						imageObservationCurrent(deps, db, record) &&
+						imageObservationCurrent(db, record) &&
 						imageVersionsCurrent(deps, db, record),
 				);
 			const messages: Messages = [
@@ -351,16 +394,16 @@ export function registerGeneratedImageObservation(deps: DialogueDeps) {
 		},
 		classify: () => "fail",
 		cancelInTransaction(db, { payload }) {
-			const record = imageObservation(db, payload.workId);
+			const record = imageObservation(db, payload.rootId);
 			if (record?.requestId)
 				larm.cancelRequestsInTransaction?.(db, [record.requestId]);
 		},
 		settleInTransaction(db, claim, _input, outcome) {
-			const record = imageObservation(db, claim.payload.workId);
+			const record = imageObservation(db, claim.payload.rootId);
 			if (
 				!record ||
 				record.state !== "pending" ||
-				!imageObservationCurrent(deps, db, record)
+				!imageObservationCurrent(db, record)
 			)
 				return "stale";
 			if (

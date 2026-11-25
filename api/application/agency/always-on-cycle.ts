@@ -24,8 +24,9 @@ import {
 import { holdNote, noteRef, type AgendaScope } from "./always-on-scope";
 import { researchThought, stepThoughts, think } from "./always-on-thoughts";
 import type { ScopePatch } from "./always-on-checkpoint";
-import type { AgendaNote } from "../../domains/dialogue";
+import type { AgendaNote, AgendaResearchTicket } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
+import { assignmentViews, workObservation } from "./work-observation";
 
 const log = getLogger("agency");
 
@@ -117,9 +118,10 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				deps.conversation.latestOrdinalInTransaction(db, c.id),
 			);
 			const before = digest();
-			const diagnosis = deps.store.read(
-				(db) => deps.backgroundDiagnostic?.(db, c.id) ?? null,
-			);
+			const { diagnosis, work } = deps.store.read((db) => ({
+				diagnosis: deps.backgroundDiagnostic?.(db, c.id) ?? null,
+				work: workObservation(deps, db, c),
+			}));
 			c.triedWhileBusy = busy(c) ? researchWaiting(c) : "";
 			const controller = new AbortController();
 			signal = controller.signal;
@@ -128,6 +130,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			let out: StepOutcome;
 			try {
 				c.stepDiagnostic = diagnosis;
+				c.stepWork = work;
 				out = await c.agent.step(
 					now(),
 					() => ({ busy: busy(c) || c.id !== active() || !on() }),
@@ -135,6 +138,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				);
 			} finally {
 				c.stepDiagnostic = null;
+				c.stepWork = null;
 				if (c.controller === controller) c.controller = null;
 			}
 			c.revision++;
@@ -145,7 +149,6 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			const speech = (db: Database) =>
 				!current() ||
 				deps.backgroundPaused?.(db, c.id) ||
-				deps.awaitingWorkConfirmation?.(db, c.id) ||
 				c.generation !== generation ||
 				controller.signal.aborted ||
 				digest() !== before ||
@@ -153,6 +156,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				deps.conversation.latestOrdinalInTransaction(db, c.id) !== ordinal ||
 				(diagnosis &&
 					deps.backgroundDiagnostic?.(db, c.id)?.digest !== diagnosis.digest) ||
+				workObservation(deps, db, c)?.digest !== work?.digest ||
 				active() !== c.id
 					? "stale"
 					: busy(c)
@@ -202,21 +206,27 @@ async function handleTicket(
 				save: host.save,
 				now,
 			});
-		} catch (error) {
-			log.warn("agency.research_failed", {
-				subjectId: c.id,
-				reason: toErrorCode(error, "agency_research_failed"),
-			});
-			outcome = { status: "refused" };
+		} catch {
+			outcome = { status: "failed", code: "agency_research_admission_failed" };
 		}
-		researchThought(c, now(), ticket, outcome.status);
-		if (outcome.status === "refused")
-			c.agent.researchStarted(ticket.id, false, now());
-		else if (outcome.status === "failed") {
-			log.info("agency.research_unavailable", {
+		if (outcome.status === "started") {
+			researchThought(c, now(), ticket, "started");
+		} else if (outcome.status === "retry") {
+			log.info("agency.research_retry", {
 				subjectId: c.id,
 				reason: outcome.code,
+				stepId: ticket.id,
 			});
+			c.agent.researchStarted(ticket.id, false, now());
+		} else {
+			if (outcome.refusal !== "repeated") {
+				researchThought(c, now(), ticket, "refused");
+				log.info("agency.research_unavailable", {
+					subjectId: c.id,
+					reason: outcome.code,
+					stepId: ticket.id,
+				});
+			}
 			c.agent.researchStarted(ticket.id, true, now());
 			c.agent.researchReturned({
 				ticketId: ticket.id,
@@ -224,6 +234,10 @@ async function handleTicket(
 				status: "failed",
 				note: null,
 			});
+			// The host's refusal remembers the operation and its evidence. Leaving an autonomous failed item
+			// in the agenda would also veto the same request when the model has a new evidence revision.
+			if (outcome.refusal && !ticket.requested && !ticket.promised)
+				c.agent.forget([ticket.itemId]);
 		}
 		c.revision++;
 		return;
@@ -276,6 +290,7 @@ async function handleTicket(
 export async function collectAgendaResults(host: ResultHost) {
 	const { deps, now, conv, saveInTransaction, collected } = host;
 	if (!deps.state) return;
+	observeAssignments(host);
 	const results = deps.store.read((db) => deps.state!.resultsInTransaction(db));
 	if (!results.length) return;
 	type Adopted = {
@@ -287,9 +302,11 @@ export async function collectAgendaResults(host: ResultHost) {
 		note: AgendaNote | null;
 	};
 	const adopted: Adopted[] = [];
+	const discarded: { c: AgendaScope; ticket: AgendaResearchTicket }[] = [];
 	const patch = new Map<string, ScopePatch>();
 	await deps.store.write((db) => {
 		adopted.length = 0;
+		discarded.length = 0;
 		patch.clear();
 		for (const r of deps.state!.resultsInTransaction(db)) {
 			const c = conv(r.conversationId);
@@ -312,6 +329,8 @@ export async function collectAgendaResults(host: ResultHost) {
 				if (ticket) {
 					const p = patchOf();
 					p.tickets = p.tickets.filter((t) => t.id !== ticket.id);
+					(p.droppedItems ??= new Set()).add(ticket.itemId);
+					discarded.push({ c, ticket });
 				}
 				continue;
 			}
@@ -358,8 +377,20 @@ export async function collectAgendaResults(host: ResultHost) {
 		if (patch.size) saveInTransaction(db, patch);
 	});
 	// Committed: the volatile state follows (a rolled-back write above leaves the scopes as they were).
+	for (const { c, ticket } of discarded) {
+		c.tickets = c.tickets.filter((t) => t.id !== ticket.id);
+		c.assignments.delete(ticket.itemId);
+		c.observed.delete(ticket.id);
+		c.agent.forget([ticket.itemId]);
+		c.agent.infoChanged(now());
+		c.revision++;
+		c.kick();
+	}
 	for (const a of adopted) {
 		a.c.tickets = a.c.tickets.filter((t) => t.id !== a.ticketId);
+		// An assignment ends with its result: the agent's item holds what came of it.
+		a.c.assignments.delete(a.itemId);
+		a.c.observed.delete(a.ticketId);
 		if (a.note) {
 			holdNote(a.c, keepNotes([...a.c.notes, a.note]));
 		}
@@ -388,4 +419,42 @@ export async function collectAgendaResults(host: ResultHost) {
 		a.c.kick();
 	}
 	collected();
+}
+
+/**
+ * What each running assignment's owner shows now (its progress, a question for the user), told to the agent when it
+ * changes: the agent's state shows it to every reply, and a new question is the agent's to ask.
+ */
+function observeAssignments(host: ResultHost) {
+	const { deps, convs, now } = host;
+	const seen = deps.store.read((db) =>
+		[...convs.values()].flatMap((c) =>
+			assignmentViews(deps, db, c).map(({ ticket, view }) => ({
+				c,
+				ticket,
+				progress: view.progress?.summary ?? null,
+				question:
+					view.status === "waiting_user"
+						? (view.question?.prompt ?? null)
+						: null,
+			})),
+		),
+	);
+	for (const { c, ticket, progress, question } of seen) {
+		const key = JSON.stringify([progress, question]);
+		const before = c.observed.get(ticket.id);
+		if (before === key) continue;
+		c.observed.set(ticket.id, key);
+		c.agent.assignmentObserved({
+			ticketId: ticket.agentTicketId,
+			at: now(),
+			progress,
+			question,
+		});
+		// Progress alone is shown to the next reply as it is; a question that came or went is the agent's to act on.
+		const asked = before === undefined ? null : JSON.parse(before)[1];
+		if (asked === question) continue;
+		c.revision++;
+		c.kick();
+	}
 }

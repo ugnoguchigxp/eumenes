@@ -31,6 +31,12 @@ export const reservedExecutionCalls = (db: Database, taskId: string) =>
 			.get(taskId) as { n: number }
 	).n;
 
+/** A finished child gives its calls back: its reservation ends with the step that waited for it. */
+export const releaseExecutionCalls = (db: Database, taskId: string) =>
+	db
+		.query("DELETE FROM agent_execution_model_reservations WHERE task_id=?")
+		.run(taskId);
+
 /** Public operations for a child tree. The real conversation run remains its source identity. */
 export function executionChildren(
 	ctx: RuntimeContext,

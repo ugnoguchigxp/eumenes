@@ -60,8 +60,7 @@ export function runCheck(
 			const pass = delegations(answer).some((call) => {
 				const args = argsOf(call);
 				return (
-					(args.mode === "execute" || args.mode === "confirm") &&
-					(check.toolchain === undefined || args.toolchain === check.toolchain)
+					check.toolchain === undefined || args.toolchain === check.toolchain
 				);
 			});
 			return done(
@@ -70,7 +69,7 @@ export function runCheck(
 				`expected a delegation${check.toolchain ? ` to ${check.toolchain}` : ""}, got [${delegations(
 					answer,
 				)
-					.map((c) => String(argsOf(c).toolchain ?? argsOf(c).mode ?? ""))
+					.map((c) => String(argsOf(c).toolchain ?? ""))
 					.join(",")}]`,
 			);
 		}

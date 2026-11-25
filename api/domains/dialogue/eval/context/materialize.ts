@@ -34,7 +34,6 @@ export function generationTime(seed: Seed): string {
 	const times = [
 		...seedEventsOf(seed).map((e) => e.at),
 		...(seed.pending ?? []).map((p) => p.at),
-		...(seed.work ?? []).flatMap((w) => [w.at, w.updatedAt ?? w.at]),
 	].map((time) => Date.parse(time));
 	const newest = times.length ? Math.max(...times) : Date.parse(DEFAULT_START);
 	return new Date(newest + 1000).toISOString();
@@ -186,17 +185,14 @@ async function applyMemorySeed(session: Session, seed: Seed, now: string) {
 	await publishStep(session, { notices: seed.notices }, now);
 }
 
-/** The seed's ports and its history: work first (events refer to it), then the episode, then the log. */
+/** The seed's ports and its history: the episode, then the log. */
 export async function applySeed(session: Session, seed: Seed, now: string) {
 	session.ports.modelWindow = seed.modelWindow ?? null;
 	if (seed.persona) session.ports.persona = seed.persona;
 	session.ports.worldNames = (seed.world ?? []).map((target) => target.name);
 	await applyMemorySeed(session, seed, now);
-	for (const work of seed.work ?? []) await session.addWork(work);
 	await session.appendEpisode(seed.episode ?? []);
 	await session.appendEvents(seed.events ?? []);
-	for (const confirmation of seed.confirmations ?? [])
-		await session.addConfirmation(confirmation, now);
 	session.wiring.setNow(now);
 }
 

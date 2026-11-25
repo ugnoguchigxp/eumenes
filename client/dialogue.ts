@@ -7,7 +7,6 @@ import {
 	runContextSchema,
 	runSchema,
 	specialistSessionResponseSchema,
-	todoNoticesSchema,
 	type PublicSubmit,
 	type Resubmit,
 	type SpecialistCommand,
@@ -49,22 +48,6 @@ export function dialogueClient(transport: Transport) {
 				`/api/conversations/${encodeURIComponent(id)}/runs`,
 				{ signal },
 			),
-		/** The finished TODOs' notices, newest first; `unread` counts all unread ones, not only the listed page. */
-		todoNotices: async (limit = 50, signal?: AbortSignal) =>
-			callJson(
-				transport,
-				todoNoticesSchema,
-				withQuery("/api/todo-notices", { limit }),
-				{ signal },
-			),
-		archiveTodoNotices: async () => {
-			await transport.call("/api/todo-notices/archive", { method: "POST" });
-		},
-		readTodoNotice: async (id: string) => {
-			await transport.call(`/api/todo-notices/${encodeURIComponent(id)}/read`, {
-				method: "POST",
-			});
-		},
 		submit: async (input: PublicSubmit, signal?: AbortSignal) =>
 			callJson(transport, runSchema, "/api/runs", { ...json(input), signal }),
 		run: async (id: string, signal?: AbortSignal) =>

@@ -91,8 +91,6 @@ test("camera and screen stills persist in a durable queue and import as WebP wit
 		gateway,
 		inference: {} as never,
 		capabilities: {} as never,
-		onJob: () => {},
-		onFinished: () => {},
 	});
 	let recognition!: ObjectRecognitionService;
 	const captureSaveInTransaction = registerCaptureLibrary(

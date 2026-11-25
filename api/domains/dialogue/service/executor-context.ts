@@ -29,9 +29,7 @@ export type ReadSources = {
 export type ToolOutcome = {
 	/** The tool's result. */
 	result: unknown;
-	/** The issued confirmation whose statement this reply carries (section 6.7). */
-	confirmationId?: string;
-	/** The work was handed over (the run now waits for it): the generation ends here, without speech of its own. */
+	/** A specialist session took the conversation over: the generation ends here, without speech of its own. */
 	end?: true;
 	/** A search's cards as it found them, and the vector of its query (what the router scores and corrects by). */
 	search?: { cards: ToolchainCard[]; query?: QueryVector };
@@ -72,33 +70,18 @@ export type GenerationOutcome = {
 	ended: boolean;
 };
 
-/** Impacts, least first (the toolchain's declared least impact raises the estimate). */
-export const IMPACT_ORDER = [
-	"none",
-	"create",
-	"modify_existing",
-	"irreversible",
-] as const;
-
-/** A delegation that ended the generation: the announcement was delivered and the work handed over. */
+/** A delegation that ended the generation: the announcement was delivered and a session took the conversation over. */
 export type Handover = {
 	announcement: string;
-	/** The run waits for the work (queued behind its job) or a session took the conversation over. */
-	handed: boolean;
-	workId: string | null;
 };
 
 export type Request = {
 	card: ToolchainCard;
 	request: string;
-	/** The user's own words behind the request, when it carries more than they said. */
-	words?: string;
 	inputs?: Record<string, unknown>;
 	diagnosticRef?: string;
 	target?: string;
 	resolveUnsaved?: "discard";
-	announcement: string;
-	confirmationId?: string;
 	routedSteps?: readonly RoutedPipelineStep[];
 	/** The resources handed over with the request: the references the toolchain reads, and their URIs. */
 	references?: ExecutionReference[];
@@ -118,7 +101,6 @@ export function candidateOf(
 		summary: card.summary,
 		useWhen: card.useWhen,
 		...(card.execution ? { execution: card.execution } : {}),
-		...(card.minImpact ? { minImpact: card.minImpact } : {}),
 		...(card.general ? { general: true as const } : {}),
 		...(produces.length ? { produces } : {}),
 		...(card.instant ? { inputs: card.instant.parameters } : {}),
@@ -128,7 +110,7 @@ export function candidateOf(
 }
 
 /**
- * What every tool of one generation shares: the run it acts for, the toolchains it may delegate to (retained, then
+ * What every tool of one generation shares: the run it acts for, the toolchains it may delegate to (the one a switch waits for, then
  * found), the search it made, the handover that ended it, and the checks every action makes first.
  */
 export function createExecutorContext(
@@ -143,10 +125,10 @@ export function createExecutorContext(
 	const { input, jobId } = ctx;
 	const events = continuity.events;
 	const offered = new Map<string, ToolchainCard>(
-		[...input.retained, ...(input.offers ?? [])].map((entry) => [
-			entry.card.id,
-			entry.card,
-		]),
+		[
+			...(input.switching ? [{ card: input.switching }] : []),
+			...(input.offers ?? []),
+		].map((entry) => [entry.card.id, entry.card]),
 	);
 	const state: {
 		search: { route: ToolchainRoute; query?: QueryVector; text: string } | null;
@@ -156,12 +138,10 @@ export function createExecutorContext(
 		instant: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
 		/** The read tool the search offered and this generation used, with its arguments. */
 		read: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
+		/** The toolchain this generation handed work to as the agent's assignment, with the request it was given. */
+		assigned: { card: ToolchainCard; request: string } | null;
 		/** The newest model call's receipt: its permission is checked again before every action. */
 		receipt: Receipt | undefined;
-		/** Each TODO's revision as the model last saw it (`<state>`, then the work tool's results). */
-		todoRevisions: Map<string, number>;
-		taskRevisions: Map<string, number>;
-		executionRevisions: Map<number, number>;
 		/** The searches and hand-overs made before the call that runs now (the tool-call reliability design, P1). */
 		exchange: readonly ExchangeStep[];
 	} = {
@@ -170,26 +150,11 @@ export function createExecutorContext(
 		handover: null,
 		instant: null,
 		read: null,
+		assigned: null,
 		receipt: undefined,
-		todoRevisions: new Map(Object.entries(input.todoRevisions)),
-		taskRevisions: new Map(
-			input.routed?.todos.flatMap(
-				({ ref, tasks }) =>
-					tasks?.map(
-						({ taskId, revision }) => [`${ref}:${taskId}`, revision] as const,
-					) ?? [],
-			),
-		),
-		executionRevisions: new Map(
-			input.routed?.todos.flatMap(({ ref, executionRevision }) =>
-				executionRevision === undefined
-					? []
-					: [[ref, executionRevision] as const],
-			),
-		),
 		exchange: [],
 	};
-	/** The user's messages this generation acts on: every action, TODO and confirmation it makes comes from them. */
+	/** The user's messages this generation acts on: every action it makes comes from them. */
 	const origin = [
 		...new Set([
 			...(input.final.kind === "utterances" ? input.final.messageIds : []),
@@ -300,20 +265,4 @@ export function adoptHere(x: ExecutorContext, tx: Database, run: Run) {
 		const adopted = adoptMemoryWindow(deps.memory, tx, run, input.memory);
 		if (!adopted.ok) throw new Error(adopted.reason);
 	}
-}
-
-/**
- * The handover's receipt, accepted only when this was the run's last generation. A run handed to another job (an
- * agent, a command, a media job or a specialist's turn) goes on under the same request, and the receipt of its last
- * call is the one adopted.
- */
-export function acceptHere(
-	x: ExecutorContext,
-	tx: Database,
-	dispatched: { handed: boolean },
-) {
-	const receipt = x.state.receipt;
-	if (dispatched.handed) return;
-	if (receipt && !x.deps.larm.acceptInTransaction?.(tx, receipt))
-		throw new Error("permission_revoked");
 }

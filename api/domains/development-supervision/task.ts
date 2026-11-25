@@ -56,7 +56,6 @@ function initialParent({
 	request,
 	workspace,
 	references,
-	confirmation,
 	deadline,
 	at,
 	set,
@@ -66,7 +65,6 @@ function initialParent({
 	request: string;
 	workspace: SupervisionWorkspace;
 	references: Parent["references"];
-	confirmation?: Parent["confirmation"];
 	deadline: number;
 	at: number;
 	set: BoundToolchain;
@@ -77,7 +75,6 @@ function initialParent({
 		generation: 0,
 		revision: 0,
 		source,
-		...(confirmation ? { confirmation } : {}),
 		request,
 		workspace,
 		references,
@@ -169,13 +166,8 @@ export function createTaskPort(
 	return {
 		startInTransaction(db, input) {
 			const currentHost = requiredHost();
-			const {
-				source,
-				references,
-				toolchainRevisionId,
-				bindingRevisionId,
-				confirmationId,
-			} = input;
+			const { source, references, toolchainRevisionId, bindingRevisionId } =
+				input;
 			if (
 				source.origin ||
 				source.delegation ||
@@ -201,29 +193,13 @@ export function createTaskPort(
 			)
 				throw new Error("supervision_binding_invalid");
 			const request = requiredText.parse(input.request);
-			const proof = confirmationId
-				? currentHost.confirmedRequestInTransaction?.(
-						db,
-						source,
-						confirmationId,
-						request,
-					)
-				: undefined;
-			if (
-				confirmationId &&
-				(!proof || !proof.request || hash(proof.request) !== proof.digest)
-			)
-				throw new Error("supervision_confirmation_invalid");
-			const confirmation =
-				confirmationId && proof ? { id: confirmationId, ...proof } : undefined;
 			const replay = parentOfRun(db, source.runId);
 			if (replay) {
 				if (
 					replay.forgotten ||
 					replay.request !== request ||
 					hash(replay.source) !== hash(source) ||
-					hash(replay.references) !== hash(references) ||
-					hash(replay.confirmation ?? null) !== hash(confirmation ?? null)
+					hash(replay.references) !== hash(references)
 				)
 					throw new Error("operation_id_conflict");
 				return executionView(replay);
@@ -245,7 +221,6 @@ export function createTaskPort(
 				at,
 				set,
 				binding,
-				...(confirmation ? { confirmation } : {}),
 			});
 			schedule(db, parent, "authority");
 			saveParent(db, parent, true);

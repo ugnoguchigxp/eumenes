@@ -113,16 +113,23 @@ export function createDotsWork(input: {
 					: null,
 		} satisfies WorkDetailView;
 	}
+	/** The user's words an operation was asked in: the conversation's turn, or an assignment made of those words. */
+	function askedIn(origin: AdapterOrigin) {
+		if (origin.kind === "conversation") return origin;
+		if (origin.kind === "task" && origin.messageId)
+			return { ...origin, messageId: origin.messageId };
+		return null;
+	}
 	function originKey(origin: AdapterOrigin) {
 		if (origin.kind === "ui")
 			return JSON.stringify({ kind: origin.kind, scope: origin.scope });
-		if (origin.kind !== "conversation")
-			throw new Error("dots_permission_denied");
+		const asked = askedIn(origin);
+		if (!asked) throw new Error("dots_permission_denied");
 		return JSON.stringify({
-			kind: origin.kind,
-			conversationId: origin.conversationId,
-			messageId: origin.messageId,
-			runId: origin.runId,
+			kind: asked.kind,
+			conversationId: asked.conversationId,
+			messageId: asked.messageId,
+			runId: asked.runId,
 		});
 	}
 	function invoke(
@@ -142,22 +149,19 @@ export function createDotsWork(input: {
 				throw new Error("dots_conflict");
 			return { receipt: JSON.parse(old.receipt_json), replay: true };
 		}
-		const conversationId =
-			request.origin.kind === "conversation"
-				? request.origin.conversationId
-				: undefined;
-		if (request.origin.kind === "conversation") {
+		const asked = askedIn(request.origin);
+		const conversationId = asked?.conversationId;
+		if (asked) {
 			const message = input.conversation.messageInTransaction(
 				db,
-				request.origin.messageId,
+				asked.messageId,
 			)?.message;
 			if (message?.role !== "user" || message.conversationId !== conversationId)
 				throw new Error("dots_permission_denied");
 		}
 		let value: unknown;
 		if (request.operationName === "dots.start") {
-			if (request.origin.kind !== "conversation")
-				throw new Error("dots_permission_denied");
+			if (!asked) throw new Error("dots_permission_denied");
 			const data = dotsWorkStartV1.parse(request.input),
 				saved = settings.inTransaction(db).settings;
 			const p = projects(db).find((p) => p.ref === data.projectRef);
@@ -200,9 +204,9 @@ export function createDotsWork(input: {
 				{
 					origin: {
 						source: "conversation",
-						conversationId: request.origin.conversationId,
-						messageId: request.origin.messageId,
-						runId: request.origin.runId,
+						conversationId: asked.conversationId,
+						messageId: asked.messageId,
+						runId: asked.runId,
 						operationKey: `dots:${request.requestId}`,
 					},
 				},

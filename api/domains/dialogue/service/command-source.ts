@@ -38,26 +38,14 @@ export function commandSource(
 	run: Pick<Run, "id" | "conversationId"> &
 		Partial<Pick<Run, "inputMessageId">>,
 	set: ReturnType<ToolchainRoutingPort["commandSetInTransaction"]>,
-	payload: { toolchainRevisionId: string; interactionId?: string },
-	execution?: import("../../tool-runtime").ChildExecution,
+	execution: import("../../tool-runtime").ChildExecution,
 ): { ok: true; source: CommandSource } | { ok: false; code: string } {
-	const { conversation, toolchains } = deps;
+	const { toolchains } = deps;
 	if (!toolchains) return { ok: false, code: "toolchain_unavailable" };
-	// A resumed run reads the interaction's frozen request and its questions and answers.
-	let resume:
-		| {
-				generation: number;
-				epoch: number;
-				exchanges: Array<{ question: string; answer: unknown }>;
-		  }
-		| undefined;
-	let request: string | undefined;
-	let original: string | undefined;
-	if (execution) {
-		request = execution.request;
-		original = execution.source.request;
-		if (execution.resume)
-			resume = {
+	const request = execution.request;
+	const original = execution.source.request;
+	const resume = execution.resume
+		? {
 				generation: execution.revision,
 				epoch: execution.revision,
 				exchanges: [
@@ -66,34 +54,8 @@ export function commandSource(
 						answer: execution.resume.input,
 					},
 				],
-			};
-	} else if (payload.interactionId) {
-		const context = deps.interactions?.resumeContextInTransaction(
-			tx,
-			payload.interactionId,
-			run.id,
-		);
-		if (!context?.ok) {
-			return {
-				ok: false,
-				code: context ? context.code : "interaction_closed",
-			};
-		}
-		if (context.chainRevisionId !== payload.toolchainRevisionId)
-			return { ok: false, code: "version_invalidated" };
-		resume = context;
-		request = context.request;
-		original = context.originalRequest ?? undefined;
-	} else {
-		request = toolchains.requestOfRunInTransaction(tx, run.id);
-		const input = run.inputMessageId
-			? conversation.messageInTransaction(tx, run.inputMessageId)
-			: null;
-		original =
-			input?.message.conversationId === run.conversationId
-				? input.message.text
-				: undefined;
-	}
+			}
+		: undefined;
 	if (!request || !original)
 		return { ok: false, code: "required_context_missing" };
 	let snapshot: unknown = null;

@@ -12,10 +12,19 @@ declare global {
 	}
 }
 
+/** Stands in for the settings document, which keeps the colour across reloads and restarts. */
+const colorKey = "avatar-view-fixture.color";
+
 function Shell() {
 	const [hidden, setHidden] = useState(false);
 	const [selected, setSelected] = useState(true);
 	const [backdrop, setBackdrop] = useState<string | null>(null);
+	const [color, setColor] = useState(() => localStorage.getItem(colorKey));
+	const saveColor = (next: string | null) => {
+		if (next === null) localStorage.removeItem(colorKey);
+		else localStorage.setItem(colorKey, next);
+		setColor(next);
+	};
 	return (
 		<main style={{ height: "100%", display: "flex", flexDirection: "column" }}>
 			<button type="button" onClick={() => setHidden((v) => !v)}>
@@ -39,6 +48,16 @@ function Shell() {
 							onPick: () =>
 								setBackdrop(window.avatarBackdropUrl ?? "/backdrop.png"),
 							onClear: () => setBackdrop(null),
+							color,
+							busy: false,
+							onColor: async (next) => {
+								saveColor(next);
+								return true;
+							},
+							onReset: () => {
+								setBackdrop(null);
+								saveColor(null);
+							},
 						}}
 					/>
 				) : (

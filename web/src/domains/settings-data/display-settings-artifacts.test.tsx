@@ -149,3 +149,46 @@ test("choices outside the registration, a foreign value type and a stale event a
 	);
 	expect(backend.sent).toHaveLength(0);
 });
+
+test("the Live2D colour shows only for the Live2D background, saves a colour and returns to the gradient by deleting its key", async () => {
+	const backend = createSettingsBackend();
+	render(
+		<Screens backend={backend} start="display" cache={newCache(backend)} />,
+	);
+	await screen.findByLabelText("会話の背景");
+	expect(screen.queryByLabelText("Live2Dの背景色")).toBeNull();
+	fireEvent.change(screen.getByLabelText("会話の背景"), {
+		target: { value: "live2d-hiyori" },
+	});
+	const picker = (await screen.findByLabelText(
+		"Live2Dの背景色",
+	)) as HTMLInputElement;
+	expect(picker.type).toBe("color");
+	expect(picker.value).toBe("#293347");
+	expect(screen.getByText("既定")).toBeTruthy();
+	fireEvent.input(picker, { target: { value: "#F0E6D2" } });
+	expect(screen.getByText("#f0e6d2")).toBeTruthy();
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	expect(await screen.findAllByText("変更を適用しました")).toHaveLength(2);
+	expect(backend.saved().general).toMatchObject({
+		background: "live2d-hiyori",
+		avatarBackgroundColor: "#f0e6d2",
+	});
+
+	fireEvent.click(screen.getByRole("button", { name: "既定に戻す" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	await waitFor(() =>
+		expect(backend.saved().general.avatarBackgroundColor).toBeUndefined(),
+	);
+	expect(backend.sent.at(-1)!.input).toMatchObject({
+		changes: [{ fieldId: "display.avatar-background-color", unset: true }],
+	});
+	expect(
+		(screen.getByRole("button", { name: "既定に戻す" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
+});

@@ -151,7 +151,7 @@ test("a research that cannot be done is a failed research for the agent, with no
 	}
 }, 30_000);
 
-test("a research whose run is gone at its owner ends: its ticket comes back failed and its TODO is closed, not left open", async () => {
+test("a research whose run is gone at its owner ends: its ticket comes back failed, not left open", async () => {
 	let release!: () => void;
 	const gate = new Promise<void>((resolve) => {
 		release = resolve;
@@ -184,8 +184,7 @@ test("a research whose run is gone at its owner ends: its ticket comes back fail
 			await f.advance(1000);
 			return !!works()[0]?.execution_id;
 		});
-		// The work is a TODO of the conversation while it runs.
-		expect(f.h.todos("ao")).toHaveLength(1);
+		// The agent holds the research (its ticket).
 		expect(f.host.inspect("ao")!.snapshot.tickets).toHaveLength(1);
 		const [work] = works();
 		// The owner drops the run on its own (its origin stopped being valid): no result will ever come.
@@ -199,7 +198,6 @@ test("a research whose run is gone at its owner ends: its ticket comes back fail
 		});
 		expect(f.host.inspect("ao")!.snapshot.tickets).toHaveLength(0);
 		expect(f.host.inspect("ao")!.snapshot.notes).toHaveLength(0);
-		expect(f.h.todos("ao")).toHaveLength(0);
 	} finally {
 		release();
 		await f.close();

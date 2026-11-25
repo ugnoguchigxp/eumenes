@@ -7,7 +7,6 @@ import {
 	STUDIO,
 	STUDIO_ARTIFACT,
 	NO_AGENT,
-	approve,
 	setup,
 	type Harness,
 } from "./specialist.fixture";
@@ -445,8 +444,9 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 		artifactRevisionId: STUDIO_ARTIFACT,
 		targetRef: "item-old",
 	};
-	// Changing a saved item is confirmed first; the approval opens that item.
+	// Changing a saved item is handed over at once, and the session opens that item.
 	h.handOver({ request: "これを直して", target: "item-old" });
+	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して", { viewing });
 	// The fill of the studio shows it on screen and offers it as a target.
 	expect(h.stateOf(0)).toContain(
@@ -458,10 +458,6 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 		.content.split("\n")
 		.find((line) => line.startsWith(`- ${STUDIO.id}: `))!;
 	expect(found).toContain("item-old「");
-	expect(h.work()).toHaveLength(0);
-	h.state.steps.push(approve());
-	h.state.specialist.push(reply("開きました"));
-	await h.ask("お願い", { viewing });
 	expect(h.work()[0]!.savedRef).toBe("item-old");
 	// Without the screen showing it, the same ref is not issued: nothing starts.
 	const other = await harness();

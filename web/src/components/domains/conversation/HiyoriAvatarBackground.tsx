@@ -2,22 +2,32 @@ import { useEffect, useRef, useState } from "react";
 import { readAssistantMouth } from "../../../domains/audio";
 import {
 	createHiyori,
-	readAvatarBackground,
 	readAvatarView,
-	saveAvatarBackground,
 	saveAvatarView,
+	type AvatarBackground,
 	type AvatarCue,
 } from "../../../domains/avatar";
 import { HiyoriViewControls } from "./HiyoriViewControls";
 import "./hiyori-avatar.css";
 
-/** A saved image behind the model, with the operations that choose and remove it. */
+/** The saved image and colour behind the model, with the operations that change them. */
 export type AvatarBackdrop = {
 	/** null: no image; the colour or the built-in gradient shows. */
 	url: string | null;
+	/** The saved `#rrggbb` colour; null keeps the built-in gradient. */
+	color: AvatarBackground;
+	/** A settings save is in flight. */
+	busy: boolean;
 	onPick(): void;
 	onClear(): void;
+	/** Resolves false when the colour was not saved. */
+	onColor(color: AvatarBackground): Promise<boolean>;
+	/** Removes the image and the colour together. */
+	onReset(): void;
 };
+
+/** The picker reports every step of a drag; only the colour it rests on is saved. */
+const colorSaveDelayMs = 300;
 
 /** Animation stays outside React; unmount, tab hiding and context loss cancel its single loop. */
 export function HiyoriAvatarBackground({
@@ -36,7 +46,41 @@ export function HiyoriAvatarBackground({
 	const host = useRef<HTMLDivElement>(null);
 	const [view, setView] = useState(readAvatarView);
 	const viewRef = useRef(view);
-	const [background, setBackground] = useState(readAvatarBackground);
+	const saved = backdrop?.color ?? null;
+	// The colour being picked shows at once; it is saved once the picker rests and nothing else is saving.
+	const [picking, setPicking] = useState<{ color: AvatarBackground } | null>(
+		null,
+	);
+	const background = picking ? picking.color : saved;
+	const saveColor = useRef(backdrop?.onColor);
+	useEffect(() => {
+		saveColor.current = backdrop?.onColor;
+	});
+	const busy = backdrop?.busy ?? false;
+	useEffect(() => {
+		if (!picking || busy) return;
+		const settle = () => setPicking((now) => (now === picking ? null : now));
+		const timer = setTimeout(() => {
+			const save = saveColor.current;
+			if (!save || picking.color === saved) return settle();
+			// Saved: the settings now hold it. Refused or failed: the saved colour shows again.
+			void save(picking.color).then(settle);
+		}, colorSaveDelayMs);
+		return () => clearTimeout(timer);
+	}, [picking, saved, busy]);
+	// Switching the background away before the picker rests still saves the picked colour.
+	const unsaved = useRef<AvatarBackground | undefined>(undefined);
+	useEffect(() => {
+		unsaved.current =
+			picking && picking.color !== saved ? picking.color : undefined;
+	}, [picking, saved]);
+	useEffect(
+		() => () => {
+			if (unsaved.current !== undefined)
+				void saveColor.current?.(unsaved.current);
+		},
+		[],
+	);
 	const redraw = useRef<(() => void) | undefined>(undefined);
 	const latest = useRef({ cue, phase });
 	useEffect(() => {
@@ -47,7 +91,6 @@ export function HiyoriAvatarBackground({
 		viewRef.current = view;
 		redraw.current?.();
 	}, [view]);
-	useEffect(() => saveAvatarBackground(background), [background]);
 	useEffect(() => {
 		const element = host.current;
 		if (!element || !active) return;
@@ -164,7 +207,11 @@ export function HiyoriAvatarBackground({
 					view={view}
 					onChange={setView}
 					background={background}
-					onBackgroundChange={setBackground}
+					onBackgroundChange={(color) => setPicking({ color })}
+					onBackgroundReset={() => {
+						setPicking(null);
+						backdrop?.onReset();
+					}}
 					backdrop={backdrop}
 				/>
 			)}

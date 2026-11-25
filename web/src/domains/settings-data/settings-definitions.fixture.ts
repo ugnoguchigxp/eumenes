@@ -55,7 +55,17 @@ const displayFields: Field[] = [
 		options: [
 			{ value: "light-fairy", label: "光の妖精" },
 			{ value: "spatial", label: "Spatial" },
+			{ value: "live2d-hiyori", label: "桃瀬ひより（Live2D）" },
 		],
+	}),
+	field({
+		fieldId: "display.avatar-background-color",
+		path: "$.general.avatarBackgroundColor",
+		label: "Live2Dの背景色",
+		control: "color",
+		defaultValue: "#293347",
+		unset: "delete-key",
+		visibleWhen: "condition:settings.background-live2d@1",
 	}),
 	field({
 		fieldId: "display.theme",

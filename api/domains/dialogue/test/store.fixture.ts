@@ -19,14 +19,6 @@ import { migrations as schedulerMigrations } from "../../scheduler";
 import { migrations as settingsMigrations } from "../../settings";
 import { migrations as dialogueMigrations } from "..";
 
-// Application fixtures can simulate work transitions through the owning domain.
-export {
-	archiveWork,
-	dropRunResults,
-	insertWork,
-	updateWork,
-} from "../repository/work";
-
 /**
  * The migrations a dialogue test database needs: every domain's own list, ordered by its dependencies. No
  * migration is picked by hand, so a new domain migration reaches every test without an edit here.

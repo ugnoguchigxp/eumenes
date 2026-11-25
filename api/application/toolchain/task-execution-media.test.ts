@@ -1,10 +1,8 @@
 import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
-import { harness } from "./toolchain.fixture";
+import { assignmentFixture } from "./assignment.fixture";
 import { imageFixture } from "../media/image.fixture";
-import { conversationByScript } from "./conversation-script.fixture";
-import { handOverTask } from "./task-delegation.fixture";
-import { waitFor } from "../../infrastructure/wait-for";
+import { TASK_TOOLCHAIN } from "./task-delegation.fixture";
 
 test("two image calls from one public source keep distinct generation/artifact IDs; duplicate acceptance reuses the same parent and forgetting erases source copies without uniqueness collisions", async () => {
 	const f = imageFixture("success", undefined, (n) => `generated-${n}`);
@@ -52,42 +50,40 @@ test("two image calls from one public source keep distinct generation/artifact I
 				]);
 				return "";
 			}
-			const conversation = conversationByScript(options, messages, (loop) =>
-				handOverTask(
-					"Create two distinct images",
-					"二つの画像を生成します。",
-				)(loop),
-			);
-			if (conversation) return conversation;
 			return f.model.answer(...args);
 		},
 	};
-	const h = await harness({
+	const fx = await assignmentFixture({
 		everyday: true,
 		model,
 		imageGateway: f.gateway,
 		discoveryTarget: (query) =>
 			query === "create an image" ? "image" : "execute_task",
 	});
+	const { h } = fx;
 	try {
-		const input = {
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "二つの異なる画像を生成して",
-		};
-		const source = await h.dialogue.submit(input);
-		expect((await h.dialogue.submit(input)).id).toBe(source.id);
-		await waitFor(
-			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
-			{ timeout: 8000 },
+		const text = "二つの異なる画像を生成して";
+		const { source } = await fx.assign(
+			text,
+			TASK_TOOLCHAIN,
+			undefined,
+			"Create two distinct images",
 		);
-		const records = h.image!.list("main");
+		// The same source asked again is the same execution: duplicate acceptance reuses the same parent.
+		await fx.assignRun(
+			source.runId,
+			TASK_TOOLCHAIN,
+			undefined,
+			"Create two distinct images",
+		);
+		await fx.until(() => fx.executions()[0]?.status === "completed");
+		expect(fx.executions()).toHaveLength(1);
+		const records = h.image!.list(fx.conversationId);
 		expect(records).toHaveLength(2);
 		expect(new Set(records.map((r) => r.id)).size).toBe(2);
 		expect(new Set(records.map((r) => r.artifactId)).size).toBe(2);
 		expect(
-			records.every((r) => r.runId === source.id && r.state === "completed"),
+			records.every((r) => r.runId === source.runId && r.state === "completed"),
 		).toBe(true);
 		expect(
 			f.requests.filter(
@@ -96,7 +92,7 @@ test("two image calls from one public source keep distinct generation/artifact I
 		).toHaveLength(2);
 		await h.store.write((db) =>
 			h.toolchain.agents.executions.purgeSourcesInTransaction(db, {
-				messageIds: [source.inputMessageId],
+				messageIds: [source.messageId],
 				itemIds: [],
 			}),
 		);
@@ -106,17 +102,17 @@ test("two image calls from one public source keep distinct generation/artifact I
 		expect(
 			bodies.every(
 				(r) =>
-					!r.request_json.includes(input.text) &&
+					!r.request_json.includes(text) &&
 					JSON.parse(r.request_json).execution.erased === 1,
 			),
 		).toBe(true);
-		expect(h.toolchain.agents.executions.list("main")).toEqual([]);
+		expect(fx.executions()).toEqual([]);
 		const erased = h.store.read((db) =>
 			db.query("SELECT state_json FROM agent_executions").all(),
 		) as { state_json: string }[];
 		expect(erased.every((row) => !JSON.parse(row.state_json).plan)).toBe(true);
 	} finally {
-		await h.close();
+		await fx.close();
 	}
 }, 15000);
 
@@ -170,12 +166,6 @@ function repeatMediaModel(
 				]);
 				return "";
 			}
-			const conversation = conversationByScript(options, messages, (loop) =>
-				handOverTask("Create two items", "二つの処理を進めます。")(loop),
-			);
-			if (conversation) return conversation;
-			if (messages.some((m) => m.content.includes("task_result")))
-				return "処理結果を確認しました。";
 			return base.answer(...args);
 		},
 	};
@@ -184,63 +174,59 @@ function repeatMediaModel(
 test("music generation calls use independent records and both reach confirmed completion", async () => {
 	const { musicFixture } = await import("../media/music.fixture");
 	const f = musicFixture();
-	const h = await harness({
+	const fx = await assignmentFixture({
 		everyday: true,
 		model: repeatMediaModel(f.model, "music"),
 		musicGateway: f.gateway,
 		discoveryTarget: discoveryFor("music"),
 	});
+	const { h } = fx;
 	try {
-		const source = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "異なる二曲を作って",
-		});
-		await waitFor(
-			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
-			{ timeout: 8000 },
+		const { source } = await fx.assign(
+			"異なる二曲を作って",
+			TASK_TOOLCHAIN,
+			undefined,
+			"Create two items",
 		);
-		const rows = h.music!.list("main");
+		await fx.until(() => fx.executions()[0]?.status === "completed");
+		const rows = h.music!.list(fx.conversationId);
 		expect(rows).toHaveLength(2);
 		expect(new Set(rows.map((r) => r.id)).size).toBe(2);
 		expect(
-			rows.every((r) => r.runId === source.id && r.state === "completed"),
+			rows.every((r) => r.runId === source.runId && r.state === "completed"),
 		).toBe(true);
 	} finally {
-		await h.close();
+		await fx.close();
 	}
 }, 15000);
 
 test("drawing calls keep two independent draft URLs without claiming they were saved", async () => {
 	const { excalidrawFixture } = await import("../media/excalidraw.fixture");
 	const f = excalidrawFixture();
-	const h = await harness({
+	const fx = await assignmentFixture({
 		everyday: true,
 		model: repeatMediaModel(f.model, "drawing_editor"),
 		drawingConnection: f.connection,
 		drawingFetch: f.fetcher,
 		discoveryTarget: discoveryFor("drawing_editor"),
 	});
+	const { h } = fx;
 	try {
-		const source = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "二つの図の下書きを開いて",
-		});
-		await waitFor(
-			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
-			{ timeout: 8000 },
+		const { source } = await fx.assign(
+			"二つの図の下書きを開いて",
+			TASK_TOOLCHAIN,
+			undefined,
+			"Create two items",
 		);
-		const rows = h.drawingOperations!.list("main");
+		await fx.until(() => fx.executions()[0]?.status === "completed");
+		const rows = h.drawingOperations!.list(fx.conversationId);
 		expect(rows).toHaveLength(2);
 		expect(new Set(rows.map((r) => r.url)).size).toBe(2);
 		expect(
-			rows.every((r) => r.runId === source.id && r.state === "completed"),
+			rows.every((r) => r.runId === source.runId && r.state === "completed"),
 		).toBe(true);
-		expect(h.excalidraw!.list("main")).toEqual([]);
+		expect(h.excalidraw!.list(fx.conversationId)).toEqual([]);
 	} finally {
-		await h.close();
+		await fx.close();
 	}
 }, 15000);

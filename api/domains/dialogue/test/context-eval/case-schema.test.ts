@@ -8,7 +8,7 @@ import {
 	sentenceSkeleton,
 	sharedSkeleton,
 } from "../../eval/context/case-schema";
-import { makeCase } from "./case-fixtures";
+import { loadRecordedCases, makeCase } from "./case-fixtures";
 
 const file = (c: unknown, name?: string) => ({
 	name: name ?? `${(c as { id: string }).id}.json`,
@@ -133,7 +133,7 @@ test("references must name a seeded key, keys are unique, delivery fields agree 
 	);
 });
 
-test("episode parts, TODOs, tendencies and forbidden identifiers are checked against the seed", () => {
+test("episode parts, tendencies and forbidden identifiers are checked against the seed", () => {
 	const events = [user("2026-10-10T00:00:00.000Z", "u")];
 	const summary = makeCase("ctx-f3-dev-01", "あ", {
 		seed: { episode: [{ kind: "summary", events }] },
@@ -143,43 +143,6 @@ test("episode parts, TODOs, tendencies and forbidden identifiers are checked aga
 		},
 	});
 	expect(caseIssues(summary)).toContain("ctx-f3-dev-01: summary_without_text");
-	const work = makeCase("ctx-f14-dev-01", "あ", {
-		seed: {
-			work: [
-				{
-					key: "w1",
-					toolchain: "t",
-					request: "r",
-					at: "2026-10-10T00:00:00.000Z",
-					status: "done",
-				},
-				{
-					key: "w2",
-					toolchain: "t",
-					request: "r",
-					at: "2026-10-10T00:00:00.000Z",
-					status: "waiting",
-				},
-				{
-					key: "w3",
-					toolchain: "t",
-					request: "r",
-					at: "2026-10-10T00:00:00.000Z",
-					status: "todo",
-					archived: true,
-				},
-			],
-		},
-		expect: {
-			checks: [],
-			rubric: [{ axis: "work_state_aware", condition: "x" }],
-		},
-	});
-	expect(caseIssues(work)).toEqual([
-		"ctx-f14-dev-01: done_work_without_outcome:w1",
-		"ctx-f14-dev-01: waiting_work_without_question:w2",
-		"ctx-f14-dev-01: archived_work_not_done:w3",
-	]);
 	const tendency = makeCase("ctx-f1-dev-01", "あ", {
 		seed: { tendencies: [{ text: "t", from: ["nowhere", "nowhere2"] }] },
 	});
@@ -187,19 +150,7 @@ test("episode parts, TODOs, tendencies and forbidden identifiers are checked aga
 		"ctx-f1-dev-01: tendency_from_unknown_item:nowhere",
 	);
 	const forbidden = makeCase("ctx-f5-dev-01", "あ", {
-		seed: {
-			work: [
-				{
-					key: "w1",
-					toolchain: "t",
-					request: "r",
-					at: "2026-10-10T00:00:00.000Z",
-					status: "done",
-					outcome: "failed",
-					result: { url: "https://internal.example/x" },
-				},
-			],
-		},
+		seed: { notices: ["結果は https://internal.example/x にあります"] },
 		expect: {
 			checks: [
 				{
@@ -265,15 +216,15 @@ test("dev/holdout leakage: the same skeleton or heavy n-gram overlap is refused;
 	expect(caseSetIssues([dev, fine])).toEqual([]);
 });
 
-test("the example experiment's cases validate and cover every family in both splits", async () => {
-	const { loadCases } = await import("../../eval/context/case-loader");
+test("the example experiment's cases validate and cover every family it still holds in both splits", async () => {
 	const dir = new URL(
 		"../../../../../scripts/context-eval/experiments/2026-10-24-context-window",
 		import.meta.url,
 	).pathname;
-	const cases = loadCases(dir);
+	const cases = loadRecordedCases(dir);
 	expect(new Set(cases.map((c) => c.id)).size).toBe(cases.length);
-	for (const family of FAMILIES)
+	// F5 and F14 are the work-state families: their cases seed the retired TODO ledger.
+	for (const family of FAMILIES.filter((f) => f !== "F5" && f !== "F14"))
 		for (const split of ["dev", "holdout"])
 			expect(cases.some((c) => c.family === family && c.split === split)).toBe(
 				true,

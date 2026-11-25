@@ -252,6 +252,8 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			/** A collaborative draft already reviewed by the user. Revalidated against the current catalog. */
 			definition?: unknown;
 			requestId?: string;
+			/** Distinguishes starts from one source (several assignments asked in one utterance). */
+			startKey?: string;
 		},
 	) {
 		const control = ctx
@@ -292,7 +294,9 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 				? `pipeline-workflow:${input.source.runId}`
 				: input.definition !== undefined
 					? `pipeline-authored:${input.source.specialistSessionId}:${input.requestId}`
-					: `pipeline:${input.source.messageId}:${input.source.digest}`,
+					: input.startKey
+						? `pipeline:key:${input.startKey}`
+						: `pipeline:${input.source.messageId}:${input.source.digest}`,
 			digest = hash(input);
 		const prior = db
 			.query("SELECT * FROM agent_executions WHERE start_key=?")

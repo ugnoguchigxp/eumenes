@@ -11,3 +11,5 @@ Agency と同じ依存関係を用意し、同じ TypeScript 版で `bun scripts
 0.1.12 の土台は `2262088`（記録係の出力を予定と質問の台帳だけにした。事実・候補・食い違いの出力と、入力の記憶・候補の一覧を廃止）。その上に、登録目標の判断契約、進行台帳と許可・観測の書き込み、会話からの登録・許可ツールを追加した。`registered-goal-autonomy-adoption-source.patch` から再現できる。直接の採用元は 0.1.11 の tgz。この tgz を照合用に保持し、直接の採用元でなくなった 0.1.10 の tgz と SHA-256 ファイルは削除した。
 
 同じ採用差分に、質問待ちの受付を保ったまま独立した条件を進める遷移、複数の読取ポリシー、構成変更の観測と質問の解消を含めた。既存台帳への追加は `agency-goals/0006-read-policies` が担う。
+
+0.1.13 は 0.1.12 の上に、担当への依頼を調べもの項目（`delegatedTo`）として持つ変更（`spec/toolchain-assignment-as-research-2026-11-25.md` §7）を加えた。担当項目は調べもの担当の一枠を使わず並行に発行し、担当の質問と進捗（`assignmentObserved`）、取消（`assignmentEnded`）、返事の状態の `assignments` 欄を持つ。`assignments-adoption-source.patch` は `baseCommit` からの全差分で、0.1.12 の採用差分を含む。直接の採用元は 0.1.12 の tgz。直接の採用元でなくなった 0.1.11 の tgz と SHA-256 ファイルは削除した。

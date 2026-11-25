@@ -318,7 +318,6 @@ function setup() {
 					? { revision: 0, data: page, params }
 					: { revision: 3, data: { enabled: false } },
 		),
-		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: submit,
 		toolchainAction: vi.fn(),
 		unsettledToolchainActions: vi.fn(async () => []),

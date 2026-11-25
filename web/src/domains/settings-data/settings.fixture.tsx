@@ -355,7 +355,6 @@ export function createSettingsBackend(
 				}
 			},
 		),
-		toolchainInteractions: vi.fn(async () => []),
 		submitToolchainAction: submit,
 		toolchainAction: vi.fn(),
 		unsettledToolchainActions: vi.fn(async () => []),

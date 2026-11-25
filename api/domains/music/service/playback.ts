@@ -13,7 +13,6 @@ import { trackQuery, type TrackQuery } from "../../larm";
 import type { PlaylistRecord } from "../contracts";
 import {
 	playlistRow,
-	playlistByRun,
 	playlistRecordOf,
 	patchPlaylist,
 	playlists,
@@ -21,7 +20,7 @@ import {
 import { musicContext, PLAN_MS } from "./context";
 import { openedTracks } from "./playback-tracks";
 import type { createMusic } from "./index";
-import type { ChildExecution, ExecutionReference } from "../../tool-runtime";
+import type { ChildExecution } from "../../tool-runtime";
 export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 	const { store, queue, inference, capabilities } = deps;
 	const fail = (
@@ -33,8 +32,6 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 		const r = playlistRow(db, id);
 		if (!r || playlistRecordOf(r).state !== "planning") return;
 		patchPlaylist(db, id, { state, errorCode: code });
-		if (state !== "cancelled" && !JSON.parse(r.request_json).execution)
-			deps.onFinished(db, r.run_id);
 	};
 	type Input = {
 		id: string;
@@ -58,12 +55,15 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 			const r = playlistRow(db, claim.payload.id);
 			if (!r || playlistRecordOf(r).state !== "planning")
 				return { status: "stale", reason: "playlist_not_planning" };
-			if (!inference.captureControlInTransaction || !inference.executeControl)
+			if (
+				!inference.captureUserControlInTransaction ||
+				!inference.executeControl
+			)
 				throw new Error("music_inference_unavailable");
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
-			const execution = JSON.parse(r.request_json).execution;
-			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+			const execution = JSON.parse(r.request_json).execution as ChildExecution;
+			if (!deps.validateExecutionInTransaction?.(db, execution))
 				throw new Error("execution_changed");
 			const capture = {
 				subject: `music:${r.id}:playback`,
@@ -71,12 +71,10 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				deadline: Math.min(r.deadline - 15000, Date.now() + PLAN_MS),
 				maxOutputTokens: 2048,
 			};
-			const requestId = execution
-				? inference.captureUserControlInTransaction!(db, {
-						...capture,
-						subject: `music-task:${r.id}-playback`,
-					})
-				: inference.captureControlInTransaction(db, capture);
+			const requestId = inference.captureUserControlInTransaction(db, {
+				...capture,
+				subject: `music-task:${r.id}-playback`,
+			});
 			return {
 				status: "ready",
 				input: {
@@ -100,19 +98,9 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				context.messages,
 				signal,
 				context.control,
-				(
-					input.request as {
-						execution?: import("../../tool-runtime").ChildExecution;
-					}
-				).execution
-					? executionCallSession(
-							(
-								input.request as {
-									execution: import("../../tool-runtime").ChildExecution;
-								}
-							).execution,
-						)
-					: undefined,
+				executionCallSession(
+					(input.request as { execution: ChildExecution }).execution,
+				),
 			);
 			let value: unknown;
 			try {
@@ -177,7 +165,6 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				trackIds,
 				currentId: trackIds[0] ?? null,
 			});
-			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction(db, job) {
@@ -194,21 +181,14 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				question: string;
 				originalRequest: string;
 				deadline: number;
-				execution?: ChildExecution;
-				/** The resources the conversation handed over with a direct request (a sub-agent's are its refs). */
-				references?: ExecutionReference[];
+				execution: ChildExecution;
 			},
 		) {
-			const existing = input.execution
-				? playlistRow(db, input.execution.id)
-				: playlistByRun(db, input.runId);
+			const id = input.execution.id;
+			const existing = playlistRow(db, id);
 			if (existing) return { id: existing.id, jobId: existing.queue_job_id! };
-			const request = musicRequest.parse({ question: input.question }),
-				id = input.execution?.id ?? crypto.randomUUID();
-			if (
-				input.execution &&
-				!deps.validateExecutionInTransaction?.(db, input.execution)
-			)
+			const request = musicRequest.parse({ question: input.question });
+			if (!deps.validateExecutionInTransaction?.(db, input.execution))
 				throw new Error("execution_changed");
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
@@ -241,11 +221,8 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
-					...(input.execution
-						? { execution: input.execution, references: input.execution.refs }
-						: input.references?.length
-							? { references: input.references }
-							: {}),
+					execution: input.execution,
+					references: input.execution.refs,
 				}),
 				JSON.stringify(prepared),
 				input.deadline,
@@ -265,12 +242,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				job.id,
 				id,
 			);
-			if (!input.execution) deps.onJob(db, input.runId, job.id);
 			return { id, jobId: job.id };
-		},
-		resultInTransaction(db: Database, runId: string) {
-			const r = playlistByRun(db, runId);
-			return r ? playlistRecordOf(r) : null;
 		},
 		purgeCallInTransaction(db: Database, id: string) {
 			db.query(

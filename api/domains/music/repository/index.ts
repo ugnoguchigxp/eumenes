@@ -80,13 +80,6 @@ export function media(db: Database, id: string, kind: "audio" | "artwork") {
 		)
 		.get(id) as { bytes: Uint8Array | null; mime: string | null } | null;
 }
-export function byRun(db: Database, id: string) {
-	return db
-		.query(
-			`SELECT ${COLUMNS} FROM music_generations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL`,
-		)
-		.get(id) as Row | null;
-}
 /** A LARM library track id is the LARM job id recorded while the track was generated here. */
 export function byTrack(db: Database, trackId: string) {
 	return db

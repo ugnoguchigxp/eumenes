@@ -1,7 +1,6 @@
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { SettingsService } from "../../domains/settings";
 import type { ConversationService } from "../../domains/conversation";
-import type { ContinuityService } from "../../domains/continuity";
 import {
 	conversationPersona,
 	type DialogueService,
@@ -15,7 +14,6 @@ export function buildLiveVoice({
 	store,
 	settings,
 	conversation,
-	continuity,
 	dialogue,
 	stopLegacy,
 	wake,
@@ -26,7 +24,6 @@ export function buildLiveVoice({
 	store: SqliteStore;
 	settings: SettingsService;
 	conversation: ConversationService;
-	continuity: ContinuityService;
 	dialogue: DialogueService;
 	stopLegacy: () => Promise<void>;
 	wake: () => void;
@@ -139,33 +136,8 @@ export function buildLiveVoice({
 			owns: live.delivery.owns,
 			assertCurrent: live.delivery.assertCurrent,
 			offer: live.delivery.offer,
-			report: live.delivery.report,
 			announce: live.delivery.announce,
 		},
-		async displayed(sessionId: string, noticeId: string) {
-			await live.delivery.displayed(
-				sessionId,
-				noticeId,
-				(tx, conversationId) => {
-					if (!noticeId.startsWith("confirmation:")) return;
-					const runId = noticeId.slice("confirmation:".length);
-					live.delivery.assertCurrent(tx, runId);
-					const said = continuity.events.deliveredUtteranceInTransaction(
-						tx,
-						conversationId,
-						`run:${runId}`,
-					);
-					if (!said) return;
-					continuity.events.appendInTransaction(tx, {
-						conversationId: conversationId,
-						at: new Date().toISOString(),
-						type: "delivered",
-						by: "host",
-						fields: { ref: said.id, heard: "full", channel: "screen" },
-						dedupeKey: `delivered:${said.id}`,
-					});
-				},
-			);
-		},
+		displayed: live.delivery.displayed,
 	};
 }

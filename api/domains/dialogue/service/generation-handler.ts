@@ -19,7 +19,7 @@ import {
 } from "./generation-settle";
 import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
-import { isPinnedDecision, pinnedGeneration } from "./pinned-operation";
+import { isPinnedDecision, pinnedGeneration } from "./pinned-assignment";
 import type { Progress } from "./progress";
 import { refreshAgentAnswer, reportedLinks } from "./result-intake";
 import { endRun } from "./run-end";
@@ -99,7 +99,7 @@ export function createGenerationHandler(
 				},
 				async () => {
 					log.info("dialogue.generation_started");
-					// A screen's form submit names its toolchain: handed over as it is, with no model call.
+					// A screen's form submit names its toolchain: assigned as it is, with no model call.
 					if (isPinnedDecision(run, input)) {
 						caller.throwIfAborted();
 						return pinnedGeneration(deps, input, run!);
@@ -128,7 +128,6 @@ export function createGenerationHandler(
 							preparation: answerCollection(run, speaksChunks(deps, run)),
 							session: answerSession(input),
 							execute: executor.execute,
-							decline: executor.decline,
 						};
 						const generated = await measureStage(
 							"dialogue",
@@ -138,7 +137,7 @@ export function createGenerationHandler(
 						const handover = executor.handover();
 						if (handover) {
 							log.info("dialogue.generation_handed_over", {
-								kind: handover.handed ? "handed" : "started",
+								kind: "session",
 							});
 							return {
 								text: "",
@@ -160,9 +159,6 @@ export function createGenerationHandler(
 								count: generated.executed.length,
 							});
 						log.info("dialogue.generation_completed");
-						const confirmationId = generated.executed.find(
-							({ outcome }) => outcome.confirmationId,
-						)?.outcome.confirmationId;
 						return {
 							...(generated.finishSilentReplyInTransaction
 								? {
@@ -170,12 +166,7 @@ export function createGenerationHandler(
 											generated.finishSilentReplyInTransaction,
 									}
 								: {}),
-							text: reportedLinks(
-								deps,
-								input,
-								generated.text,
-								generated.lookupSources,
-							),
+							text: reportedLinks(generated.text, generated.lookupSources),
 							...(generated.imageAnswer
 								? { imageAnswer: generated.imageAnswer }
 								: {}),
@@ -188,7 +179,6 @@ export function createGenerationHandler(
 								: {}),
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
 							...(generated.emotion ? { emotion: generated.emotion } : {}),
-							...(confirmationId ? { confirmationId } : {}),
 							...(input.final.kind === "utterances"
 								? {
 										selection: executor.answered(delegationRefused(generated)),

@@ -12,23 +12,6 @@ import type {
 import { grantOf, parentOf, questionsOf, saveGrant } from "./repository";
 import type { Grant, Parent, Task } from "./state";
 
-function confirmationCurrent(
-	host: SupervisionHost,
-	db: Database,
-	parent: Parent,
-) {
-	const saved = parent.confirmation;
-	if (!saved) return true;
-	if (parent.source.origin === "goal") return false;
-	const proof = host.confirmedRequestInTransaction?.(
-		db,
-		parent.source,
-		saved.id,
-		parent.request,
-	);
-	return proof?.digest === saved.digest && proof.request === saved.request;
-}
-
 export function sourceCurrent(
 	host: SupervisionHost,
 	db: Database,
@@ -42,7 +25,7 @@ export function sourceCurrent(
 	return (
 		!parent.forgotten &&
 		host.validSourceInTransaction(db, original) &&
-		confirmationCurrent(host, db, parent) &&
+		!parent.confirmation &&
 		parent.references.every((ref) =>
 			host.validReferenceInTransaction(db, original, ref),
 		) &&

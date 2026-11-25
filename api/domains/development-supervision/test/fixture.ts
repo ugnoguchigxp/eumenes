@@ -99,7 +99,6 @@ export async function fixture(
 	reply: (data: Record<string, unknown>) => unknown,
 	request = "Read the source, fix the source, and run the regression check.",
 	researchEnabled = false,
-	approvedRequest?: string,
 	goal?: SupervisionHost["goal"],
 	workspace?: SupervisionHost["workspace"],
 	extraMigrations: Parameters<typeof openStore>[1] = [],
@@ -130,8 +129,6 @@ export async function fixture(
 	const answers: { workId: string; questionId: string; answer: string }[] = [];
 	const recorded = new Map<string, string>();
 	let available = true;
-	const confirmationId = approvedRequest ? crypto.randomUUID() : undefined;
-	let confirmationCurrent = true;
 	let time = Date.now();
 	let inputRevision = "input-before";
 	let readRevision: string | undefined;
@@ -175,14 +172,6 @@ export async function fixture(
 		...(goal ? { goal } : {}),
 		validSourceInTransaction: (_db, input) =>
 			available && hash(input) === hash(source),
-		confirmedRequestInTransaction: (_db, input, id, text) =>
-			confirmationCurrent &&
-			approvedRequest &&
-			id === confirmationId &&
-			hash(input) === hash(source) &&
-			text === approvedRequest
-				? { request: approvedRequest, digest: hash(approvedRequest) }
-				: null,
 		controlSourceInTransaction: (_db, conversationId, messageId) => {
 			const text = recorded.get(messageId);
 			return conversationId === source.conversationId && text
@@ -461,8 +450,7 @@ export async function fixture(
 	const started = await store.write((db) =>
 		service.task.startInTransaction(db, {
 			source,
-			request: approvedRequest ?? request,
-			...(confirmationId ? { confirmationId } : {}),
+			request,
 			references: [],
 			toolchainRevisionId: "toolchain:development-supervision.request@1",
 			bindingRevisionId: "binding:development-supervision.managed@1",
@@ -518,9 +506,6 @@ export async function fixture(
 		},
 		readInputChanged: (digest: string) => {
 			readRevision = digest;
-		},
-		invalidateConfirmation: () => {
-			confirmationCurrent = false;
 		},
 		invalidate: () => {
 			available = false;

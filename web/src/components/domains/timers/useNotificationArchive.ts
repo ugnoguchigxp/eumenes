@@ -5,10 +5,7 @@ import { queryRoots } from "../../../queryKeys";
 
 type ArchiveClient = Pick<
 	EumenesClient,
-	| "identity"
-	| "archiveTimerNotifications"
-	| "archiveKanbanNotices"
-	| "archiveTodoNotices"
+	"identity" | "archiveTimerNotifications" | "archiveKanbanNotices"
 >;
 
 /** Each source owns its archive. Refresh all sources even when one request fails. */
@@ -26,7 +23,6 @@ export function useNotificationArchive(client: ArchiveClient) {
 			const results = await Promise.allSettled([
 				client.archiveTimerNotifications(),
 				client.archiveKanbanNotices(),
-				client.archiveTodoNotices(),
 			]);
 			if (results.some((result) => result.status === "rejected")) {
 				setError(
@@ -39,9 +35,6 @@ export function useNotificationArchive(client: ArchiveClient) {
 				}),
 				cache.invalidateQueries({
 					queryKey: [queryRoots.kanban, client.identity, "notices"],
-				}),
-				cache.invalidateQueries({
-					queryKey: [queryRoots.dialogue, client.identity, "todo-notices"],
 				}),
 			]);
 		} finally {

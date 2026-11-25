@@ -294,15 +294,6 @@ export const viewRegistry = {
 			title,
 		}),
 	},
-	"todo-workspace": {
-		name: "TodoWorkspace",
-		label: "会話の仕事と報告の一覧",
-		schema: z.strictObject({
-			view: z.literal("todo-workspace"),
-			source,
-			title,
-		}),
-	},
 	"collection-workspace": {
 		name: "CollectionWorkspace",
 		label: "登録された一覧の表示と編集",

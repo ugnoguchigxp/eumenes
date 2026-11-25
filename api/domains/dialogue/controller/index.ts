@@ -6,13 +6,11 @@ import {
 	specialistCommandKinds,
 	specialistCommandSchema,
 	specialistRetargetSchema,
-	todoNoticesQuery,
 	type RunProgress,
 } from "../contracts";
-import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
+import { parseJsonBody } from "../../../infrastructure/http";
 import { snapshotStream } from "../../../infrastructure/snapshot-stream";
 import { SSE_HEADERS } from "../../../infrastructure/sse";
-export { registerCommandInteractions } from "./interactions";
 export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/runs/:id/stream", (c) => {
 		const id = c.req.param("id");
@@ -49,20 +47,6 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 	app.post("/api/conversations/:id/recent/clear", async (c) => {
 		if (!(await service.clearRecent(c.req.param("id"))))
 			return c.json({ error: "conversation_busy" }, 409);
-		return c.json({ ok: true });
-	});
-	app.get("/api/todo-notices", (c) => {
-		const query = parseQuery(c, todoNoticesQuery, { code: "invalid_input" });
-		if (!query.ok) return query.response;
-		return c.json(service.todoNotices(query.data.limit));
-	});
-	app.post("/api/todo-notices/archive", async (c) => {
-		await service.archiveTodoNotices();
-		return c.body(null, 204);
-	});
-	app.post("/api/todo-notices/:id/read", async (c) => {
-		if (!(await service.readTodoNotice(c.req.param("id"))))
-			return c.json({ error: "work_not_found" }, 404);
 		return c.json({ ok: true });
 	});
 	app.post("/api/runs", async (c) => {

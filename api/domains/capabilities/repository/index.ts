@@ -180,6 +180,13 @@ DELETE FROM capability_items WHERE key IN (
 ) OR key GLOB 'tool:collaboration.task.*';
 DELETE FROM capability_artifact_pointers WHERE artifact_id='collaboration.task';`,
 	},
+	{
+		// The TODOリスト screen (`agency.todos`) is gone with the TODO ledger: assigned work shows through the agent's
+		// assignment items. Its registered revisions stay as history; the screen is no longer offered on the launcher.
+		id: "capabilities/0014-retire-agency-todos",
+		after: ["capabilities/0013-retire-collaboration-task"],
+		sql: `DELETE FROM capability_artifact_pointers WHERE artifact_id='agency.todos';`,
+	},
 ];
 
 export type DocumentKind = "binding" | "artifact" | "schema";
