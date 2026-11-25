@@ -183,15 +183,16 @@ export function createGoalRecovery(
 				goals.activeProgressInTransaction(db, goalAccess(row), row)
 			) {
 				recoverDelivery(db, row);
-				if (ports.enabled(db) && resumeDesignFailure(db, row)) continue;
 				if (ports.reconcileConfiguration) {
 					if (ports.enabled(db)) {
 						const configured = ports.reconcileConfiguration(db, row);
+						if (resumeDesignFailure(db, configured)) continue;
 						if (configured.progressVersion !== row.progressVersion)
 							submit(db, configured);
 					}
 					continue;
 				}
+				if (ports.enabled(db) && resumeDesignFailure(db, row)) continue;
 			}
 			if (
 				row.phase !== "waiting" ||

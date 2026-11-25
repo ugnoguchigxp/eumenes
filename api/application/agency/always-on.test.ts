@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { ADDED_WORDS_MARK, START_PREPARATION } from "eumenes-agency/agenda";
+import {
+	ADDED_WORDS_MARK,
+	READ_NOTE,
+	SHOW_NOTE,
+	START_PREPARATION,
+} from "eumenes-agency/agenda";
 import {
 	agendaFixture,
 	composeSay,
@@ -370,13 +375,12 @@ test("the reply's system holds the package's rules for the agenda, with the tool
 		expect(f.host.conversationAgent.system().facts).toContain(
 			"start_preparation",
 		);
-		expect(base).toContain("read_note");
+		expect(base).not.toMatch(/\b(?:read_note|show_note)\b/u);
 		// The way to a toolchain: the tools' own descriptions say how, the talk turn offers the two tools, and the facts
 		// leave the making to them. The package's lines a tool's description or Eumenes' own rule already says are left out.
 		expect(base).toContain("whileAway があれば");
 		expect(base).not.toContain("【あなたの仕組み】");
 		expect(base).not.toContain("【返事の仕方】");
-		expect(base).not.toContain("メモは show_note で表示できます");
 		expect(base).toContain("kind=said、minutes=0 で呼んで解除します");
 		expect(base).toContain("「その話は調べなくていい」");
 		expect(f.host.conversationAgent.handsWork?.()).toBe(true);
@@ -388,6 +392,20 @@ test("the reply's system holds the package's rules for the agenda, with the tool
 		await f.start();
 		await f.user("user-a");
 		const { toolDefinitions } = await replyWith(f, []);
+		expect(toolDefinitions[0]).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					name: READ_NOTE,
+					description: expect.stringContaining("メモの内容についての質問"),
+				}),
+				expect.objectContaining({
+					name: SHOW_NOTE,
+					description: expect.stringMatching(
+						/表示の提案への了承.*Markdown 画面/u,
+					),
+				}),
+			]),
+		);
 		const preparation = toolDefinitions[0]!.filter(
 			(tool) => tool.name === START_PREPARATION,
 		);

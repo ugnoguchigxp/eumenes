@@ -1,6 +1,6 @@
 # 登録目標へ実際の参照先と検査を渡す設計差分
 
-2026年11月23日。**利用者が実装を承認済み、実装・検証中。** 質問配送・質問待ちの分離・改訂後の読取許可は既存設計に対する補修として別に進める。本書は、単一許可・単一専用runnerという現在の実装契約を変更する部分を定める。承認には利用者が起動したサーバーの操作を含めない。[既存設計](registered-goal-autonomy-2026-11-23.md)・[再診断と補修](verification/goal-autonomy-2026-11-23/production-rollout.md#実運用の再診断)
+2026年11月23日策定、11月24日更新。**利用者が実装を承認済み。実装・正式検証を完了し、補修版の実稼働再受入を待っている。** 質問配送・質問待ちの分離・改訂後の読取許可は既存設計に対する補修として実装した。本書は、単一許可・単一専用runnerという従来の実装契約を変更する部分を定める。承認には利用者が起動したサーバーの操作を含めない。[既存設計](registered-goal-autonomy-2026-11-23.md)・[補修版の検証記録](verification/goal-autonomy-2026-11-23/operational-repair.md)
 
 ## 1. 目的・範囲・完了条件
 
@@ -54,7 +54,7 @@ Agencyの既存`goal_permits`と`scope_json`を引き続き正本にする。過
 
 ポリシーで実施できる検査は既存の`runGoalCheck / createCheckSandbox`を使う。固定の実行ファイル・引数・cwdを保持し、ネットワーク禁止・作業先の書込み禁止・期限・出力量の制約を維持する。sandboxが利用不可なら検査不能を保存する。sandboxを外して実行しない。本人の編集許可と、登録検査の実施を分ける。
 
-Live2D用には[作業先・検査候補](verification/goal-autonomy-2026-11-23/workspace-proposal.json)の参照範囲を登録し、`policyCheckRefs: ["avatar-background-behavior"]`を追加する案とする。書込み対象は0件。現在の候補JSONは現行契約で解決できるレビュー用であり、この追加項目と稼働設定は未反映。[sandboxでの検査結果](verification/goal-autonomy-2026-11-23/existing-avatar-verification.json)
+Live2D用には[登録した作業先・検査](verification/goal-autonomy-2026-11-23/workspace-proposal.json)の参照範囲と、`policyCheckRefs: ["avatar-background-behavior"]`を設定した。書込み対象は0件。11月23日23:30 JSTに既存の別作業先を保持して稼働設定へ反映した。設定済みであることと、補修版の起動・実目標の受入が済んだことは区別する。[sandboxでの検査結果](verification/goal-autonomy-2026-11-23/existing-avatar-verification.json)
 
 作業先の実パス・HEAD・入力digestは既存の検査を再利用する。第三者による変更を自分の変更として採用しない。実物を読む・検査する前に、既存の機能がないと推定して新たな編集を始めない。
 
@@ -97,3 +97,5 @@ Live2D用には[作業先・検査候補](verification/goal-autonomy-2026-11-23/
 発話を投入せずに実稼働状態を確認できるよう、既存`list_goals`と同じ登録目標の投影を`GET /api/agency/goals`へ接続する。既存API認証を維持し、会話の生成・選択・attend、LLM呼出し、台帳更新、キュー投入を行わない。反復GETでもwriter呼出し・進行版・会話・受付が増えないことを固定試験で確認する。
 
 受入中に共有配布物は`74981c957258…`から`5228ee16a86e…`へ更新された。採用ソースの違いは`src/agenda/extract.ts`と`src/agenda/index.ts`で、目標処理のソースは同一だった。引用停止をこの差分のせいにはしない。現在の配布物を保全してホストの補修を進め、再度の実稼働確認を別の受入として記録する。
+
+同じ質問の一回配送では、質問IDも不変でなければならない。従来のdigestは渡された進行行全体を含め、キューID・進行版の更新でも別質問になり得た。所有者・目標ID・目標版・重複を除き整列した条件ID・前後の空白を除いた不足理由だけで照合し、旧形式の未回答質問にも同じ意味の照合を行って既存IDと本文を再利用する。本人の回答済み・構成変更による解消済みの質問は復活させない。この補修を含む配布物は`794a0c03481a…`で、直前の別作業による変更を維持する。

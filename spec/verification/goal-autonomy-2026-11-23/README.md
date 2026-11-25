@@ -1,6 +1,8 @@
 # 登録目標の自律実行の検証記録
 
-**実運用は未完了。** 受入用READMEの自律修正には合格しているが、実目標への参照・検査の接続、確認質問の自発配送、読取許可と同一目標内の待機処理に未完了点がある。[再診断と残作業](production-rollout.md#実運用の再診断)
+**実目標の受入は未完了。** 参照・検査の接続、確認質問の配送、複数許可、本人待ちの分離、設計生成で止まった旧目標の復帰を補修し、最終版の正式検証349件とAgency検証1,241件が成功した。前回の実稼働受入は設計生成で停止して不合格。補修版で同じLive2D目標が自力で参照・検査・完了報告へ進むかの確認は残る。[最新の補修・検証記録](operational-repair.md)
+
+以下は11月23日の初期版の履歴であり、補修版の実稼働合格を表すものではない。
 
 [設計](../../registered-goal-autonomy-2026-11-23.md)と[導入・受入手順](../../registered-goal-autonomy-implementation-2026-11-23.md)の実装を、2026年11月23日に確認した。取込版は Agency 0.1.12、SHA-256 は `3d0e1932cb9ae4fec95f52160a872a46f77aa61949608a03b109345c3d512c2b`。Agency の Git 基準と採用差分から再構築した配布物はこの SHA-256 と一致した。[取込元、差分、ハッシュ](../../../vendor/agency/manifest.json)
 
@@ -10,7 +12,7 @@
 
 既定の自律作業設定の下で、登録済み目標は追加の会話イベントを待たず永続キューに入る。開発作業は既存の開発監督が Claude の管理実行を受付・照会する。読み取りポリシーで既存の Web メモを使う場合は、取得した本文と出典を別の検証に渡す。利用者の許可は現在の目標版と本人の発言に結び付ける。
 
-ローカル開発を行うホストは `EUMENES_GOAL_WORKSPACES` に作業先を登録する。各項目に `ref`、Git checkout の `root`、`readablePaths`、`writablePaths`、`checks` を指定する。検査ごとに `ref`、`description`、実行ファイルの `command`、固定の `args`、`cwd` を指定し、独立検証に使うものは `acceptance: true` を設定する。開発作業を引き受ける既存 Claude runner のソケットは `EUMENES_CLAUDE_WORK_RUNNER_SOCKET` を使う。現在の組立では、専用 checkout 用の runner は登録先が1件のときに選ばれる。利用者が編集を許可したときも、登録済みの実パスと検査に範囲が限定される。[作業先レジストリと許可の解決](../../../api/application/agency/goal-workspaces.ts)・[ホストでの runner 組立](../../../api/application/server-wiring.ts)
+ローカル開発を行うホストは `EUMENES_GOAL_WORKSPACES` に作業先を登録する。各項目に `ref`、Git checkout の `root`、`readablePaths`、`writablePaths`、`checks` を指定する。検査ごとに `ref`、`description`、実行ファイルの `command`、固定の `args`、`cwd` を指定し、独立検証に使うものは `acceptance: true` を設定する。読取ポリシーで使わせる検査だけを `policyCheckRefs` に列挙し、省略時は許可しない。補修版では複数の作業先をcanonical pathでrunnerへ対応付け、同じ実パスは共有する。対応先を利用できない場合は別作業先へ転送しない。通常会話のrunnerは維持する。利用者が編集を許可したときも、登録済みの実パスと検査に範囲が限定される。[作業先レジストリと許可の解決](../../../api/application/agency/goal-workspaces.ts)・[runner組立](../../../api/application/work/claude-runners.ts)
 
 ## 固定試験
 

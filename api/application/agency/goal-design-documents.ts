@@ -13,6 +13,7 @@ import {
 	currentGoalPermits,
 	goalAccess,
 	goalDigest,
+	type prepareGoalSnapshot,
 } from "./goal-progress-context";
 import type { GoalProgressPorts } from "./goal-progress";
 
@@ -23,6 +24,98 @@ const quoteCorrection =
 	"validationFailure には直前の案と引用検査の結果が入ります。指定された箇所の sourceQuote を sourceText に実在する連続した文字列から選び直してください。目的の言い換えや資料本文を引用元に使いません。元の目標と達成条件を保ち、検証済みの引用を維持した完全な設計結果を返してください。";
 const refFor = (row: GoalProgress) =>
 	`${owner}:${row.goalId}:${row.goalRevision}`;
+
+type DesignInput = Parameters<GoalStore["adoptGoalCriteriaInTransaction"]>[3];
+export type Designed =
+	| (Omit<DesignInput, "expectedVersion"> & {
+			document?: { title: string; markdown: string };
+	  })
+	| { blocked: string };
+export type GoalDesignPreparation = {
+	inputVersion: string;
+	sources: readonly string[];
+	run: (signal: AbortSignal) => Promise<Designed>;
+};
+export type AdvanceGoalProgress = (
+	db: Database,
+	row: GoalProgress,
+	next: Parameters<GoalStore["transitionProgressInTransaction"]>[4],
+	claimId?: string,
+) => GoalProgress | null;
+
+export function continueAfterDesignFailure(
+	advance: AdvanceGoalProgress,
+	db: Database,
+	row: GoalProgress,
+	problem: string,
+	preparation: GoalDesignPreparation | null,
+	claimId?: string,
+) {
+	return advance(
+		db,
+		row,
+		(current) => ({
+			phase: "ready",
+			state: {
+				...current.state,
+				problem,
+				watch: null,
+				next: null,
+				evidence: preparation
+					? [
+							...current.state.evidence.filter(
+								({ ref }) => ref !== goalDesignObservation,
+							),
+							{
+								ref: goalDesignObservation,
+								version: preparation.inputVersion,
+								digest: goalDigest([preparation.inputVersion, problem]),
+								summary: `設計書を採用できませんでした（${problem}）。提示された読取・検証は進められます。変更には有効な設計書が必要です。`,
+								sources: preparation.sources,
+							},
+						]
+					: current.state.evidence,
+			},
+		}),
+		claimId,
+	);
+}
+
+export function resumeLegacyDesignFailure(
+	ports: Pick<GoalProgressPorts, "prepareDesign">,
+	ops: {
+		advance: AdvanceGoalProgress;
+		snapshot(
+			db: Database,
+			row: GoalProgress,
+		): ReturnType<typeof prepareGoalSnapshot> | undefined;
+	},
+	db: Database,
+	row: GoalProgress,
+) {
+	if (
+		row.phase !== "waiting" ||
+		row.state.design ||
+		row.currentWorkId ||
+		row.state.problem !== invalidGoalCriterionQuote ||
+		row.state.watch?.producer !== "goal-configuration"
+	)
+		return false;
+	const offered = ops.snapshot(db, row);
+	return !!(
+		offered &&
+		(offered.capabilities.some(({ effect }) => effect === "read") ||
+			offered.context.checks.length) &&
+		continueAfterDesignFailure(
+			ops.advance,
+			db,
+			row,
+			row.state.problem,
+			ports.prepareDesign?.(db, row) ?? null,
+		)
+	);
+}
+
 export function createGoalDesignDocuments(ports: {
 	goals: GoalStore;
 	generated: Pick<
@@ -106,28 +199,32 @@ export function createGoalDesignDocuments(ports: {
 			at: row.state.startedAt,
 			refs: [],
 		}));
+		const permitVersions = permits.map(({ id, revision }) => [id, revision]);
 		const inputVersion = goalDigest([
 			source,
-			permits.map(({ id, revision }) => [id, revision]),
+			permitVersions,
+			row.state.configuration?.ref,
 			[...new Set(evidence.map(({ summary }) => summary))].sort(),
 		]);
+		const legacyBlocked = "goal_design_blocked:";
 		if (
 			row.state.evidence.some(
 				({ ref, version }) =>
 					ref === goalDesignObservation && version === inputVersion,
 			) ||
-			(row.state.problem?.startsWith("goal_design_blocked:") &&
+			(row.state.problem?.startsWith(legacyBlocked) &&
 				row.state.problem.startsWith(
-					"goal_design_blocked:" +
-						goalDigest([
-							source,
-							permits.map(({ id, revision }) => [id, revision]),
-							row.state.evidence,
-						]),
+					legacyBlocked +
+						goalDigest([source, permitVersions, row.state.evidence]),
 				))
 		)
 			return null;
-		const sources = row.state.sourceRef ? [row.state.sourceRef] : [];
+		const sources = [
+			...new Set([
+				...(row.state.sourceRef ? [row.state.sourceRef] : []),
+				...evidence.flatMap((item) => item.sources ?? []),
+			]),
+		];
 		const designInput: RegisteredGoalDesignInput = {
 			sourceText: source,
 			purpose: goal.desiredState,

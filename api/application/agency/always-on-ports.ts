@@ -68,11 +68,12 @@ const AGENDA_TOOL_SPECS: Record<
 	},
 	[READ_NOTE]: {
 		description:
-			"メモ本文を自分で読む（非表示）。メモに関する質問は先に読んで答える。",
+			"メモの内容についての質問に答えるため、対象のメモの本文を読む。",
 		props: { id: "メモID（n1等）" },
 	},
 	[SHOW_NOTE]: {
-		description: "メモを利用者に表示する（表示承諾や閲覧依頼時）。",
+		description:
+			"メモの表示依頼や表示の提案への了承を受け、対象が分かったらこのツールを呼ぶ。メモを利用者の Markdown 画面に開く。",
 		props: { id: "メモID（n1等）" },
 	},
 	[SET_QUIET]: {

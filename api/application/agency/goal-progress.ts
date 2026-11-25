@@ -14,8 +14,12 @@ import { z } from "zod";
 import type { HandlerDefinition, QueueService } from "../../domains/queue";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
-	goalDesignObservation,
+	continueAfterDesignFailure,
 	invalidGoalCriterionQuote,
+	resumeLegacyDesignFailure,
+	type AdvanceGoalProgress,
+	type Designed,
+	type GoalDesignPreparation,
 } from "./goal-design-documents";
 import { createGoalRecovery, openJob, scheduled } from "./goal-recovery";
 import {
@@ -81,17 +85,6 @@ type Selected = Extract<
 >;
 type VerifyInput = Parameters<GoalStore["recordGoalChecksInTransaction"]>[3];
 type CheckOutcome = VerifyInput["checks"];
-type DesignInput = Parameters<GoalStore["adoptGoalCriteriaInTransaction"]>[3];
-type Designed =
-	| (Omit<DesignInput, "expectedVersion"> & {
-			document?: { title: string; markdown: string };
-	  })
-	| { blocked: string };
-type GoalDesignPreparation = {
-	inputVersion: string;
-	sources: readonly string[];
-	run: (signal: AbortSignal) => Promise<Designed>;
-};
 type Prepared =
 	| { kind: "decide"; snapshot: Snapshot }
 	| { kind: "design"; preparation: GoalDesignPreparation }
@@ -442,12 +435,7 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 }
 
 type GoalAdvanceOps = {
-	advance: (
-		db: Database,
-		row: GoalProgress,
-		next: Parameters<GoalStore["transitionProgressInTransaction"]>[4],
-		claimId?: string,
-	) => GoalProgress | null;
+	advance: AdvanceGoalProgress;
 	claimRow: (db: Database, key: Payload, jobId: string) => GoalProgress | null;
 	finishReceipt: (db: Database, row: GoalProgress, jobId: string) => void;
 	pendingParkedReceipt: (db: Database, row: GoalProgress) => GoalAttempt | null;
@@ -466,73 +454,6 @@ type GoalAdvanceOps = {
 	submit: (db: Database, row: GoalProgress, jobId?: string) => void;
 	wake: () => void;
 };
-
-function continueAfterDesignFailure(
-	advance: GoalAdvanceOps["advance"],
-	db: Database,
-	row: GoalProgress,
-	problem: string,
-	preparation: GoalDesignPreparation | null,
-	claimId?: string,
-) {
-	return advance(
-		db,
-		row,
-		(current) => ({
-			phase: "ready",
-			state: {
-				...current.state,
-				problem,
-				watch: null,
-				next: null,
-				evidence: preparation
-					? [
-							...current.state.evidence.filter(
-								({ ref }) => ref !== goalDesignObservation,
-							),
-							{
-								ref: goalDesignObservation,
-								version: preparation.inputVersion,
-								digest: goalDigest([preparation.inputVersion, problem]),
-								summary: `設計書を採用できませんでした（${problem}）。提示された読取・検証は進められます。変更には有効な設計書が必要です。`,
-								sources: preparation.sources,
-							},
-						]
-					: current.state.evidence,
-			},
-		}),
-		claimId,
-	);
-}
-
-function resumeLegacyDesignFailure(
-	ports: GoalProgressPorts,
-	ops: Pick<GoalAdvanceOps, "advance" | "snapshot">,
-	db: Database,
-	row: GoalProgress,
-) {
-	if (
-		row.phase !== "waiting" ||
-		row.state.design ||
-		row.currentWorkId ||
-		row.state.problem !== invalidGoalCriterionQuote ||
-		row.state.watch?.producer !== "goal-configuration"
-	)
-		return false;
-	const offered = ops.snapshot(db, row);
-	return !!(
-		offered &&
-		(offered.capabilities.some(({ effect }) => effect === "read") ||
-			offered.context.checks.length) &&
-		continueAfterDesignFailure(
-			ops.advance,
-			db,
-			row,
-			row.state.problem,
-			ports.prepareDesign?.(db, row) ?? null,
-		)
-	);
-}
 
 function prepareGoalAdvance(
 	ports: GoalProgressPorts,

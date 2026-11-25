@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-23T15:15:25.731880+00:00",
+  "status": "fixed_checks_passed_production_acceptance_pending",
+  "goal": {
+    "id": "4c31866e-d426-4ce8-a4bd-470d90fa6aae",
+    "sourceConversation": "main",
+    "sourceRevision": 1,
+    "desiredState": "Live2Dの背景を設定でさまざまな色に変更できるようにすること。達成条件は、設定から背景色を変更できること。"
+  },
+  "artifact": {
+    "package": "eumenes-agency",
+    "version": "0.1.12",
+    "sha256": "794a0c03481a0f704794dc4e854dc332075e55df56c1cdd82e54ef572074b245",
+    "baseCommit": "2262088f019fcbdbefd28fd48db6e94b1ba7cac3",
+    "patchSha256": "a0af938582e83eab5f395f43793522f0db58356230c2758b164ee45002e63617",
+    "sourceHash": "3d84dce5606f2fab09a880cee82d744f2391b9413177d2ac048d4f064326bd79",
+    "reproducedSha256": "794a0c03481a0f704794dc4e854dc332075e55df56c1cdd82e54ef572074b245",
+    "reproductionMatches": true,
+    "reproducedSourceFiles": 95,
+    "sourceMismatches": []
+  },
+  "hostFormal": {
+    "scope": [
+      "goals",
+      "queue",
+      "markdown"
+    ],
+    "result": "pass",
+    "runId": "2026-11-23T15-06-52-850Z-aab1d3b4-ce6b-40f4-b61a-81d0a57d4aff",
+    "baseCommit": "a3bb775e96a3420fa2caffa2d6bda5bf9bf7eb01",
+    "inputRevision": "db63c64160350ec0d1a09ed63669f724652443898ee9c51013b23e17403a9ce8",
+    "finalRevision": "db63c64160350ec0d1a09ed63669f724652443898ee9c51013b23e17403a9ce8",
+    "snapshotFiles": 7596,
+    "sourceChangedWhileCopying": [],
+    "gatesPassed": 15,
+    "gatesTotal": 15,
+    "bun": {
+      "pass": 275,
+      "skip": 1,
+      "fail": 0
+    },
+    "web": {
+      "pass": 25,
+      "fail": 0
+    },
+    "designSystem": {
+      "pass": 49,
+      "fail": 0
+    },
+    "totalPass": 349,
+    "integrityErrors": [],
+    "sourceHashes": {
+      "api/application/agency/goal-agenda-regressions.test.ts": "799a8fe677f7d5747ef4dec64f44908e68bda39719cbed6510ba261c88d22c5d",
+      "api/application/agency/goal-agenda.fixture.ts": "11222623dc1c96da28cd0b3b24361f99a3c2f01fb4349fb5de38f40261df6734",
+      "api/application/agency/goal-agenda.test.ts": "270cb6f3657ec9022298dedd7f1b66f4011634044b842b42a6be5b138671e95e",
+      "api/application/agency/goal-agenda.ts": "7835251c5407bd3a807e2b4c31bc1613793db18cd1a61243b8e51a34536fcd9e",
+      "api/application/agency/goal-autonomy-backend.fixture.ts": "6f0600d3c3d7875a1623c16b835b2ca1cf9f6c50e45d2b899c0ff9f405becc7b",
+      "api/application/agency/goal-autonomy.live.test.ts": "ea71ad634200c3f29ee937e4815fdf06b01bcee65b7821f842395b1ca9ad5b56",
+      "api/application/agency/goal-capability-selection.test.ts": "684c67af59165486dbe8013945f90bb352e28a165f0289b699439951500a9098",
+      "api/application/agency/goal-completion.test.ts": "f43eeadf236c72de872ee822a346f7ffb5d93fcffafe4a370ee9ca933cbe5662",
+      "api/application/agency/goal-design-documents.test.ts": "a0d3d94bf3e5e3461b0a74439c16759516222a4c4b7613f8003ac26b0da52d7b",
+      "api/application/agency/goal-design-documents.ts": "2029f6089a832e4d81e1ce027b5e1ae7fe514a5793b1a71643f6d484cf05a6a5",
+      "api/application/agency/goal-execution-source.ts": "fce3a3aa4fc231ad9b8158d292886e8fe687779827cfe5d170a578559d513d86",
+      "api/application/agency/goal-input-sources.ts": "984aecdf4ad953fbd0dd0af3e3ef65de887f67d68642f6232c744d690fefad1b",
+      "api/application/agency/goal-note-adoption.ts": "32f7bede72816d4bcd3e31f41b0e059fd42770b0694a518ed1b3e86a1001a983",
+      "api/application/agency/goal-owner-wait.test.ts": "9a6975b17657c0fb53685eb9150e8d325fb3cc1e268c06b5274294c859cde82e",
+      "api/application/agency/goal-permission.test.ts": "7fa28790453dffffcb0a782f37d34bdfe038c31dfecde5129e35e0242983e668",
+      "api/application/agency/goal-permission.ts": "cfd94379c214ca613951ec84b9008a5b633602d777e9689c169b5ed65df96ae7",
+      "api/application/agency/goal-policy-configuration.ts": "e199af1dd7c3349c099cfb6dcca628c8508eb0cf1f506f252f5d79be25f41f94",
+      "api/application/agency/goal-progress-context.ts": "0b9149a373a09e89b34f158ce28c4def4d218a6fb9b9a6e5e96df327ae8739f9",
+      "api/application/agency/goal-progress.fixture.ts": "8428213ee3faa0c068d5df81e5473f0c06198cd799c70824ad44a2e84a210213",
+      "api/application/agency/goal-progress.test.ts": "651126787e0a92c46bf6ebbfe4db63ddc74abd01c2b6f9588972e88f31bd05c6",
+      "api/application/agency/goal-progress.ts": "755f4bb28ea0dc4bcfeed1bfc129de53f5c9f435a245d7be5f9579c2249800f4",
+      "api/application/agency/goal-question-delivery.test.ts": "d419afaa0e2bbfd17026628489d128d1829d21b76e3f8d3aa368abcab24614db",
+      "api/application/agency/goal-question-delivery.ts": "2b243feac5626050b4499a70237ad44f3530b74c4c07e34974d48046e88c7b41",
+      "api/application/agency/goal-receipts.ts": "5a7e6d34146329a09ad8f17d4c6dc0306625422d9f2905d8557503469a359bf0",
+      "api/application/agency/goal-recovery.test.ts": "659e1ca7175544eb3aafd906a20fb5f641aaab5f2387434138dfa949712c3775",
+      "api/application/agency/goal-recovery.ts": "1b7e68f38516f2ebf9b25fbfee9ae5736514f50c4755006e9fe3f312d577de61",
+      "api/application/agency/goal-report-delivery.ts": "1021df0105647886d3c65ddd94abaab92114b067430ccec1ae7ef6d079f6ec93",
+      "api/application/agency/goal-semantic-verification.ts": "e94a43ec61d2817be0e2d105d351d8522834e988bf8f9fbc702e059ccdcb732b",
+      "api/application/agency/goal-verification.ts": "ca2b7a72f963b2fcf01a9e81f6d7a312fb62a93150929118a49d35f951bd81d2",
+      "api/application/agency/goal-verifiers.ts": "4a3113ec02e5b97aad597d7427f4fa0a55e69b471282f37692151817d87d788d",
+      "api/application/agency/goal-web-note.ts": "ab6edf5eab51d8c30323505aa731838156ac831daa96bc31b25f8acb3bf48690",
+      "api/application/agency/goal-workspaces.ts": "bca82bd7db8e9758404d8d68051c03b379380ba32c415ab0f0b8b66d6cc144fb",
+      "api/application/agency/registered-goals.ts": "ac81972e82b92d322cb659a8f8ac8e29acc51c3d8eddc7c886ba1e5929105df9",
+      "api/application/agency/routes.ts": "12ba38ae5de7d5040681758c3aa10357c279873c53837dfefe99e9f24b5d06fb",
+      "api/application/server-app-services.ts": "a5f8872167c71154ed40b3f7cbf22575504d771cf4385c4b34510cb1164a7a98",
+      "api/application/work/claude-runners.ts": "3f434dda9d73b70100b726b415c9408869d2f4bc0ea86c2dd974e2b2a41b855b",
+      "api/application/work/development-supervision-host.ts": "1ad41c4da85226cfd381a77eeb172341b14ae831aaa30a35c02b5b6be8764edd",
+      "bun.lock": "db35ddb80304acc29f27e5e2639bf94e96382d8dcca763e1b953d0cb75a05eca",
+      "package.json": "4a69f6e56b4330f71c12bd2bf0964058e94934d795d3feea4068d52ee44d0523",
+      "vendor/agency/manifest.json": "81df7b1508a1d615bc07b8b6528c3040504080e006bbba53aace5c733247ec64"
+    },
+    "productionSourceDifferencesAfterChecks": [],
+    "report": "operational-repair-host-report.json"
+  },
+  "targetedHost": {
+    "pass": 48,
+    "fail": 0,
+    "testFiles": 11,
+    "source": "Sol implementation agent, explicit ./api/... paths"
+  },
+  "agencyFixture": {
+    "pass": 1241,
+    "skip": 49,
+    "todo": 1,
+    "fail": 0,
+    "assertions": 5113,
+    "testFiles": 105,
+    "isolated": true
+  },
+  "existingFeatureChecks": {
+    "pass": 24,
+    "sandbox": "registered runGoalCheck/createCheckSandbox; read-only; network disabled",
+    "cacheWrite": "disabled via --configLoader runner --no-cache",
+    "liveGoalProof": false,
+    "hardwareOrGUIProof": false,
+    "evidence": "existing-avatar-verification.json"
+  },
+  "configuration": {
+    "appliedAt": "2026-11-23T14:30:44.386Z",
+    "preservedWorkspaceRefs": [
+      "autonomy-workspace"
+    ],
+    "addedWorkspaceRef": "eumenes-avatar",
+    "writablePaths": [],
+    "policyCheckRefs": [
+      "avatar-background-behavior"
+    ],
+    "unrelatedEnvironmentBytesPreserved": true,
+    "proposal": "workspace-proposal.json"
+  },
+  "previousProductionAcceptance": {
+    "result": "failed",
+    "serverReadyAt": "2026-11-23T14:37:09.017Z",
+    "failedJobId": "0459232f-8de2-4e80-8f35-a8833e4e0a33",
+    "failedAt": "2026-11-23T14:39:16.068Z",
+    "errorCode": "goal_criterion_source_invalid",
+    "sourceConversationAdditionalUserMessages": 0,
+    "completionReports": 0,
+    "cause": "detailed design generation incorrectly gated read/verify; exact quote validation failed"
+  },
+  "finalProductionAcceptance": {
+    "result": "pending_user_owned_server_start",
+    "latestApiObservation": {
+      "at": "2026-11-23T15:11:00.901Z",
+      "result": "ECONNREFUSED"
+    },
+    "observerMethods": [
+      "GET /api/agency/goals",
+      "GET /api/conversations/main",
+      "GET /api/jobs"
+    ],
+    "userUtterancesInjected": 0,
+    "serverOperationsPerformed": false
+  },
+  "limits": [
+    "Selected formal gates do not certify unrelated shared-worktree changes.",
+    "Earlier broad static attempt failed on unrelated app-development.bundle.json formatting; it was not reported as passing.",
+    "No final production acceptance, GUI operation, or voice/hardware acceptance is claimed."
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-11-23T15-06-52-850Z-aab1d3b4-ce6b-40f4-b61a-81d0a57d4aff",
+  "startedAt": "2026-11-23T15:06:52.851Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "goals",
+      "queue",
+      "markdown"
+    ]
+  },
+  "baseCommit": "a3bb775e96a3420fa2caffa2d6bda5bf9bf7eb01",
+  "revision": "db63c64160350ec0d1a09ed63669f724652443898ee9c51013b23e17403a9ce8",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 82
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 2656
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 118
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "ms": 1075
+    },
+    {
+      "name": "fixed-names",
+      "status": "pass",
+      "ms": 242
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "pass",
+      "ms": 1352
+    },
+    {
+      "name": "domain-docs",
+      "status": "pass",
+      "ms": 28
+    },
+    {
+      "name": "format",
+      "status": "pass",
+      "ms": 160
+    },
+    {
+      "name": "lint",
+      "status": "pass",
+      "ms": 283
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 391,
+      "log": "steps/10-design-system-typecheck.log",
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 11163,
+      "log": "steps/11-design-system-build.log",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "ms": 686
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/application/agency/goal-agenda-regressions.test.ts",
+        "./api/application/agency/goal-agenda.test.ts",
+        "./api/application/agency/goal-autonomy.live.test.ts",
+        "./api/application/agency/goal-capability-selection.test.ts",
+        "./api/application/agency/goal-completion.test.ts",
+        "./api/application/agency/goal-design-documents.test.ts",
+        "./api/application/agency/goal-owner-wait.test.ts",
+        "./api/application/agency/goal-permission.test.ts",
+        "./api/application/agency/goal-progress.test.ts",
+        "./api/application/agency/goal-question-delivery.test.ts",
+        "./api/application/agency/goal-recovery.test.ts",
+        "./api/application/agency/note-documents.test.ts",
+        "./api/application/agency/research-note-persistence.test.ts",
+        "./api/application/app-development/storage-recovery.test.ts",
+        "./api/application/app.test.ts",
+        "./api/application/browser/browser-composition.test.ts",
+        "./api/application/browser/browser-toolchain.test.ts",
+        "./api/application/canvas/canvas-adoption.test.ts",
+        "./api/application/canvas/canvas.test.ts",
+        "./api/application/compute/compute-http.test.ts",
+        "./api/application/knowledge/specialist-guidance.test.ts",
+        "./api/application/markdown/markdown-integration.test.ts",
+        "./api/application/markdown/markdown-registration.test.ts",
+        "./api/application/media/capture-library.test.ts",
+        "./api/application/media/model3d-adapter.test.ts",
+        "./api/application/media/ui-compositions-adapter.test.ts",
+        "./api/application/toolchain/capability-seed.test.ts",
+        "./api/application/work/claude-code-improvements.test.ts",
+        "./api/application/work/claude-code-task-integration.test.ts",
+        "./api/application/work/claude-code-task-recovery.test.ts",
+        "./api/application/work/claude-runners.test.ts",
+        "./api/application/work/goal-supervision.test.ts",
+        "./api/application/work/supervision-conversation-controls.test.ts",
+        "./api/application/work/supervision-design.test.ts",
+        "./api/application/work/supervision-research-skill.test.ts",
+        "./api/application/work/supervision-research.test.ts",
+        "./api/application/work/supervision-through.test.ts",
+        "./api/application/work/tasks-http.test.ts",
+        "./api/application/world/world-acceptance-p3.test.ts",
+        "./api/domains/goals/test/goals.test.ts",
+        "./api/domains/goals/test/steward.test.ts",
+        "./api/domains/markdown/test/archive-research.test.ts",
+        "./api/domains/markdown/test/document-files.test.ts",
+        "./api/domains/markdown/test/generated.test.ts",
+        "./api/domains/markdown/test/library-management.test.ts",
+        "./api/domains/markdown/test/workspace.test.ts",
+        "./api/domains/queue/test/boundaries.test.ts",
+        "./api/domains/queue/test/error-code.test.ts",
+        "./api/domains/queue/test/queue.test.ts",
+        "./api/domains/queue/test/recovery.test.ts",
+        "./api/domains/queue/test/retention.test.ts",
+        "./api/domains/queue/test/sleep.test.ts",
+        "./api/domains/queue/test/writer-overload.test.ts"
+      ],
+      "status": "pass",
+      "ms": 73024,
+      "log": "steps/13-bun-tests.log",
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/markdown/client-library.test.ts",
+        "web/src/domains/markdown/library-management.test.tsx",
+        "web/src/domains/markdown/toolchain-adapter.test.tsx",
+        "web/src/domains/markdown/uploads.test.ts"
+      ],
+      "status": "pass",
+      "ms": 4440,
+      "log": "steps/14-web-tests.log",
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx",
+        "src/components/MarkdownWorkspace/file-browser.test.tsx",
+        "src/components/MarkdownWorkspace/header-delete.test.tsx",
+        "src/components/MarkdownWorkspace/managed-library.test.tsx",
+        "src/components/MarkdownWorkspace/use-cache-autosave.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 7850,
+      "log": "steps/15-design-system-tests.log",
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 104075,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "db63c64160350ec0d1a09ed63669f724652443898ee9c51013b23e17403a9ce8",
+    "distAfterBuild": "872d172d9617a013c07946be28b8059fb80e12c0f2729a45571ee416e22adc7e",
+    "distAfterConsumers": "872d172d9617a013c07946be28b8059fb80e12c0f2729a45571ee416e22adc7e"
+  },
+  "finalRevision": "db63c64160350ec0d1a09ed63669f724652443898ee9c51013b23e17403a9ce8",
+  "finishedAt": "2026-11-23T15:08:43.681Z"
+}

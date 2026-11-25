@@ -12,6 +12,7 @@
       "spec/avatar-view-adjustment-2026-11-07.md"
     ],
     "writablePaths": [],
+    "policyCheckRefs": ["avatar-background-behavior"],
     "checks": [
       {
         "ref": "avatar-background-behavior",

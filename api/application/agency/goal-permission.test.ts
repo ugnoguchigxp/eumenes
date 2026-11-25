@@ -200,9 +200,11 @@ test("one utterance registers and grants once, even on replay, and stale authori
 		expect(slots.slots).toHaveLength(10);
 		expect(slots.workspaces[0].ref).toBe("trial");
 		await verifyGoalListRoute(store, bindReply().list, slots);
-		expect(bindReply("other").list().slots.every(({ goal }) => !goal)).toBe(
-			true,
-		);
+		expect(
+			bindReply("other")
+				.list()
+				.slots.every(({ goal }) => !goal),
+		).toBe(true);
 		const update = {
 			slot: 1,
 			goalId: first.goalId,

@@ -7,12 +7,12 @@
 	},
 	"elements": {
 		"system.alwaysOn": {
-			"chars": 3375,
-			"tokens": 2827
+			"chars": 3373,
+			"tokens": 2833
 		},
 		"system.alwaysOn.Role": {
-			"chars": 1193,
-			"tokens": 989
+			"chars": 1191,
+			"tokens": 995
 		},
 		"system.alwaysOn.Speaking": {
 			"chars": 295,
@@ -31,8 +31,8 @@
 			"tokens": 859
 		},
 		"system.alwaysOnGoal": {
-			"chars": 3716,
-			"tokens": 3039
+			"chars": 3714,
+			"tokens": 3045
 		},
 		"tools.read": {
 			"chars": 2456,
@@ -91,20 +91,20 @@
 			"tokens": 111
 		},
 		"tools.agenda": {
-			"chars": 1323,
-			"tokens": 632
+			"chars": 1357,
+			"tokens": 658
 		},
 		"tool.start_preparation": {
 			"chars": 383,
 			"tokens": 203
 		},
 		"tool.read_note": {
-			"chars": 213,
-			"tokens": 97
+			"chars": 210,
+			"tokens": 94
 		},
 		"tool.show_note": {
-			"chars": 203,
-			"tokens": 87
+			"chars": 240,
+			"tokens": 117
 		},
 		"tool.set_quiet": {
 			"chars": 519,

@@ -1949,10 +1949,10 @@ index 0000000..539027f
 +}
 diff --git a/runtime/agenda/goal-progress-store.ts b/runtime/agenda/goal-progress-store.ts
 new file mode 100644
-index 0000000..791e75c
+index 0000000..0bf7df0
 --- /dev/null
 +++ b/runtime/agenda/goal-progress-store.ts
-@@ -0,0 +1,1751 @@
+@@ -0,0 +1,1764 @@
 +import type { Database } from "bun:sqlite";
 +import {
 +	canResolveGoalQuestion,
@@ -2033,6 +2033,15 @@ index 0000000..791e75c
 +
 +const keyArgs = ({ principal, goalId, goalRevision }: GoalProgressKey) =>
 +	[principal, goalId, goalRevision] as const;
++const goalQuestionRef = (
++	key: GoalProgressKey,
++	{ criterionIds, missing }: Pick<GoalQuestion, "criterionIds" | "missing">,
++) =>
++	contentDigest([
++		keyArgs(key),
++		[...new Set(criterionIds)].sort(),
++		missing.trim(),
++	]);
 +const keyWhere = "principal=? AND goal_id=? AND goal_revision=?";
 +const terminal = (phase: GoalPhase) =>
 +	phase === "completed" || phase === "withdrawn" || phase === "superseded";
@@ -2828,14 +2837,18 @@ index 0000000..791e75c
 +					phase = "waiting";
 +					break;
 +				case "ask": {
-+					const id = contentDigest([
-+						key,
-+						[...new Set(step.criterionIds)].sort(),
-+						step.missing.trim(),
-+					]);
-+					const prior = questions.find((question) => question.ref === id);
-+					if (prior?.answeredBy || prior?.resolution)
++					const id = goalQuestionRef(key, step);
++					const matching = questions.filter(
++						(question) =>
++							!question.owner && goalQuestionRef(key, question) === id,
++					);
++					if (
++						matching.some(
++							(question) => question.answeredBy || question.resolution,
++						)
++					)
 +						return { status: "forbidden" };
++					const prior = matching.at(0);
 +					resultRef = prior?.ref ?? id;
 +					if (!prior)
 +						questions = [
@@ -3706,10 +3719,10 @@ index 0000000..791e75c
 +}
 diff --git a/test/agenda/goal-progress.test.ts b/test/agenda/goal-progress.test.ts
 new file mode 100644
-index 0000000..c312398
+index 0000000..ae64908
 --- /dev/null
 +++ b/test/agenda/goal-progress.test.ts
-@@ -0,0 +1,701 @@
+@@ -0,0 +1,872 @@
 +import { expect, test } from "bun:test";
 +import { mkdtempSync, rmSync } from "node:fs";
 +import { tmpdir } from "node:os";
@@ -3722,7 +3735,10 @@ index 0000000..c312398
 +	type GoalAccess,
 +} from "../../runtime/agenda/index.ts";
 +import { eumenesRoot, hasGoalSource } from "../../runtime/agenda/goal-store.ts";
-+import { validateRegisteredGoalDesign } from "../../runtime/agenda/goal-design.ts";
++import {
++	contentDigest,
++	validateRegisteredGoalDesign,
++} from "../../runtime/agenda/goal-design.ts";
 +
 +const integration = test.skipIf(!hasGoalSource());
 +type Migration = { id: string; sql: string; after?: readonly string[] };
@@ -4067,6 +4083,174 @@ index 0000000..c312398
 +		goalRevision: goal.revision,
 +	};
 +}
++
++integration(
++	"a goal question's identity ignores job and progress changes",
++	async () => {
++		const f = await fixture();
++		const db = f.open();
++		try {
++			const goals = createGoalStore(db, f.service, scopes);
++			const key = await db.write((tx) => register(tx, goals));
++			const ask = (missing: string, question: string) =>
++				db.write((tx) => {
++					const row = goals.progressInTransaction(tx, access, key)!;
++					const contextId = "question:" + row.progressVersion;
++					return goals.applyDecisionInTransaction(
++						tx,
++						access,
++						row,
++						{
++							kind: "ask",
++							contextId,
++							progressVersion: row.progressVersion,
++							criterionIds: ["root"],
++							reason: "比較する資料が必要",
++							missing,
++							question,
++							review: null,
++						},
++						{ nowMs: 20, contextId, current: guard },
++					);
++				});
++			const first = await ask("資料", "どの資料ですか？");
++			if (first.status !== "applied") throw new Error("fixture_goal_question");
++			expect(first.resultRef).toBe(
++				contentDigest([
++					[key.principal, key.goalId, key.goalRevision],
++					["root"],
++					"資料",
++				]),
++			);
++			await db.write((tx) => {
++				const advanced = goals.transitionProgressInTransaction(
++					tx,
++					access,
++					key,
++					first.progress.progressVersion,
++					({ state }) => ({
++						phase: "ready",
++						state: { ...state, problem: "新しい観測" },
++					}),
++				)!;
++				expect(
++					goals.bindGoalJobInTransaction(
++						tx,
++						key,
++						advanced.progressVersion,
++						"next-job",
++					),
++				).toBe(true);
++			});
++			const repeated = await ask(" 資料 ", "どの資料を使いますか？");
++			expect(repeated).toMatchObject({
++				status: "applied",
++				resultRef: first.resultRef,
++				progress: { state: { questions: first.progress.state.questions } },
++			});
++			expect(
++				db.read(
++					(tx) => goals.progressInTransaction(tx, access, key)?.state.questions,
++				),
++			).toEqual(first.progress.state.questions);
++		} finally {
++			await db.close();
++			f.close();
++		}
++	},
++);
++
++for (const disposition of ["pending", "answered", "resolved"] as const)
++	integration(
++		`legacy ${disposition} goal questions keep their issued reference`,
++		async () => {
++			const f = await fixture();
++			const db = f.open();
++			try {
++				const goals = createGoalStore(db, f.service, scopes);
++				const saved = await db.write((tx) => {
++					const key = register(tx, goals);
++					const designed = goals.adoptGoalCriteriaInTransaction(
++						tx,
++						access,
++						key,
++						{
++							expectedVersion: 1,
++							design: { id: "design", digest: "digest" },
++							source: original,
++							criteria: [{ sourceQuote: "所定の結果", text: "結果を照合する" }],
++						},
++					);
++					if (designed.status !== "applied")
++						throw new Error("fixture_goal_design");
++					return goals.transitionProgressInTransaction(
++						tx,
++						access,
++						key,
++						designed.progress.progressVersion,
++						({ state }) => ({
++							phase: "ready",
++							state: {
++								...state,
++								questions: [
++									{
++										ref: "already-issued-reference",
++										criterionIds: ["root.1", "root"],
++										missing: " 資料 ",
++										question: "元の質問です。",
++										...(disposition === "answered" && {
++											answeredBy: "earlier-reply",
++										}),
++										...(disposition === "resolved" && {
++											resolution: {
++												observationRef: "earlier-configuration",
++												contextId: "earlier-context",
++												progressVersion: 1,
++												reason: "資料を確認できた",
++											},
++										}),
++									},
++								],
++							},
++						}),
++					)!;
++				});
++				const repeated = await db.write((tx) =>
++					goals.applyDecisionInTransaction(
++						tx,
++						access,
++						saved,
++						{
++							kind: "ask",
++							contextId: "new-context",
++							progressVersion: saved.progressVersion,
++							criterionIds: ["root", "root.1"],
++							reason: "比較する資料が必要",
++							missing: "資料",
++							question: "言い換えた質問です。",
++							review: null,
++						},
++						{ nowMs: 20, contextId: "new-context", current: guard },
++					),
++				);
++				if (disposition === "pending")
++					expect(repeated).toMatchObject({
++						status: "applied",
++						resultRef: "already-issued-reference",
++					});
++				else expect(repeated).toEqual({ status: "forbidden" });
++				expect(
++					db.read(
++						(tx) =>
++							goals.progressInTransaction(tx, access, saved)?.state.questions,
++					),
++				).toEqual(saved.state.questions);
++			} finally {
++				await db.close();
++				f.close();
++			}
++		},
++	);
 +
 +integration(
 +	"old rows keep their mock owner and real progress uses the Goals ledger scope",
