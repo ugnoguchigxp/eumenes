@@ -13,6 +13,8 @@ import {
 } from "../../domains/kanban";
 import type { DomainAdapter } from "../../domains/tool-runtime";
 
+export const ordinaryClaudeWorkspaceRef = "eumenes";
+
 export function describeClaudeCodeTaskAdapter() {
 	return {
 		owner: "claude-code",

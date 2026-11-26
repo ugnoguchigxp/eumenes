@@ -61,7 +61,7 @@
 | `audio` | 0 | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
 | `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | `web/src/domains/scheduler/` | なし | `queue` | なし | なし |
-| `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | `resources` | なし |
+| `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
 | `pursuit` | 3 | `api/domains/pursuit/index.ts` | なし | なし | `capabilities`、`resources`、`tool-runtime` | なし | なし |
 | `development-supervision` | 3 | `api/domains/development-supervision/index.ts` | なし | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
 | `claude-code` | 3 | `api/domains/claude-code/index.ts` | なし | なし | `capabilities`、`coding`、`inference`、`queue`、`tool-runtime` | なし | なし |

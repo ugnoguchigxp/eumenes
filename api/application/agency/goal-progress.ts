@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import type { LlmPort } from "eumenes-agency";
-import { decideGoalStep } from "eumenes-agency/agenda";
 import type {
 	GoalAccess,
 	GoalAttempt,
@@ -10,15 +9,12 @@ import type {
 	GoalProgressKey,
 	GoalStore,
 } from "eumenes-agency/agenda/runtime";
-import { z } from "zod";
-import type { HandlerDefinition, QueueService } from "../../domains/queue";
+import { type Ledger } from "eumenes-thought-plan";
+import type { QueueService } from "../../domains/queue";
 import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
-	continueAfterDesignFailure,
-	invalidGoalCriterionQuote,
 	resumeLegacyDesignFailure,
-	type AdvanceGoalProgress,
 	type Designed,
 	type GoalDesignPreparation,
 } from "./goal-design-documents";
@@ -27,30 +23,34 @@ import {
 	createGoalReceipts,
 	goalHasParkedWork,
 	goalTerminal,
-	goalPollMs,
-	goalSlotBusy,
 	slotTurnByPriority,
 } from "./goal-receipts";
 import {
 	goalAccess,
 	goalDigest,
-	goalEditAvailabilityWatch,
 	prepareGoalSnapshot,
 	type GoalCheckCandidate,
 	type GoalSurface,
 } from "./goal-progress-context";
+import {
+	cycleOf,
+	deliberateGoal,
+	parkDelayMs,
+	withCycle,
+} from "./goal-deliberation";
+
+import {
+	createGoalAdvanceHandler,
+	GOAL_ADVANCE_KIND,
+	type Payload,
+	type CheckOutcome,
+} from "./goal-advance-handler";
+
+export { GOAL_ADVANCE_KIND } from "./goal-advance-handler";
 
 const log = getLogger("agency");
 
-export const GOAL_ADVANCE_KIND = "agency.goal.advance";
 const scope = "agency-goals";
-const payloadSchema = z.strictObject({
-	principal: z.string().min(1),
-	goalId: z.string().min(1),
-	goalRevision: z.number().int().positive(),
-	progressVersion: z.number().int().positive(),
-});
-type Payload = z.infer<typeof payloadSchema>;
 export type OwnerResult =
 	| { status: "unknown" | "absent" }
 	| { status: "refused"; reason: string }
@@ -72,6 +72,7 @@ export interface GoalOwnerPort {
 		progress: GoalProgress,
 		attempt: GoalAttempt,
 	): boolean;
+	readonly answerWhileRunning?: true;
 	answerInTransaction?(
 		db: Database,
 		progress: GoalProgress,
@@ -81,24 +82,6 @@ export interface GoalOwnerPort {
 	): void;
 	wake(): void;
 }
-type Snapshot = ReturnType<typeof prepareGoalSnapshot>;
-type Selected = Extract<
-	Awaited<ReturnType<typeof decideGoalStep>>,
-	{ status: "chosen" }
->;
-type VerifyInput = Parameters<GoalStore["recordGoalChecksInTransaction"]>[3];
-type CheckOutcome = VerifyInput["checks"];
-type Prepared =
-	| { kind: "decide"; snapshot: Snapshot }
-	| { kind: "design"; preparation: GoalDesignPreparation }
-	| { kind: "verify"; verify: (signal: AbortSignal) => Promise<CheckOutcome> }
-	| { kind: "receipt" | "wake" | "unavailable" | "suspended" | "recheck" };
-type Result =
-	| { kind: "decide"; selected: Selected }
-	| { kind: "design"; designed: Designed }
-	| { kind: "verify"; checks: CheckOutcome }
-	| { kind: "receipt" | "wake" | "unavailable" | "suspended" | "recheck" };
-
 export interface GoalProgressPorts {
 	readonly store: SqliteStore;
 	readonly goals: GoalStore;
@@ -133,7 +116,7 @@ export interface GoalProgressPorts {
 	readonly verify?: (
 		db: Database,
 		progress: GoalProgress,
-	) => Extract<Prepared, { kind: "verify" }>["verify"] | null;
+	) => ((signal: AbortSignal) => Promise<CheckOutcome>) | null;
 	readonly staleVerificationEvidence?: (
 		db: Database,
 		progress: GoalProgress,
@@ -159,6 +142,15 @@ export interface GoalProgressPorts {
 	readonly report?: (progress: GoalProgress) => string;
 	readonly legacyAccess?: GoalAccess;
 	readonly nowMs?: () => number;
+	/** Where each turn's thought plan records its stages (the host's SQLite); off when absent. */
+	readonly thoughtLedger?: Ledger;
+	/**
+	 * null while the host is idle (nobody is being served in the foreground and the last foreground request
+	 * ended long enough ago); otherwise when idling can begin. A goal thinks only while the host is idle.
+	 */
+	readonly idleUntil?: () => number | null;
+	/** One turn of thinking; the thought plan (`deliberateGoal`) unless a test supplies its own. */
+	readonly deliberate?: typeof deliberateGoal;
 }
 
 export function createGoalProgress(ports: GoalProgressPorts) {
@@ -286,8 +278,14 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 			row,
 			(current) => ({
 				phase: "waiting",
+				// Looked at again later even if nothing changes: 1 hour, then twice as long each time, up to 24 hours.
+				dueAtMs: now() + parkDelayMs(cycleOf(current).parks),
 				state: {
-					...current.state,
+					...withCycle(current.state, {
+						...cycleOf(current),
+						parks: cycleOf(current).parks + 1,
+						pending: null,
+					}),
 					problem: note,
 					next: null,
 					watch: {
@@ -443,350 +441,4 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 				: "stale";
 		},
 	};
-}
-
-type GoalAdvanceOps = {
-	advance: AdvanceGoalProgress;
-	claimRow: (db: Database, key: Payload, jobId: string) => GoalProgress | null;
-	finishReceipt: (db: Database, row: GoalProgress, jobId: string) => void;
-	pendingParkedReceipt: (db: Database, row: GoalProgress) => GoalAttempt | null;
-	now: () => number;
-	problem: (
-		db: Database,
-		row: GoalProgress,
-		note: string,
-		jobId: string,
-	) => void;
-	retryReceipt: (db: Database, row: GoalProgress, jobId: string) => void;
-	scopeAllowed: (db: Database, row: GoalProgress) => boolean;
-	snapshot: (db: Database, row: GoalProgress) => Snapshot | undefined;
-	stopped: (db: Database, row: GoalProgress) => boolean;
-	slotTurn: (db: Database, row: GoalProgress) => boolean;
-	submit: (db: Database, row: GoalProgress, jobId?: string) => void;
-	wake: () => void;
-};
-
-function prepareGoalAdvance(
-	ports: GoalProgressPorts,
-	ops: Pick<
-		GoalAdvanceOps,
-		| "claimRow"
-		| "pendingParkedReceipt"
-		| "stopped"
-		| "scopeAllowed"
-		| "snapshot"
-	>,
-	db: Database,
-	claim: { payload: Payload; jobId: string },
-): ReturnType<
-	HandlerDefinition<Payload, Prepared, Result>["prepareInTransaction"]
-> {
-	const { claimRow, pendingParkedReceipt, stopped, scopeAllowed, snapshot } =
-		ops;
-	const { goals } = ports;
-	const row = claimRow(db, claim.payload, claim.jobId);
-	if (!row) return { status: "stale", reason: "goal_snapshot_old" };
-	if (
-		(row.currentWorkId &&
-			(goalTerminal(row) ||
-				row.phase === "dispatch" ||
-				row.phase === "observing")) ||
-		pendingParkedReceipt(db, row)
-	)
-		return { status: "ready", input: { kind: "receipt" } };
-	if (stopped(db, row))
-		return { status: "ready", input: { kind: "suspended" } };
-	if (!scopeAllowed(db, row)) {
-		goals.clearGoalJobInTransaction(db, row, claim.jobId);
-		return { status: "stale", reason: "goal_scope_inactive" };
-	}
-	if (row.phase === "waiting")
-		return { status: "ready", input: { kind: "wake" } };
-	const stale = ports.staleVerificationEvidence?.(db, row);
-	if (stale?.size) return { status: "ready", input: { kind: "recheck" } };
-	if (row.phase === "verifying") {
-		const verify = ports.verify?.(db, row);
-		return {
-			status: "ready",
-			input: verify ? { kind: "verify", verify } : { kind: "unavailable" },
-		};
-	}
-	if (row.phase !== "ready")
-		return { status: "stale", reason: "goal_not_ready" };
-	if (!row.state.design) {
-		const preparation = ports.prepareDesign?.(db, row);
-		if (preparation)
-			return { status: "ready", input: { kind: "design", preparation } };
-	}
-	const prepared = snapshot(db, row);
-	return prepared
-		? { status: "ready", input: { kind: "decide", snapshot: prepared } }
-		: { status: "stale", reason: "goal_not_current" };
-}
-
-function createGoalAdvanceHandler(
-	ports: GoalProgressPorts,
-	ops: GoalAdvanceOps,
-): HandlerDefinition<Payload, Prepared, Result> {
-	const { goals } = ports;
-	const {
-		advance,
-		claimRow,
-		finishReceipt,
-		pendingParkedReceipt,
-		now,
-		problem,
-		retryReceipt,
-		scopeAllowed,
-		snapshot,
-		stopped,
-		slotTurn,
-		submit,
-		wake,
-	} = ops;
-	return {
-		kind: GOAL_ADVANCE_KIND,
-		payloadVersions: [1],
-		schema: payloadSchema,
-		recovery: "replay_safe",
-		prepareInTransaction: (db, claim) =>
-			prepareGoalAdvance(ports, ops, db, claim),
-		execute: (input, { signal }) => executeGoalAdvance(ports, input, signal),
-		classify: (error) =>
-			error instanceof Error && error.message === invalidGoalCriterionQuote
-				? "fail"
-				: "retry",
-		settleInTransaction(db, claim, input, settled) {
-			const row = claimRow(db, claim.payload, claim.jobId);
-			if (!row) return "stale";
-			if (settled.type === "retry") return "applied";
-			goals.clearGoalJobInTransaction(db, row, claim.jobId);
-			if (settled.type !== "success") {
-				const reason =
-					settled.type === "expired"
-						? "goal_decision_expired"
-						: settled.errorCode;
-				if (row.currentWorkId || pendingParkedReceipt(db, row))
-					retryReceipt(db, row, claim.jobId);
-				else if (input?.kind === "design") {
-					if (!scopeAllowed(db, row)) return "stale";
-					continueAfterDesignFailure(
-						advance,
-						db,
-						row,
-						reason,
-						input.preparation,
-						claim.jobId,
-					);
-				} else problem(db, row, reason, claim.jobId);
-				return "applied";
-			}
-			const result = settled.result;
-			if (result.kind === "receipt") {
-				finishReceipt(db, row, claim.jobId);
-				return "applied";
-			}
-			if (result.kind === "suspended" || stopped(db, row)) {
-				advance(
-					db,
-					row,
-					(current) => ({
-						phase: current.phase,
-						state: current.state,
-						dueAtMs: current.dueAtMs,
-					}),
-					claim.jobId,
-				);
-				return "applied";
-			}
-			if (!scopeAllowed(db, row)) return "stale";
-			const access = goalAccess(row);
-			if (result.kind === "recheck") {
-				const stale =
-					ports.staleVerificationEvidence?.(db, row) ?? new Set<string>();
-				advance(
-					db,
-					row,
-					(current) => ({
-						phase: "ready",
-						state: {
-							...current.state,
-							next: null,
-							criteria: current.state.criteria.map((criterion) =>
-								criterion.evidenceRefs.some((ref) => stale.has(ref))
-									? {
-											...criterion,
-											status: "open",
-											evidenceRefs: [],
-										}
-									: criterion,
-							),
-						},
-					}),
-					claim.jobId,
-				);
-			} else if (result.kind === "wake") {
-				advance(
-					db,
-					row,
-					(current) => ({
-						phase: "ready",
-						state: { ...current.state, watch: null, next: null },
-					}),
-					claim.jobId,
-				);
-			} else if (result.kind === "design") {
-				const designed = result.designed;
-				if ("blocked" in designed) {
-					continueAfterDesignFailure(
-						advance,
-						db,
-						row,
-						designed.blocked,
-						input?.kind === "design" ? input.preparation : null,
-						claim.jobId,
-					);
-				} else {
-					const saved = goals.adoptGoalCriteriaInTransaction(db, access, row, {
-						...designed,
-						expectedVersion: row.progressVersion,
-					});
-					if (saved.status === "applied") {
-						ports.saveDesign?.(db, saved.progress, designed);
-						submit(db, saved.progress, claim.jobId);
-					} else problem(db, row, "goal_design_conflict", claim.jobId);
-				}
-			} else if (result.kind === "verify") {
-				const current = (tx: Database, progress: GoalProgress) =>
-					ports.verificationCurrent?.(tx, progress, result.checks) === true;
-				const finished = goals.recordGoalChecksInTransaction(db, access, row, {
-					expectedVersion: row.progressVersion,
-					checks: result.checks,
-					current,
-				});
-				if (!finished)
-					problem(db, row, "goal_verification_unavailable", claim.jobId);
-				else if (
-					finished.state.criteria.every(({ status }) => status === "passed")
-				) {
-					const complete = goals.completeInTransaction(db, access, row, {
-						expectedVersion: finished.progressVersion,
-						current,
-						text:
-							ports.report?.(finished) ??
-							finished.state.criteria.map(({ text }) => text).join("\n"),
-					});
-					if (complete.status !== "applied")
-						throw new Error("goal_completion_conflict");
-				} else submit(db, finished, claim.jobId);
-			} else if (result.kind === "decide" && input?.kind === "decide") {
-				const current = snapshot(db, row);
-				if (
-					!current ||
-					current.context.contextId !== input.snapshot.context.contextId
-				) {
-					advance(
-						db,
-						row,
-						(latest) => ({ phase: "ready", state: latest.state }),
-						claim.jobId,
-					);
-					return "stale";
-				}
-				const step = result.selected.step;
-				const capability =
-					step.kind === "act" &&
-					current.capabilities.find(({ ref }) => ref === step.capabilityRef);
-				const watch =
-					step.kind === "wait" &&
-					current.watches.find(({ ref }) => ref === step.watchRef);
-				const retryWhileAsking =
-					step.kind === "ask"
-						? current.watches.find(
-								({ ref }) => ref === goalEditAvailabilityWatch,
-							)
-						: undefined;
-				const accepted =
-					step.kind === "act" && !slotTurn(db, row)
-						? ({ status: "busy" } as const)
-						: goals.applyDecisionInTransaction(db, access, row, step, {
-								nowMs: now(),
-								contextId: current.context.contextId,
-								current: () => true,
-								...(capability
-									? {
-											act: {
-												owner: capability.owner,
-												bindingRevisionId: capability.bindingRevisionId,
-												permitId: capability.permitId,
-												permitRevision: capability.permitRevision,
-												operationRef: capability.operationRef,
-											},
-										}
-									: {}),
-								...(watch ? { watch } : {}),
-								...(retryWhileAsking ? { retryWhileAsking } : {}),
-								...(step.kind === "ask" && {
-									questionSources: current.input.sources,
-								}),
-								...(current.context.configuration && {
-									configurationRef: current.context.configuration.ref,
-								}),
-								canProceedWhileAsking:
-									current.capabilities.length > 0 &&
-									current.context.criteria.some(
-										({ id, status }) =>
-											status === "open" && !step.criterionIds.includes(id),
-									),
-							});
-				if (accepted.status === "applied")
-					submit(db, accepted.progress, claim.jobId);
-				else if (accepted.status === "busy")
-					advance(
-						db,
-						row,
-						(latest) => ({
-							phase: "waiting",
-							dueAtMs: now() + goalPollMs,
-							state: {
-								...latest.state,
-								next: step,
-								problem: goalSlotBusy,
-							},
-						}),
-						claim.jobId,
-					);
-				else if (accepted.status !== "replayed")
-					problem(db, row, "goal_decision_" + accepted.status, claim.jobId);
-			} else problem(db, row, "goal_worker_unavailable", claim.jobId);
-			return "applied";
-		},
-		afterCommit: wake,
-		cancelInTransaction(db, job) {
-			goals.clearGoalJobInTransaction(db, job.payload, job.jobId);
-		},
-	};
-}
-
-async function executeGoalAdvance(
-	ports: GoalProgressPorts,
-	input: Prepared,
-	signal: AbortSignal,
-): Promise<Result> {
-	if (input.kind === "decide") {
-		const { context, input: sources } = input.snapshot;
-		const selected = await decideGoalStep(
-			ports.llm(context.progressVersion),
-			context,
-			sources,
-			signal,
-		);
-		if (selected.status === "invalid") throw new Error(selected.reason);
-		return { kind: "decide", selected };
-	}
-	if (input.kind === "design")
-		return { kind: "design", designed: await input.preparation.run(signal) };
-	if (input.kind === "verify")
-		return { kind: "verify", checks: await input.verify(signal) };
-	return input;
 }

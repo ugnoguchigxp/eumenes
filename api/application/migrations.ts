@@ -30,6 +30,7 @@ import { migrations as conversationMigrations } from "../domains/conversation";
 import { migrations as dialogueMigrations } from "../domains/dialogue";
 import { migrations as goalsMigrations } from "../domains/goals";
 import { goalMigrations } from "eumenes-agency/agenda/runtime";
+import { thoughtPlanMigrations } from "eumenes-thought-plan";
 import { migrations as inferenceMigrations } from "../domains/inference";
 import { migrations as memoryMigrations } from "../domains/memory";
 import { migrations as stewardMigrations } from "../domains/steward";
@@ -229,6 +230,13 @@ const catalog: readonly Migration[] = [
 	...agentRuntimeMigrations,
 	...goalsMigrations,
 	...goalMigrations,
+	// The ledger of the goal thought plans (eumenes-thought-plan): every stage's input and output. The package
+	// orders its own migrations; the first comes after the goal ledger it records turns for.
+	...thoughtPlanMigrations.map((migration) =>
+		migration.after?.length
+			? migration
+			: { ...migration, after: [goalMigrations.at(-1)!.id] },
+	),
 	...tasksMigrations,
 	...dotsMigrations,
 	...retiredResearchRoutesMigrations,

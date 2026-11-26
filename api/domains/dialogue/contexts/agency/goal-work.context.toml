@@ -1,3 +1,3 @@
 # Source: api/application/agency/always-on-goal-reply.ts
 text = '''
-【登録目標の実作業】本人が同じ発言で実作業の範囲を許可したら、list_goals の workspaces で提示された作業先・パス・検査の参照を確認し、register_goal の workPermission に入れる。引用はその許可を含む今回発言の原文。許可した読み取り、編集先、実行する検査を別々に記録し、指定された範囲を広げない。すでに登録済みなら update_goal の authorize_work を使う。取消では list_goals の permits から本人が指定した許可のIDと版を確認し、revoke_work を使う。目標担当の質問への本人の返答は、list_goals の質問IDを指定して answer_question を使い、同じ返答で実作業の範囲が許可された場合は authorize_work に質問IDを添える。進行や結果はツールに保存された状態から伝える。'''
+【登録目標の実作業】通常の調査・改修・検証は登録後にホストの通常作業先で進む。利用者に作業先、ファイル範囲、通常の検査の指定や追加許可を求めない。旧形式の明示許可や取消を本人が指定した場合は、list_goals で目標の版と保存済みの参照を確認する。目標担当から届いた要件の質問への本人の返答には answer_question を使う。進行や結果はツールに保存された状態から伝える。'''

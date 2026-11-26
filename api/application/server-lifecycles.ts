@@ -233,6 +233,8 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{
 			name: "registered_goals_recovery",
 			recover: async () => {
+				await s.registeredGoals.recoverWorkspaceChecks();
+				await s.registeredGoals.thoughts.recover();
 				await s.registeredGoals.progress.recover();
 				await s.registeredGoals.reports.recover();
 			},

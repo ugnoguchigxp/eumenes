@@ -220,7 +220,12 @@ export function createGoalReceipts(
 		const answerText =
 			answer?.answeredBy && ports.sourceText?.(db, answer.answeredBy);
 		const canAnswer =
-			answer?.owner?.released && answer.owner.expiresAtMs > now() && answerText;
+			answer?.owner &&
+			answer.owner.expiresAtMs > now() &&
+			answerText &&
+			(answer.owner.released ||
+				(owner?.answerWhileRunning &&
+					row.currentWorkId === answer.owner.attemptId));
 		if (!permit || !owner || (!row.currentWorkId && !canAnswer)) {
 			if (!owner || !owner.cancelInTransaction(db, row, attempt)) {
 				retryReceipt(db, row, claimId);
@@ -251,15 +256,18 @@ export function createGoalReceipts(
 					)
 						return;
 				}
-				const admission = slotTurn(db, row)
-					? goals.admitGoalAnswerInTransaction(
-							db,
-							access,
-							row,
-							attempt.id,
-							answer.ref,
-						)
-					: "busy";
+				const alreadyHolding =
+					answer.owner?.released === false && row.currentWorkId === attempt.id;
+				const admission =
+					alreadyHolding || slotTurn(db, row)
+						? goals.admitGoalAnswerInTransaction(
+								db,
+								access,
+								row,
+								attempt.id,
+								answer.ref,
+							)
+						: "busy";
 				if (admission === "ready") {
 					owner.answerInTransaction(db, row, attempt, permit, {
 						ref: answer.ref,

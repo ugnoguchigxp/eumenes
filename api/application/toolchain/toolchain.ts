@@ -149,6 +149,7 @@ type ToolchainOptions = {
 	 */
 	webNote?: Pick<WebNoteDeps, "turn" | "record" | "inspectSource">;
 	claudeRunner?: ClaudeRunner;
+	claudeProtectedPaths?: readonly string[];
 	goalClaudeRunners?: ReadonlyMap<string, ClaudeRunner>;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
@@ -422,11 +423,7 @@ export async function createToolchain(
 					}),
 				]
 			: []),
-		...(options.timers
-			? [
-					createTimerAdapter(options.timers),
-				]
-			: []),
+		...(options.timers ? [createTimerAdapter(options.timers)] : []),
 		...(options.settings
 			? [
 					createUsageAdapter(options.settings),
@@ -466,6 +463,7 @@ export async function createToolchain(
 		runner: options.claudeRunner,
 		goalRunners: options.goalClaudeRunners,
 		root: process.cwd(),
+		protectedPaths: options.claudeProtectedPaths,
 	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(

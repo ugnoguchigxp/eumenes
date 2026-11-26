@@ -7,10 +7,12 @@ import type {
 	ExecutionView,
 	OwnedExecutionView,
 	GoalSupervisedExecutionSource,
+	GoalExecutionSource,
 	TaskLifecyclePort,
 	OwnedSupervisedExecutionSource,
 } from "../tool-runtime";
 import type { Database } from "bun:sqlite";
+import type { GoalTaskView } from "./goal-task";
 
 export const adapterRef = "adapter:claude-code-task@1";
 export const questionAnswer = z.string().trim().min(1).max(2_000);
@@ -168,7 +170,7 @@ export type SupervisedView = {
 
 export type Work = {
 	id: string;
-	source: ExecutionSource | GoalSupervisedExecutionSource;
+	source: ExecutionSource | GoalSupervisedExecutionSource | GoalExecutionSource;
 	binding: string;
 	request: string;
 	references: Parameters<
@@ -249,6 +251,17 @@ export type Host = Pick<
 	validSourceInTransaction(db: Database, source: ExecutionSource): boolean;
 	deliverInTransaction(db: Database, view: ExecutionView, id: string): boolean;
 	revokeInTransaction(db: Database, eventId: string): void;
+	goal?: {
+		observeInTransaction?(
+			db: Database,
+			source: GoalExecutionSource,
+			work: GoalTaskView,
+		): void;
+		modeInTransaction(
+			db: Database,
+			source: GoalExecutionSource,
+		): Work["mode"] | null;
+	};
 	supervised?: {
 		authorizeInTransaction(
 			db: Database,

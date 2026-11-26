@@ -7,7 +7,7 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { Notice } from "../../domains/dialogue/contracts";
 import { createKanbanSdkHost } from "../work/kanban-sdk-host";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { createShell } from "../../domains/shell";
 import { reportShellRuns } from "../shell/shell-reports";
@@ -216,6 +216,8 @@ export async function createHostToolchain(
 			kanban,
 			kanbanSdk: sdkHost,
 			claudeRunner: s.claudeRunner,
+			claudeProtectedPaths:
+				s.dbPath && s.dbPath !== ":memory:" ? [dirname(resolve(s.dbPath))] : [],
 			goalClaudeRunners: s.goalClaudeRunners,
 			webResearch: s.webResearchEnabled,
 			...(s.webNote ? { webNote: s.webNote } : {}),

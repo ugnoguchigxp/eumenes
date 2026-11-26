@@ -1259,16 +1259,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "【登録目標の実作業】本人が同じ発言で実作業の範囲を許可したら、list_goals の workspaces で提示された作業先・パス・検査の参照を確認し、register_goal の workPermission に入れる。引用はその許可を含む今回発言の原文。許可した読み取り、編集先、実行する検査を別々に記録し、指定された範囲を広げない。すでに登録済みなら update_goal の authorize_work を使う。取消では list_goals の permits から本人が指定した許可のIDと版を確認し、revoke_work を使う。目標担当の質問への本人の返答は、list_goals の質問IDを指定して answer_question を使い、同じ返答で実作業の範囲が許可された場合は authorize_work に質問IDを添える。進行や結果はツールに保存された状態から伝える。"
+                  "value": "【登録目標の実作業】通常の調査・改修・検証は登録後にホストの通常作業先で進む。利用者に作業先、ファイル範囲、通常の検査の指定や追加許可を求めない。旧形式の明示許可や取消を本人が指定した場合は、list_goals で目標の版と保存済みの参照を確認する。目標担当から届いた要件の質問への本人の返答には answer_question を使う。進行や結果はツールに保存された状態から伝える。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:1e57eb599d659643dadbf76c5f1c30d990572ab380a0defdde7ab9cc5256d475"
+          "artifactHash": "sha256:7283cbce300e8c17bf1df744dc1920d64fa7f3323df70d35928b8577b5cde1a0"
         }
       },
-      "definitionHash": "sha256:eaa0663d9d3d6e8e3d51ee6f315acf189cec8b3e9bda375b5f9499b6753df141",
-      "releaseDigest": "sha256:24917fde11335f50ec9e5bce9587e34c288c44bcdc77420d95364b514d042374"
+      "definitionHash": "sha256:b36ca2a178ac13b7af1a8f8b081d454e86e3c7a6b06d6e6420b3f8abfc48a99c",
+      "releaseDigest": "sha256:0cfeab57014e6994dc28d6d05eddd4eeb6d8d50241ce1cd7589697e046d0cbca"
     },
     "dialogue.contexts.agency.interests": {
       "key": "dialogue.contexts.agency.interests",
@@ -3467,5 +3467,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:942c45f283ca76ee599b71005b4ddf260236251f8da486b9a1000379d9c0c52e"
+  "catalogDigest": "sha256:c2949eea51e314886a9a2990f504fa7c06bb5ebc87cc76cfbb28281211ae3a72"
 }

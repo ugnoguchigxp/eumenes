@@ -1,4 +1,7 @@
-import { claudeWorkspace } from "../work/claude-code-task-adapter";
+import {
+	claudeWorkspace,
+	ordinaryClaudeWorkspaceRef,
+} from "../work/claude-code-task-adapter";
 import { pipelineContract } from "../pipelines/pipeline-contract";
 import { adoptTaskResources } from "./task-execution-resources";
 import {
@@ -186,7 +189,7 @@ function configureClaudeCode(
 ) {
 	const claude = host.claudeCode;
 	claude?.configure({
-		workspace: claudeWorkspace("eumenes", {
+		workspace: claudeWorkspace(ordinaryClaudeWorkspaceRef, {
 			parallel: !!host.developmentSupervision,
 		}),
 		...(host.claudeWorkspaceRefs

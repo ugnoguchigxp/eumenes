@@ -1,0 +1,170 @@
+diff --git a/package.json b/package.json
+index c58b051..94a1ee9 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+ 	"name": "eumenes-agency",
+-	"version": "0.1.14",
++	"version": "0.1.15",
+ 	"private": true,
+ 	"license": "MIT",
+ 	"type": "module",
+diff --git a/runtime/agenda/goal-permits.ts b/runtime/agenda/goal-permits.ts
+index 870160b..a6531be 100644
+--- a/runtime/agenda/goal-permits.ts
++++ b/runtime/agenda/goal-permits.ts
+@@ -52,7 +52,8 @@ export function decodePermit({
+ 	...row
+ }: PermitRow): GoalPermit {
+ 	const scope = JSON.parse(scopeJson) as GoalPermitScope;
+-	if (scope.version !== 1) throw new Error("goal_permit_version_unknown");
++	if (scope.version !== 1 && scope.version !== 2)
++		throw new Error("goal_permit_version_unknown");
+ 	return {
+ 		...row,
+ 		scope,
+@@ -86,6 +87,16 @@ export function permitForOperation(
+ }
+ 
+ export function normalizedPermitScope(scope: GoalPermitScope): GoalPermitScope {
++	if (scope.version === 2)
++		return {
++			version: 2,
++			basis: { kind: "policy", revision: scope.basis.revision },
++			workspaceRef: scope.workspaceRef,
++			readablePaths: [],
++			writablePaths: [],
++			checks: [],
++			expiresAtMs: scope.expiresAtMs,
++		};
+ 	const sorted = (values: readonly string[]) => [...new Set(values)].sort();
+ 	return {
+ 		version: 1,
+@@ -178,22 +189,40 @@ export function matchesPolicy(permit: GoalPermit, policy: GoalReadPolicyGrant) {
+ 	);
+ }
+ 
+-export function applyReadPolicy(
++export function applyGoalPolicy(
+ 	db: Database,
+ 	row: GoalProgress,
+ 	policy: GoalReadPolicyGrant,
+ ) {
++	const workspace = policy.scope.version === 2;
+ 	if (
+ 		!policy.policyKey ||
+ 		!policy.policyGeneration ||
+ 		policy.scope.basis.kind !== "policy" ||
+ 		policy.scope.writablePaths.length ||
+-		policy.impact !== "read"
++		policy.impact !== (workspace ? "workspace" : "read") ||
++		(workspace &&
++			(policy.scope.readablePaths.length ||
++				policy.scope.checks.length ||
++				policy.scope.baselineCommit !== undefined))
+ 	)
+-		throw new Error("goal_policy_read_required");
+-	const matches = readGoalPermits(db, row).filter((permit) =>
+-		matchesPolicy(permit, policy),
+-	);
++		throw new Error("goal_policy_scope_invalid");
++	const permits = readGoalPermits(db, row);
++	const matches = permits.filter((permit) => matchesPolicy(permit, policy));
++	if (
++		workspace &&
++		permits.some(
++			(permit) =>
++				(permit.scope.basis.kind === "message" &&
++					(!permit.revoked || permit.revocationReason === "user")) ||
++				(permit.workspace === policy.workspace &&
++					permit.revocationReason === "user"),
++		)
++	) {
++		const active = matches.find((permit) => !permit.revoked);
++		if (active) revokeGoalPermit(db, active, "configuration");
++		return { status: "suppressed" } as const;
++	}
+ 	const current = matches.find((permit) => !permit.revoked);
+ 	if (current?.policyGeneration === policy.policyGeneration) {
+ 		if (permitSpec(current) !== permitSpec(policy))
+diff --git a/runtime/agenda/goal-progress-contracts.ts b/runtime/agenda/goal-progress-contracts.ts
+index 539027f..1dde39f 100644
+--- a/runtime/agenda/goal-progress-contracts.ts
++++ b/runtime/agenda/goal-progress-contracts.ts
+@@ -151,7 +151,9 @@ export interface GoalCheckAuthorization {
+ 	readonly expectationDigest?: string;
+ }
+ 
+-export interface GoalPermitScope {
++export type GoalPermitScope = FileGoalPermitScope | WorkspaceGoalPermitScope;
++
++interface FileGoalPermitScope {
+ 	readonly version: 1;
+ 	readonly basis:
+ 		| { readonly kind: "message"; readonly sourceRefs: readonly string[] }
+@@ -165,6 +167,19 @@ export interface GoalPermitScope {
+ 	readonly limits?: Readonly<Record<string, number>>;
+ }
+ 
++/** Authority over the host's ordinary working directory, with the runner's ordinary tool rules. */
++interface WorkspaceGoalPermitScope {
++	readonly version: 2;
++	readonly basis: { readonly kind: "policy"; readonly revision: string };
++	readonly workspaceRef: string;
++	readonly baselineCommit?: never;
++	readonly readablePaths: readonly [];
++	readonly writablePaths: readonly [];
++	readonly checks: readonly [];
++	readonly expiresAtMs: number | null;
++	readonly limits?: Readonly<Record<string, number>>;
++}
++
+ export interface GoalPermit extends GoalProgressKey {
+ 	readonly id: string;
+ 	readonly revision: number;
+diff --git a/runtime/agenda/goal-progress-store.ts b/runtime/agenda/goal-progress-store.ts
+index 0bf7df0..30813a7 100644
+--- a/runtime/agenda/goal-progress-store.ts
++++ b/runtime/agenda/goal-progress-store.ts
+@@ -27,7 +27,7 @@ import type {
+ } from "./goal-progress-contracts.ts";
+ import type { GoalAccess, GoalSource, StoredGoal } from "./goal-store.ts";
+ import {
+-	applyReadPolicy,
++	applyGoalPolicy,
+ 	insertGoalPermit,
+ 	matchesPolicy,
+ 	permitForOperation,
+@@ -620,8 +620,9 @@ export function createGoalProgressStore(owners: {
+ 			if (!progress) throw new Error("goal_state_conflict");
+ 			const prior = permitForOperation(db, key.principal, grant.operationKey);
+ 			if (
+-				grant.scope.basis.kind === "policy" &&
+-				grant.scope.writablePaths.length
++				grant.scope.version !== 1 ||
++				(grant.scope.basis.kind === "policy" &&
++					grant.scope.writablePaths.length)
+ 			)
+ 				throw new Error("goal_policy_write_forbidden");
+ 			if (prior) {
+@@ -665,7 +666,9 @@ export function createGoalProgressStore(owners: {
+ 		) {
+ 			const progress = active(db, access, key);
+ 			if (!progress) return { status: "stale" as const };
+-			const result = applyReadPolicy(db, progress, policy);
++			if (policy.scope.version !== 1)
++				throw new Error("goal_policy_read_required");
++			const result = applyGoalPolicy(db, progress, policy);
+ 			if (result.status !== "applied") return { ...result, progress };
+ 			const advanced = advance(db, progress, {
+ 				phase: progress.currentWorkId
+@@ -706,7 +709,7 @@ export function createGoalProgressStore(owners: {
+ 					revokeGoalPermit(db, existing, "configuration");
+ 			}
+ 			for (const policy of configuration.policies)
+-				applyReadPolicy(db, progress, policy);
++				applyGoalPolicy(db, progress, policy);
+ 			const phase =
+ 				progress.currentWorkId || progress.phase === "verifying"
+ 					? progress.phase

@@ -72,3 +72,88 @@ test("Display v12 upgrades v9 immutably and reimports idempotently", async () =>
 		await h.close();
 	}
 });
+
+test("Display saves different Live2D colours through the published settings action and resets to the default", async () => {
+	const h = await workersSettingsFixture();
+	try {
+		const bundle = JSON.parse(
+			readFileSync(
+				new URL(
+					"../../domains/capabilities/bundles/settings.spatial.bundle.json",
+					import.meta.url,
+				),
+				"utf8",
+			),
+		);
+		const imported = await h.store.write((db) =>
+			h.caps.importBundleInTransaction(db, bundle, h.host()),
+		);
+		expect(imported.issues).toEqual([]);
+
+		const headers = {
+			authorization: "Bearer fixture-workers-api-browser-token",
+			"content-type": "application/json",
+		};
+		const list = await h.app.request("/api/toolchain-artifacts", { headers });
+		const active = (
+			(await list.json()) as {
+				artifacts: { artifactId: string; artifactRevisionId: string }[];
+			}
+		).artifacts.find(({ artifactId }) => artifactId === "settings.display");
+		expect(active).toBeDefined();
+		const artifactRevisionId = active!.artifactRevisionId;
+		const ref = encodeURIComponent(artifactRevisionId);
+		const artifact = await h.app.request("/api/toolchain-artifacts/" + ref, {
+			headers,
+		});
+		const { scopeRef } = (await artifact.json()) as { scopeRef: string };
+		const source = "settings-display";
+		const get = async () => {
+			const response = await h.app.request("/api/settings", { headers });
+			expect(response.status).toBe(200);
+			return (await response.json()) as ReturnType<typeof h.settings.get>;
+		};
+		async function save(changes: object[]) {
+			const { revision } = await get();
+			const now = Date.now();
+			const response = await h.app.request("/api/toolchain-actions", {
+				method: "POST",
+				headers,
+				body: JSON.stringify({
+					version: 1,
+					eventId: crypto.randomUUID(),
+					eventCreatedAt: new Date(now).toISOString(),
+					eventExpiresAt: new Date(now + 60_000).toISOString(),
+					artifactId: "tab-display",
+					artifactRevisionId,
+					scopeRef,
+					source,
+					sourceRevision: revision,
+					actionId: "apply",
+					input: { expectedRevision: revision, changes },
+				}),
+			});
+			expect(response.status).toBe(200);
+			expect(await response.json()).toMatchObject({ status: "accepted" });
+			return (await get()).general;
+		}
+		const fieldId = "appearance.avatar-background-color";
+		expect(
+			await save([
+				{ fieldId: "appearance.background", value: "live2d-hiyori" },
+				{ fieldId, value: "#e46a90" },
+			]),
+		).toMatchObject({
+			background: "live2d-hiyori",
+			avatarBackgroundColor: "#e46a90",
+		});
+		expect(
+			(await save([{ fieldId, value: "#36a8c7" }])).avatarBackgroundColor,
+		).toBe("#36a8c7");
+		expect(await save([{ fieldId, unset: true }])).not.toHaveProperty(
+			"avatarBackgroundColor",
+		);
+	} finally {
+		await h.close();
+	}
+});

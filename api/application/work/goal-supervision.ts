@@ -22,7 +22,11 @@ import type {
 } from "../agency/goal-progress-context";
 import { goalAccess, goalDigest } from "../agency/goal-progress-context";
 import type { GoalOwnerPort, GoalProgressPorts } from "../agency/goal-progress";
-import type { GoalWorkspaceRegistry } from "../agency/goal-workspaces";
+import {
+	permitBaseline,
+	READ_POLICY_BASELINE,
+	type GoalWorkspaceRegistry,
+} from "../agency/goal-workspaces";
 
 const owner = "development-supervision";
 const read = "development-supervision:read";
@@ -101,6 +105,7 @@ function supervisionScope(
 	capability: string,
 	now: number,
 ) {
+	if (permit.scope.version !== 1) return null;
 	const workspace = workspaces.get(permit.scope.workspaceRef);
 	const mode = modes(capability);
 	if (!workspace || workspace.root !== permit.workspace || !mode) return null;
@@ -132,7 +137,10 @@ function supervisionScope(
 	return {
 		workspace: {
 			workspaceRef: workspace.ref,
-			targetRevision: permit.scope.baselineCommit,
+			targetRevision: permitBaseline(workspaces, {
+				workspace: permit.workspace,
+				scope: permit.scope,
+			}),
 			rootPath: workspace.root,
 			checkExecutables: [
 				...new Set(workspace.checks.map(({ command }) => command)),
@@ -140,7 +148,10 @@ function supervisionScope(
 		},
 		scope: {
 			workspaceRef: workspace.ref,
-			targetRevision: permit.scope.baselineCommit,
+			targetRevision: permitBaseline(workspaces, {
+				workspace: permit.workspace,
+				scope: permit.scope,
+			}),
 			mode,
 			deadline: permit.scope.expiresAtMs ?? Number.MAX_SAFE_INTEGER,
 			readablePaths: [
@@ -284,9 +295,12 @@ export function createGoalSupervision(ports: {
 				now(),
 			);
 			if (
+				permit.scope.version !== 1 ||
 				!scope ||
 				(scope.scope.mode === "edit" && !design) ||
-				workspaces.revision(permit.workspace) !== permit.scope.baselineCommit
+				// A read-only policy works on the HEAD of its moment; any other permit stays on its commit.
+				(permit.scope.baselineCommit !== READ_POLICY_BASELINE &&
+					workspaces.revision(permit.workspace) !== permit.scope.baselineCommit)
 			)
 				return null;
 			return {
@@ -337,7 +351,7 @@ export function createGoalSupervision(ports: {
 			row.state.watch?.producer === "markdown" && row.state.watch.subjectRef
 				? [row.state.watch]
 				: [];
-		if (!permit || !registration || !bound)
+		if (!permit || permit.scope.version !== 1 || !registration || !bound)
 			return { checks: [], capabilities: [], watches };
 		const checks = registration.checks
 			.filter(

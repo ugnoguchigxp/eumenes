@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import {
 	isStandardExecutionSource,
+	isGoalExecutionSource,
 	isSupervisedExecutionSource,
 	type ExecutionView,
 	type OwnedExecutionView,
@@ -30,15 +31,17 @@ export function workWorkspace(
 
 export function view(work: Work): ExecutionView {
 	const source = work.source;
-	if (source.conversationId === null) throw new Error("claude_owner_mismatch");
+	if (typeof source.conversationId !== "string")
+		throw new Error("claude_owner_mismatch");
 	return { ...commonView(work), conversationId: source.conversationId };
 }
 export function supervisedView(work: Work): OwnedExecutionView {
-	return work.source.conversationId === null
+	return isSupervisedExecutionSource(work.source) &&
+		work.source.conversationId === null
 		? { ...commonView(work), conversationId: null, goal: work.source.goal }
 		: view(work);
 }
-function commonView(work: Work): Omit<ExecutionView, "conversationId"> {
+export function commonView(work: Work): Omit<ExecutionView, "conversationId"> {
 	return {
 		id: work.id,
 		request: work.request,
@@ -54,11 +57,12 @@ function commonView(work: Work): Omit<ExecutionView, "conversationId"> {
 }
 
 export function closeQuestion(db: Database, host: Host, work: Work) {
-	if (!work.supervision) {
+	if (work.supervision) work.supervision.presentation = undefined;
+	else if (isStandardExecutionSource(work.source)) {
 		if (work.notice) host.revokeInTransaction(db, work.notice);
 		if (work.deliveredNotice)
 			host.revokeInTransaction(db, work.deliveredNotice);
-	} else work.supervision.presentation = undefined;
+	}
 	work.notice = null;
 	work.deliveredNotice = undefined;
 	work.question = null;
@@ -312,7 +316,20 @@ export function acceptObservation(
 		)
 			return true;
 		closeQuestion(db, host, work);
-		if (!supervised && incoming.kind === "question") {
+		if (
+			isGoalExecutionSource(work.source) &&
+			incoming.kind === "permission" &&
+			incoming.tool !== "Bash"
+		) {
+			work.effect = {
+				kind: "reply",
+				id: newId(),
+				questionId: incoming.id,
+				answer: "deny",
+			};
+			work.status = "waiting_child";
+			work.summary = "通常の作業先の範囲外のファイル操作を拒否しました。";
+		} else if (!supervised && incoming.kind === "question") {
 			work.pendingRunnerQuestion = incoming;
 			work.status = "deciding";
 			work.summary = "Claude Code からの質問を確認しています。";
@@ -334,6 +351,7 @@ export function acceptObservation(
 				work.effect = { kind: "stop", id: newId(), reason: "question_wait" };
 				work.stopAt = now;
 			}
+			releaseGoalQuestionSlot(db, host, work);
 		}
 	} else if (observation.state === "unknown") {
 		work.stop = "unconfirmed";
@@ -365,6 +383,15 @@ export function acceptObservation(
 		if (supervised) work.notice = newId();
 	}
 	return true;
+}
+
+export function releaseGoalQuestionSlot(db: Database, host: Host, work: Work) {
+	if (!isGoalExecutionSource(work.source) || !work.question || work.executionId)
+		return;
+	if (work.holdsWorkspace) {
+		host.workspace.release(db, work.id, true);
+		work.holdsWorkspace = false;
+	}
 }
 
 export function applyDecision(
@@ -401,6 +428,7 @@ export function applyDecision(
 			work,
 			decision.action === "ask_user" ? decision.question : undefined,
 		);
+		releaseGoalQuestionSlot(db, host, work);
 		return;
 	}
 	switch (decision.action) {
@@ -415,8 +443,9 @@ export function applyDecision(
 				finish(db, host, work, "partial", "追加実行の上限に達しました。");
 				return;
 			}
+			const forGoal = isGoalExecutionSource(work.source);
 			let instruction = decision.instruction;
-			if (work.supervision) {
+			if (work.supervision || forGoal) {
 				const limit = 8_000;
 				if (work.request.length > limit) {
 					finish(
@@ -429,11 +458,17 @@ export function applyDecision(
 					return;
 				}
 				const heading = "\n\n## 今回の実行指示\n";
-				const available = limit - work.request.length - heading.length;
+				const guidance = forGoal
+					? "\n\nホストが作業先を決めています。着手時にリポジトリの作業規則を確認してください。通常の読み書き・検査の許可確認は不要です。結果には、達成条件を確かめられる現行のテストを相対パスで含めてください。依頼で明示された別の作業先を確認した場合は、編集を行わず理由を報告してください。"
+					: "";
+				const workspaceRules =
+					work.request.length + guidance.length <= limit ? guidance : "";
+				const available =
+					limit - work.request.length - heading.length - workspaceRules.length;
 				const addition = decision.instruction
 					.slice(0, Math.max(0, available))
 					.trimEnd();
-				instruction = work.request;
+				instruction = work.request + workspaceRules;
 				if (decision.instruction !== work.request && addition)
 					instruction += heading + addition;
 			}
@@ -541,6 +576,7 @@ export function applyDecision(
 				...(work.supervision ? { presentation: "waiting" as const } : {}),
 			};
 			work.notice = newId();
+			releaseGoalQuestionSlot(db, host, work);
 			return;
 		case "finish": {
 			const known = new Set(
@@ -636,6 +672,8 @@ export function authorityCurrent(
 	work: Work,
 	action: "continue" | "inspect" = "continue",
 ) {
+	if (isGoalExecutionSource(work.source))
+		return host.goal?.modeInTransaction(db, work.source) === work.mode;
 	const valid = work.supervision
 		? codingCanonicalJSON(supervisedAuthority(host, db, work, action)) ===
 			codingCanonicalJSON(work.supervision.authorization)
@@ -645,7 +683,7 @@ export function authorityCurrent(
 		valid &&
 		work.references.every(
 			(reference) =>
-				work.source.conversationId !== null &&
+				typeof work.source.conversationId === "string" &&
 				host.validReferenceInTransaction(db, work.source, reference),
 		)
 	);

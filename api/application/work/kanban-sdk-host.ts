@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { ordinaryClaudeWorkspaceRef } from "./claude-code-task-adapter";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
 import type { SqliteStore } from "../../infrastructure/sqlite";
@@ -45,7 +46,7 @@ export function createKanbanSdkHost(options: {
 	) => ReturnType<typeof createTerminals>;
 }) {
 	const cwd = realpathSync(options.cwd ?? process.cwd());
-	const workspaceRef = "eumenes";
+	const workspaceRef = ordinaryClaudeWorkspaceRef;
 	const workspace = (path: string | undefined) => {
 		try {
 			return realpathSync(path ?? cwd) === cwd ? workspaceRef : null;

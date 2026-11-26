@@ -78,6 +78,7 @@ function buildRegisteredGoalServices(
 		queue,
 		capabilities: toolchain.capabilities,
 		webNote: toolchain.webNote,
+		claude: toolchain.claudeCode,
 		onWorkerAvailabilityChange: toolchain.claudeCode.onAvailabilityChange,
 		workspaces: goalWorkspaces,
 		referenceInputs: memory.referenceInputs,
@@ -88,6 +89,7 @@ function buildRegisteredGoalServices(
 			agendaGoals: { store: agendaGoalStore, ...goalForgetDeps(goals) },
 		},
 		markdown,
+		activity: inference,
 		...(toolchain.developmentSupervision
 			? { supervision: toolchain.developmentSupervision }
 			: {}),

@@ -158,6 +158,7 @@ function offeredSurface(
 				(item) =>
 					deps.ownerAvailable(item.owner) &&
 					(item.effect === "read" ||
+						permit.scope.version === 2 ||
 						(row.state.design !== null && deps.nowMs >= analysisUntil)),
 			)
 			.map((item) => ({
@@ -432,6 +433,7 @@ export function prepareGoalSnapshot(
 	return {
 		context,
 		input,
+		ordinaryWorkspace: permits.some(({ scope }) => scope.version === 2),
 		capabilities,
 		watches,
 		controlGeneration: control?.generation ?? 0,

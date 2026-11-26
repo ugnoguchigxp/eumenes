@@ -59,12 +59,29 @@ function resolvePath(path: string): string {
 }
 
 /** Checkouts, runner receipts, and all other filesystem paths remain read-only. */
-export function createCheckSandbox(workspace: string, id: string) {
+export function createCheckSandbox(
+	workspace: string,
+	id: string,
+	options?: {
+		writablePaths?: readonly string[];
+		protectedPaths?: readonly string[];
+		path?: string;
+	},
+) {
 	if (process.platform !== "darwin" || !existsSync(sandboxExecutable))
 		throw new Error(verificationUnavailable);
-	const temporary = mkdtempSync(
-		join(realpathSync(tmpdir()), `claude-check-${id}-`),
-	);
+	const tempRoot = realpathSync(tmpdir());
+	if (
+		options?.writablePaths?.length &&
+		(workspace === tempRoot || !contained(tempRoot, realpathSync(workspace)))
+	)
+		throw new Error(verificationUnavailable);
+	const writable = (options?.writablePaths ?? []).map(resolvePath);
+	if (
+		writable.some((path) => path === workspace || !contained(workspace, path))
+	)
+		throw new Error(verificationUnavailable);
+	const temporary = mkdtempSync(join(tempRoot, `claude-check-${id}-`));
 	if (contained(workspace, temporary) || contained(temporary, workspace)) {
 		rmSync(temporary, { recursive: true, force: true });
 		throw new Error(verificationUnavailable);
@@ -76,7 +93,15 @@ export function createCheckSandbox(workspace: string, id: string) {
 		"(allow default)",
 		"(deny network*)",
 		"(deny file-write*)",
+		'(allow file-write-data (literal "/dev/null"))',
 		`(allow file-write* (subpath ${JSON.stringify(files)}))`,
+		...writable.map(
+			(path) => `(allow file-write* (subpath ${JSON.stringify(path)}))`,
+		),
+		...(options?.protectedPaths ?? []).map(
+			(path) =>
+				`(deny file-read* (subpath ${JSON.stringify(resolvePath(path))}))`,
+		),
 		"(deny file-link)",
 	].join(" ");
 	try {
@@ -104,7 +129,7 @@ export function createCheckSandbox(workspace: string, id: string) {
 			profile,
 			"/usr/bin/env",
 			"-i",
-			"PATH=/usr/bin:/bin",
+			`PATH=${options?.path ?? "/usr/bin:/bin"}`,
 			`HOME=${files}`,
 			`TMPDIR=${files}`,
 			`XDG_CACHE_HOME=${files}`,

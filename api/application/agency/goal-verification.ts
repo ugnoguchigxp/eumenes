@@ -15,7 +15,10 @@ import {
 	goalDigest,
 } from "./goal-progress-context";
 import type { GoalProgressPorts } from "./goal-progress";
-import type { GoalWorkspaceRegistry } from "./goal-workspaces";
+import {
+	READ_POLICY_BASELINE,
+	type GoalWorkspaceRegistry,
+} from "./goal-workspaces";
 
 const execute = promisify(execFile);
 const proofPrefix = "goal-verification:";
@@ -36,10 +39,11 @@ export async function runGoalCheck(
 	workspace: string,
 	check: GoalCheckAuthorization,
 	signal: AbortSignal,
+	options?: Parameters<typeof createCheckSandbox>[2] & { timeoutMs?: number },
 ) {
 	let sandbox: ReturnType<typeof createCheckSandbox>;
 	try {
-		sandbox = createCheckSandbox(workspace, crypto.randomUUID());
+		sandbox = createCheckSandbox(workspace, crypto.randomUUID(), options);
 	} catch {
 		return {
 			exitCode: null,
@@ -56,14 +60,14 @@ export async function runGoalCheck(
 		try {
 			const output = await execute("/bin/sh", ["-c", command], {
 				signal,
-				timeout: 30_000,
+				timeout: options?.timeoutMs ?? 30_000,
 				maxBuffer: 128 * 1024,
 				env: { PATH: "/usr/bin:/bin" },
 			});
 			return {
 				exitCode: 0,
-				stdout: output.stdout.slice(0, 4_096),
-				stderr: output.stderr.slice(0, 4_096),
+				stdout: output.stdout.slice(0, options ? 24_576 : 4_096),
+				stderr: output.stderr.slice(0, options ? 24_576 : 4_096),
 			};
 		} catch (error) {
 			signal.throwIfAborted();
@@ -74,8 +78,8 @@ export async function runGoalCheck(
 			};
 			return {
 				exitCode: typeof failed.code === "number" ? failed.code : null,
-				stdout: failed.stdout?.slice(0, 4_096) ?? "",
-				stderr: failed.stderr?.slice(0, 4_096) ?? "",
+				stdout: failed.stdout?.slice(0, options ? 24_576 : 4_096) ?? "",
+				stderr: failed.stderr?.slice(0, options ? 24_576 : 4_096) ?? "",
 			};
 		}
 	} finally {
@@ -107,25 +111,31 @@ export function createGoalVerification(ports: {
 			row,
 		);
 		return permits.flatMap((permit) => {
+			if (permit.scope.version !== 1) return [];
 			const { workspaceRef } = permit.scope;
 			const workspace = ports.workspaces.get(workspaceRef);
 			if (
 				!workspace ||
 				workspace.root !== permit.workspace ||
-				ports.workspaces.revision(workspace.root) !==
-					permit.scope.baselineCommit
+				// A read-only policy checks the HEAD of its moment; any other permit stays on its commit.
+				(permit.scope.baselineCommit !== READ_POLICY_BASELINE &&
+					ports.workspaces.revision(workspace.root) !==
+						permit.scope.baselineCommit)
 			)
 				return [];
 			const criterionIds = row.state.criteria
 				.filter(
 					({ id }) =>
 						permit.scope.basis.kind === "message" ||
+						// The goal read this workspace under this permit and kept evidence for the criterion: whether
+						// the worker then concluded or not, the registered check of what it read may run.
 						attempts.some(
 							(attempt) =>
 								attempt.permitId === permit.id &&
 								attempt.permitRevision === permit.revision &&
-								attempt.outcome === "succeeded" &&
-								attempt.resultRef &&
+								(attempt.outcome === "succeeded" ||
+									attempt.outcome === "partial" ||
+									attempt.outcome === "failed") &&
 								attempt.evidenceRefs.length &&
 								attempt.step.criterionIds.some(
 									(target) => id === target || id.startsWith(target + "."),

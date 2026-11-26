@@ -112,6 +112,7 @@ export function staticSelectionPaths(selected: Domain[]) {
 }
 
 export const acceptanceFiles = [
+	"drafts",
 	"judge",
 	"frozen",
 	"tester-parser",

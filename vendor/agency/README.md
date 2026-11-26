@@ -15,3 +15,5 @@ Agency と同じ依存関係を用意し、同じ TypeScript 版で `bun scripts
 0.1.13 は 0.1.12 の上に、担当への依頼を調べもの項目（`delegatedTo`）として持つ変更（`spec/toolchain-assignment-as-research-2026-11-25.md` §7）を加えた。担当項目は調べもの担当の一枠を使わず並行に発行し、担当の質問と進捗（`assignmentObserved`）、取消（`assignmentEnded`）、返事の状態の `assignments` 欄を持つ。`assignments-adoption-source.patch` は `baseCommit` からの全差分で、0.1.12 の採用差分を含む。直接の採用元は 0.1.12 の tgz。直接の採用元でなくなった 0.1.11 の tgz と SHA-256 ファイルは削除した。
 
 0.1.14 の土台は `3873882`（0.1.13 をコミットしたもの）。その上に、画面に出ていない会話の段取りで、計画せず約束した報告（頼まれた仕事の完成報告・担当の質問）だけを話す `StepHost.promisedOnly` と、計画が進行中の依頼（`inProgress`）を終わったものとして話題にしない規則を加えた。`promised-only-adoption-source.patch` は `baseCommit` からの全差分。直接の採用元は 0.1.13 の tgz。直接の採用元でなくなった 0.1.12 の tgz と SHA-256 ファイルは削除した。
+
+0.1.15 は 0.1.14 の上に、通常の Claude Code 作業先を目標に結び付ける scope 版2を加える。従来のファイル指定は版1として読み、本人による取消と明示的な限定を継承する。差分は `workspace-goal-adoption-source.patch` に含まれる。

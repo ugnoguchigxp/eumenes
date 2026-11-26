@@ -4,6 +4,7 @@ import type {
 	GoalReadPolicyGrant,
 	GoalStore,
 } from "eumenes-agency/agenda/runtime";
+import type { Settings } from "../../domains/settings";
 import type { SupervisionTarget } from "../../domains/development-supervision";
 import type { createGoalWebNote } from "./goal-web-note";
 import { goalAccess, goalDigest } from "./goal-progress-context";
@@ -14,6 +15,10 @@ export function createGoalPolicyConfiguration(ports: {
 	workspaces: GoalWorkspaceRegistry;
 	binding(db: Database): SupervisionTarget | null;
 	available(db: Database, workspaceRef: string): boolean;
+	ordinary?: {
+		policy(db: Database, row: GoalProgress): GoalReadPolicyGrant | null;
+		available(): boolean;
+	};
 	inferenceConfiguration?(db: Database): unknown;
 	webPolicy?: ReturnType<typeof createGoalWebNote>["readPolicy"];
 }) {
@@ -48,8 +53,10 @@ export function createGoalPolicyConfiguration(ports: {
 						return { policy, available };
 					})
 			: [];
+		const ordinary = ports.ordinary?.policy(db, row);
 		const web = ports.webPolicy?.(db);
 		const policies: GoalReadPolicyGrant[] = local.map(({ policy }) => policy);
+		if (ordinary) policies.push(ordinary);
 		if (web)
 			policies.push({
 				...web,
@@ -63,6 +70,7 @@ export function createGoalPolicyConfiguration(ports: {
 			local
 				.map(({ policy, available }) => [policy.policyKey, available])
 				.sort(),
+			...(ordinary ? [ports.ordinary?.available()] : []),
 			ports.inferenceConfiguration?.(db),
 		]);
 		const result = ports.goals.reconcileReadPoliciesInTransaction(
@@ -72,10 +80,27 @@ export function createGoalPolicyConfiguration(ports: {
 			{
 				digest,
 				policies,
-				summary:
-					"ホストが登録作業先、読取・検査の許可、実行先の現在の構成を照合しました。提示された参照と検査から次の手を選べます。",
+				summary: ordinary
+					? "ホストが通常の Claude Code 作業先の構成を照合しました。利用者への作業先・ファイル・通常検査の確認は不要です。"
+					: "ホストが登録作業先、読取・検査の許可、実行先の現在の構成を照合しました。提示された参照と検査から次の手を選べます。",
 			},
 		);
 		return result.status === "stale" ? row : result.progress;
 	};
+}
+
+export function goalInferenceConfiguration(configured: Settings) {
+	const route = configured.routes.llm;
+	const resources = [
+		configured.agency.thinkResourceId,
+		route.fallbackId,
+	].flatMap((id) => configured.resources.filter((item) => item.id === id));
+	return [
+		route,
+		configured.general.reasoningEffort,
+		resources,
+		configured.connections.filter((connection) =>
+			resources.some((resource) => resource.connectionId === connection.id),
+		),
+	];
 }

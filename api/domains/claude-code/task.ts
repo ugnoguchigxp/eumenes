@@ -3,12 +3,14 @@ import type { Capabilities } from "../capabilities";
 import {
 	executionControl,
 	isStandardExecutionSource,
+	isGoalExecutionSource,
 	type TaskLifecyclePort,
 } from "../tool-runtime";
 import { adapterRef, questionAnswer, type Host, type Work } from "./contracts";
 import { closeQuestion, newId, view, workWorkspace } from "./lifecycle";
 import { read, save, terminal } from "./repository";
 import { createSupervisedTaskPort } from "./supervised-task";
+import { createGoalTaskPort } from "./goal-task";
 
 export function createTaskPort({
 	capabilities,
@@ -38,6 +40,7 @@ export function createTaskPort({
 		> & { source: Work["source"] },
 		host: Host,
 		authorization?: NonNullable<Work["supervision"]>["authorization"],
+		goalMode?: Work["mode"],
 	) {
 		const revision = input.toolchainRevisionId;
 		const set =
@@ -59,7 +62,7 @@ export function createTaskPort({
 		if (
 			input.references.some(
 				(ref) =>
-					input.source.conversationId === null ||
+					typeof input.source.conversationId !== "string" ||
 					!host.validReferenceInTransaction(db, input.source, ref),
 			)
 		)
@@ -71,7 +74,7 @@ export function createTaskPort({
 		);
 		if (deadline <= at) throw new Error("claude_deadline_exceeded");
 		const work: Work = {
-			id: newId(),
+			id: isGoalExecutionSource(input.source) ? input.source.runId : newId(),
 			source: input.source,
 			binding: set.binding.revisionId,
 			request,
@@ -114,7 +117,9 @@ export function createTaskPort({
 			forgotten: false,
 			holdsWorkspace: false,
 			stop: undefined,
-			mode: binding.id === "claude-code.repair-managed" ? "analysis" : "work",
+			mode:
+				goalMode ??
+				(binding.id === "claude-code.repair-managed" ? "analysis" : "work"),
 			conversationSummary: binding.conversationSummary,
 			...(authorization && input.toolchainRevisionId
 				? {
@@ -256,6 +261,26 @@ export function createTaskPort({
 	};
 	return {
 		task,
+		goal: createGoalTaskPort({
+			getHost,
+			available,
+			now,
+			cancel,
+			start: (db, host, source, mode) =>
+				start(
+					db,
+					{
+						source,
+						request: source.request,
+						references: [],
+						toolchainRevisionId: source.toolchainRevisionId,
+						bindingRevisionId: source.bindingRevisionId,
+					},
+					host,
+					undefined,
+					mode,
+				),
+		}),
 		supervised: createSupervisedTaskPort({
 			getHost,
 			now,

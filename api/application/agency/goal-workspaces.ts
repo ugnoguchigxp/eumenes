@@ -48,6 +48,22 @@ function checkedPath(root: string, path: string) {
 		throw new Error("goal_workspace_path_forbidden");
 	return physical;
 }
+/**
+ * The baseline of a read-only policy permit. Commits to the workspace do not revoke and reissue it; what was
+ * read is identified by the read files' content digests, and a check runs against the HEAD of its moment.
+ */
+export const READ_POLICY_BASELINE = "read-policy:current-head";
+
+/** The commit a permit's work and checks run against: the HEAD now for a read-only policy permit. */
+export function permitBaseline(
+	workspaces: { revision(root: string): string },
+	permit: { workspace: string; scope: { baselineCommit: string } },
+): string {
+	return permit.scope.baselineCommit === READ_POLICY_BASELINE
+		? workspaces.revision(permit.workspace)
+		: permit.scope.baselineCommit;
+}
+
 function revision(root: string) {
 	return execFileSync(
 		"git",
@@ -114,7 +130,8 @@ export function createGoalWorkspaceRegistry(raw: string | undefined) {
 					version: 1,
 					workspaceRef: workspace.ref,
 					basis: { kind: "policy", revision: revisionId },
-					baselineCommit: revision(workspace.root),
+					// A read-only policy is not tied to a commit: work and checks read the HEAD of their moment.
+					baselineCommit: READ_POLICY_BASELINE,
 					readablePaths: workspace.readablePaths.map((path) =>
 						checkedPath(workspace.root, path),
 					),

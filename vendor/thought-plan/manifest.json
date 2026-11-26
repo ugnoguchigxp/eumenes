@@ -1,0 +1,11 @@
+{
+	"package": "eumenes-thought-plan",
+	"version": "0.2.0",
+	"artifact": "eumenes-thought-plan-0.2.0-6686cf56b513.tgz",
+	"sha256": "33d1fea09a2752d525b45761a8ca8e1e2c1840dd4f0d3019fb926b8bdea16c39",
+	"gitSha": "6686cf56b513d4feedf836195c605495abf2100e",
+	"dirty": false,
+	"files": 22,
+	"builtAt": "2026-11-26T03:25:43.140Z",
+	"source": "https://github.com/ugnoguchigxp/eumenes_thought_plan"
+}

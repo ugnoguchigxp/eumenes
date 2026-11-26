@@ -1,30 +1,30 @@
 {
 	"package": "eumenes-agency",
-	"version": "0.1.14",
-	"artifact": "eumenes-agency-0.1.14-38738821f743-f732d88535f4.tgz",
-	"sha256": "f732d88535f44dda168d07fe89da59434d77a874426395bc7d548401b4fcbb20",
-	"size": 278362,
+	"version": "0.1.15",
+	"artifact": "eumenes-agency-0.1.15-7fc268574f0a-047687db250e.tgz",
+	"sha256": "047687db250ef377b8f6ff12fa2915d86ad92702963d65c1f92f1851f45daf4e",
+	"size": 278683,
 	"INSTRUCTION_VERSION": "p0e-instructions-29",
 	"HOST_RULES_VERSION": "host-rules-26",
-	"gitSha": "38738821f743d3b24f6c69752a6e657e6c1ae616",
+	"gitSha": "7fc268574f0a56412d32284a6886ef0ad8147c10",
 	"dirty": true,
-	"builtAt": "2026-11-26T02:04:41.644Z",
+	"builtAt": "2026-11-26T03:42:54.235Z",
 	"adoptionSource": {
-		"baseCommit": "38738821f743d3b24f6c69752a6e657e6c1ae616",
-		"patchFile": "promised-only-adoption-source.patch",
-		"patchSha256": "6318f3a9104138274a03e95a41e1ebbdefa545b6297837f67e591a0576f7ca83",
+		"baseCommit": "7fc268574f0a56412d32284a6886ef0ad8147c10",
+		"patchFile": "workspace-goal-adoption-source.patch",
+		"patchSha256": "005115ebf0430fe8489f905f8630a9c85c87d0569a760b6d0f3f50526538e225",
 		"sourceFiles": {
 			"LICENSE": "d0ab62e002125a8e6852aca037c33779e980ad9b0e0f517d99b13ea54e039a6b",
-			"package.json": "011f04a8d98c506e542890ff80a0502eebb134b9a6b79883387fb601c5d2eb3f",
+			"package.json": "e47f3911122c3aebacac3410ac3b3864f94df57a4f53c3422431ad72544dabc2",
 			"runtime/agenda/agenda-goals.ts": "05ea2b39f85d094c7231134a7eb1220e1966d8056c8c348fc6ac226ff79934c3",
 			"runtime/agenda/codex-goal-design.ts": "f75f4a044dc7e8341cdcb118dda6d984fcc0ca1d71cab9ea9079cbb20eb33112",
 			"runtime/agenda/docs.ts": "a255d832b4ed244b7811c059d9012d9fe0d52f2eee06a39f8157ec87a18eebe8",
 			"runtime/agenda/goal-design.ts": "42f5bc2f01dd1f9143b6455df967b09a7061cfb68f48bfcb6859d0f0aea75cd7",
 			"runtime/agenda/goal-host.ts": "a75b659c4bebd30eebc100619efd2f269ab81367125537ba6067596c1eb25458",
 			"runtime/agenda/goal-mock.ts": "05e3dfe16d043efc0241f53e2855769b843fb245f609c78a4f16327760d1b156",
-			"runtime/agenda/goal-permits.ts": "06fd0a79d2fbb8e103152fdf8054ff31cba6ad9d6a9b867ecf51a256a8cf73da",
-			"runtime/agenda/goal-progress-contracts.ts": "b2bcdfe51580dc5c40d41666a466eda71db15e42b21dd832d3540b33c6fbd95e",
-			"runtime/agenda/goal-progress-store.ts": "ebdda67c0c04f84e455e84093530d359201105bf60c34f95d98f621e15390550",
+			"runtime/agenda/goal-permits.ts": "fc3e96131f5c9a26b633374a2976ec7f794ffd6022c67dd91793647fdc2191d4",
+			"runtime/agenda/goal-progress-contracts.ts": "f3d1bcc5d728361116b7bf53a38b0947c4748226ece9f0bf2f2ad33025d38662",
+			"runtime/agenda/goal-progress-store.ts": "aead04ab39232d3103ddc74911086980d390d93d42fcdb9170d19cd5ce7af41f",
 			"runtime/agenda/goal-store.ts": "76fc2adba23d607b1e57309e440fbf299c6634627a9713a4418fb668319f3d34",
 			"runtime/agenda/host-memory.ts": "6382d3eba6aed6acbbc574497e8cd1d2938fdb1d8e552b16afecd95644e76d05",
 			"runtime/agenda/index.ts": "5c71971eb5f048edd8a6f566353501a1c6b5c9f3e7815d3775126f6594bce453",
@@ -110,9 +110,9 @@
 			"tsconfig.build.json": "fa22e196413c17c4a3d58d1064021f24f21c4264fbd42e2ec5c04b81aadd1bef",
 			"tsconfig.json": "1c81cf9c06ac5a8894a8d60e358e04cef018537b89d59809f037605016d73dfb"
 		},
-		"sourceHash": "8718ca01ac79145ed30765a610f75f5d6e6e06dbeedfcbe087435f055d133586"
+		"sourceHash": "ff54178b7ee195ea409a8343d29903333478ba8260f306158e85feb2f49afab5"
 	},
+	"derivedFrom": "eumenes-agency-0.1.14-38738821f743-f732d88535f4.tgz",
 	"normalizedWith": "normalize-pack.py",
-	"compiler": "typescript@5.9.3",
-	"derivedFrom": "eumenes-agency-0.1.13-2262088f019f-f2e0e95d6fbb.tgz"
+	"compiler": "typescript@5.9.3"
 }

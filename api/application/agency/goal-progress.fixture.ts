@@ -1,9 +1,8 @@
-import { expect } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LlmPort } from "eumenes-agency";
-import type { GoalStepContext } from "eumenes-agency/agenda";
+import { goalStepSchema, type GoalStepContext } from "eumenes-agency/agenda";
 import { createGoalStore, goalMigrations } from "eumenes-agency/agenda/runtime";
 import {
 	createGoalsService,
@@ -52,29 +51,35 @@ export function fixture(
 		now: () => now,
 		limits: { total: queueSize, background: queueSize, scope: queueSize },
 	});
+	// The progress machinery's tests choose each step themselves: `decide` sees the turn's snapshot and its
+	// answer is the turn's step, checked against the step contract as a model's would be.
+	const deliberate: NonNullable<GoalProgressPorts["deliberate"]> = async ({
+		snapshot,
+		cycle,
+	}) => {
+		decisions++;
+		const context = snapshot.context;
+		const parsed = goalStepSchema.safeParse({
+			contextId: context.contextId,
+			progressVersion: context.progressVersion,
+			criterionIds: ["root"],
+			reason: "観測に基づく提案",
+			review: null,
+			...decide(context),
+		});
+		if (!parsed.success) throw new Error("invalid_shape");
+		return {
+			kind: "step",
+			step: parsed.data,
+			remaining: cycle.remaining,
+			planned: null,
+			runId: null,
+			stalled: 0,
+		};
+	};
 	const llm: LlmPort = {
-		async complete(request) {
-			decisions++;
-			expect(request.purpose).toEqual("think");
-			const snapshot = JSON.parse(request.prompt) as GoalStepContext;
-			const value = request.schema.parse({
-				step: {
-					contextId: snapshot.contextId,
-					progressVersion: snapshot.progressVersion,
-					criterionIds: ["root"],
-					reason: "観測に基づく提案",
-					review: null,
-					...decide(snapshot),
-				},
-			});
-			return {
-				value,
-				model: "fixture",
-				inputTokens: 0,
-				outputTokens: 0,
-				cacheReadTokens: 0,
-				latencyMs: 0,
-			};
+		async complete() {
+			throw new Error("fixture_llm_unused");
 		},
 	};
 	const progress = createGoalProgress({
@@ -82,6 +87,7 @@ export function fixture(
 		goals,
 		queue,
 		llm: () => llm,
+		deliberate,
 		nowMs: () => now,
 		enabled: () => true,
 		sourcesCurrent: () => true,

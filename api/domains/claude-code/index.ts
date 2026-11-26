@@ -6,6 +6,7 @@ import type { InferencePort } from "../inference";
 import type { QueueService } from "../queue";
 import {
 	isStandardExecutionSource,
+	isGoalExecutionSource,
 	isSupervisedExecutionSource,
 	type OwnedSupervisedExecutionSource,
 } from "../tool-runtime";
@@ -13,12 +14,14 @@ import { type Host, type Runner, type Work } from "./contracts";
 import { DECISION_JOB, registerDecisionJobs } from "./jobs";
 import { drive, recover, tryRecovery } from "./driver";
 import { createTaskPort } from "./task";
+import { goalTaskView } from "./goal-task";
 import {
 	authorityCurrent,
 	closeQuestion,
 	escalatePendingQuestion,
 	finish,
 	newId,
+	releaseGoalQuestionSlot,
 	requestStop,
 	view,
 	supervisedView,
@@ -28,6 +31,7 @@ import { pending, read, save, terminal } from "./repository";
 import { createWatch } from "./watch";
 
 export { migrations } from "./repository";
+export type { GoalTaskView } from "./goal-task";
 export {
 	adapterRef,
 	type Runner,
@@ -47,6 +51,7 @@ type Deps = {
 	goalRunners?: ReadonlyMap<string, Runner>;
 	/** The working folder: the watch pane shows paths inside it relative to it. */
 	root?: string;
+	protectedPaths?: readonly string[];
 	now?: () => number;
 };
 
@@ -75,6 +80,74 @@ const isNewProgress = (
 	work.progressCalls < 6 &&
 	work.maxCalls - work.calls > 4;
 
+function schedule(
+	db: Database,
+	host: Host,
+	work: Work,
+	now: () => number,
+	queueDecision: (db: Database, work: Work, mode: Work["decisionMode"]) => void,
+) {
+	if (!canSchedule(work)) return;
+	if (work.pendingRunnerQuestion) {
+		if (work.calls >= work.maxCalls) {
+			escalatePendingQuestion(work);
+			releaseGoalQuestionSlot(db, host, work);
+		} else {
+			work.status = "deciding";
+			queueDecision(db, work, "question");
+		}
+		save(db, work, now());
+		return;
+	}
+	if (work.executionId) {
+		if (!isNewProgress(work, now())) return;
+		work.progressSeq = work.observation.seq;
+		work.progressAt = now();
+		queueDecision(db, work, "progress");
+	} else {
+		if (!work.holdsWorkspace) {
+			const workspace = workWorkspace(host, work);
+			const reservation = workspace.hold(
+				db,
+				work.id,
+				work.supervision?.authorization,
+			);
+			if (
+				!reservation ||
+				(work.supervision && typeof reservation !== "object")
+			) {
+				if (reservation) workspace.release(db, work.id, true);
+				if (work.supervision || isGoalExecutionSource(work.source)) {
+					const blocker = workspace.blocker?.(db, work.id);
+					const summary =
+						blocker?.state === "unknown"
+							? "他タスクの停止未確認のため起動を保留しています。"
+							: work.supervision?.authorization.mode === "read" ||
+								  work.mode === "analysis"
+								? "読取り枠が空くまで待機しています。"
+								: "編集枠が空くまで待機しています。";
+					if (work.summary !== summary) {
+						work.summary = summary;
+						work.observedAt = now();
+						work.notice = newId();
+						save(db, work, now());
+					}
+				}
+				return;
+			}
+			if (work.supervision && typeof reservation === "object")
+				work.supervision.lease = reservation;
+			work.holdsWorkspace = true;
+		}
+		if (work.calls >= work.maxCalls)
+			finish(db, host, work, "partial", "判断回数の上限に達しました。");
+		else {
+			work.status = "deciding";
+			queueDecision(db, work, "work");
+		}
+	}
+	save(db, work, now());
+}
 export function createClaudeCode({
 	store,
 	queue,
@@ -83,9 +156,11 @@ export function createClaudeCode({
 	runner,
 	goalRunners,
 	root,
+	protectedPaths,
 	now = Date.now,
 }: Deps) {
 	let host: Host | undefined;
+	let goalHost: Host["goal"];
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let maintenance: Promise<void> | undefined;
 	let closed = false;
@@ -115,7 +190,7 @@ export function createClaudeCode({
 	];
 	const availabilityListeners = new Set<() => void>();
 	const readiness = () =>
-		runners.map((runner) => capableRunner(runner)).join(",");
+		[runner?.ready() ?? false, ...runners.map(capableRunner)].join(",");
 	const supervisedAvailable = (forGoal = false, workspaceRef?: string) =>
 		configured() &&
 		!!host?.supervised &&
@@ -140,7 +215,7 @@ export function createClaudeCode({
 	}
 
 	registerDecisionJobs(queue, inference, () => host, now, kick);
-	const { task, supervised } = createTaskPort({
+	const { task, goal, supervised } = createTaskPort({
 		capabilities,
 		getHost: () => host,
 		available,
@@ -149,65 +224,6 @@ export function createClaudeCode({
 		cancel,
 	});
 
-	function schedule(db: Database, work: Work) {
-		if (!host || !canSchedule(work)) return;
-		if (work.pendingRunnerQuestion) {
-			if (work.calls >= work.maxCalls) escalatePendingQuestion(work);
-			else {
-				work.status = "deciding";
-				queueDecision(db, work, "question");
-			}
-			save(db, work, now());
-			return;
-		}
-		if (work.executionId) {
-			if (!isNewProgress(work, now())) return;
-			work.progressSeq = work.observation.seq;
-			work.progressAt = now();
-			queueDecision(db, work, "progress");
-		} else {
-			if (!work.holdsWorkspace) {
-				const workspace = workWorkspace(host, work);
-				const reservation = workspace.hold(
-					db,
-					work.id,
-					work.supervision?.authorization,
-				);
-				if (
-					!reservation ||
-					(work.supervision && typeof reservation !== "object")
-				) {
-					if (reservation) workspace.release(db, work.id, true);
-					if (work.supervision) {
-						const blocker = workspace.blocker?.(db, work.id);
-						const summary =
-							blocker?.state === "unknown"
-								? "他タスクの停止未確認のため起動を保留しています。"
-								: work.supervision.authorization.mode === "read"
-									? "読取り枠が空くまで待機しています。"
-									: "編集枠が空くまで待機しています。";
-						if (work.summary !== summary) {
-							work.summary = summary;
-							work.observedAt = now();
-							work.notice = newId();
-							save(db, work, now());
-						}
-					}
-					return;
-				}
-				if (work.supervision && typeof reservation === "object")
-					work.supervision.lease = reservation;
-				work.holdsWorkspace = true;
-			}
-			if (work.calls >= work.maxCalls)
-				finish(db, host, work, "partial", "判断回数の上限に達しました。");
-			else {
-				work.status = "deciding";
-				queueDecision(db, work, "work");
-			}
-		}
-		save(db, work, now());
-	}
 	function queueDecision(db: Database, work: Work, mode: Work["decisionMode"]) {
 		work.decisionMode = mode;
 		work.decisionId = queue.enqueueInTransaction(db, {
@@ -217,7 +233,11 @@ export function createClaudeCode({
 			subjectRef: work.id,
 			concurrencyKey: `claude-code:${work.id}`,
 			lane:
-				work.supervision || mode === "progress" ? "background" : "interactive",
+				work.supervision ||
+				isGoalExecutionSource(work.source) ||
+				mode === "progress"
+					? "background"
+					: "interactive",
 			deadlineAtMs: work.deadline,
 			payload: { id: work.id },
 			maxAttempts: 1,
@@ -250,7 +270,7 @@ export function createClaudeCode({
 			for (const work of pending(db)) {
 				enforceDeadlines(db, currentHost, work, now(), cancel);
 				deliverNotice(db, currentHost, work, now());
-				schedule(db, work);
+				schedule(db, currentHost, work, now, queueDecision);
 				if (
 					(work.executionId || work.effect?.kind === "read_events") &&
 					!terminal(work)
@@ -339,6 +359,9 @@ export function createClaudeCode({
 	}
 	return {
 		task,
+		goal,
+		workingDirectory: root,
+		protectedPaths,
 		supervised,
 		watch: createWatch({ store, runnerFor, root, now }),
 		onAvailabilityChange(listener: () => void) {
@@ -350,7 +373,11 @@ export function createClaudeCode({
 		availableInTransaction: available,
 		supervisedAvailableInTransaction: supervisedAvailable,
 		configure(value: Host) {
-			host = value;
+			host = goalHost ? { ...value, goal: goalHost } : value;
+		},
+		configureGoal(value: NonNullable<Host["goal"]>) {
+			goalHost = value;
+			if (host) host = { ...host, goal: value };
 		},
 		sourceRunInTransaction(db: Database, id: string) {
 			const work = read(db, id);
@@ -389,7 +416,8 @@ function enforceDeadlines(
 	if (
 		work.deadline <= at ||
 		!authorityCurrent(currentHost, db, work) ||
-		(!!work.supervision && (work.question?.expiresAt ?? Infinity) <= at)
+		((!!work.supervision || isGoalExecutionSource(work.source)) &&
+			(work.question?.expiresAt ?? Infinity) <= at)
 	) {
 		cancel(
 			db,
@@ -417,6 +445,17 @@ function deliverNotice(
 	at: number,
 ) {
 	if (!work.notice) return;
+	if (isGoalExecutionSource(work.source)) {
+		if (!work.forgotten)
+			currentHost.goal?.observeInTransaction?.(
+				db,
+				work.source,
+				goalTaskView(work),
+			);
+		work.notice = null;
+		save(db, work, at);
+		return;
+	}
 	const notice =
 		work.supervision && isSupervisedExecutionSource(work.source)
 			? currentHost.supervised?.observeInTransaction(

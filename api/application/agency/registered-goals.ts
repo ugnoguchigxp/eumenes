@@ -1,3 +1,9 @@
+import {
+	abandonRunsInTransaction,
+	createLedger,
+	pruneRunsInTransaction,
+	purgeSubjectInTransaction,
+} from "eumenes-thought-plan";
 import type { Database } from "bun:sqlite";
 import type { GoalStore } from "eumenes-agency/agenda/runtime";
 import type { Capabilities } from "../../domains/capabilities";
@@ -16,16 +22,21 @@ import {
 import type { WebNoteService } from "../../domains/web-note";
 import type { SettingsService } from "../../domains/settings";
 import type { SqliteStore } from "../../infrastructure/sqlite";
+import type { ClaudeCodeService } from "../../domains/claude-code";
+import { createGoalClaude } from "../work/goal-claude";
 import { createGoalSupervision } from "../work/goal-supervision";
 import { captureGoalSources } from "./goal-input-sources";
 import { createGoalDesignDocuments } from "./goal-design-documents";
 import { createGoalReplyWork } from "./goal-permission";
 import { createGoalReportDelivery } from "./goal-report-delivery";
 import { goalQuestionMessageId } from "./goal-question-delivery";
-import { createGoalPolicyConfiguration } from "./goal-policy-configuration";
-import { composeGoalVerifiers } from "./goal-verifiers";
-import { createGoalSemanticVerification } from "./goal-semantic-verification";
-import { createGoalVerification } from "./goal-verification";
+import { recoverGoalWorkspaceChecks } from "./goal-workspace-verification";
+import { goalSubject } from "./goal-deliberation";
+import {
+	createGoalPolicyConfiguration,
+	goalInferenceConfiguration,
+} from "./goal-policy-configuration";
+import { registeredGoalVerifier } from "./registered-goal-verification";
 import { goalDigest } from "./goal-progress-context";
 import { createGoalProgress, type GoalProgressPorts } from "./goal-progress";
 import { createGoalWebNote } from "./goal-web-note";
@@ -58,6 +69,46 @@ export function registeredDevelopmentBinding(
 	return null;
 }
 
+/** How long a goal's finished turns stay in the thought ledger. */
+export const THOUGHT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Thinking waits this long after the last foreground request ended (spec/goal-idle-deliberation-redesign §2.2). */
+export const GOAL_IDLE_AFTER_MS = 2 * 60 * 1000;
+
+/**
+ * When the host is idle for a goal's thinking: no foreground request runs and the last one ended at least
+ * `GOAL_IDLE_AFTER_MS` ago. A process that just started is idle. `until()` is null while idle, otherwise the
+ * time idling can begin at the earliest.
+ */
+export function createIdleWatch(
+	activity:
+		| {
+				foregroundBusy(): boolean;
+				onActivity(listener: () => void): () => void;
+		  }
+		| undefined,
+	now: () => number = Date.now,
+) {
+	let lastForegroundAt = 0;
+	let wasBusy = false;
+	// Every request starting or ending is reported; only the foreground's own start and end move the clock,
+	// so background calls (a goal's own thinking included) never postpone idling.
+	activity?.onActivity(() => {
+		const busy = activity.foregroundBusy();
+		if (busy || wasBusy) lastForegroundAt = now();
+		wasBusy = busy;
+	});
+	return {
+		until(): number | null {
+			if (!activity) return null;
+			const at = now();
+			if (activity.foregroundBusy()) return at + GOAL_IDLE_AFTER_MS;
+			const from = lastForegroundAt + GOAL_IDLE_AFTER_MS;
+			return lastForegroundAt && from > at ? from : null;
+		},
+	};
+}
+
 export function createRegisteredGoals(ports: {
 	store: SqliteStore;
 	goals: GoalStore;
@@ -74,9 +125,15 @@ export function createRegisteredGoals(ports: {
 	capabilities: Capabilities;
 	workspaces: GoalWorkspaceRegistry;
 	supervision?: DevelopmentSupervisionService;
+	claude?: ClaudeCodeService;
 	webNote?: WebNoteService;
 	onWorkerAvailabilityChange?(listener: () => void): () => void;
 	markdown: MarkdownService;
+	/** The foreground requests (conversation answers, ASR, TTS): a goal thinks only while none ran lately. */
+	activity?: {
+		foregroundBusy(): boolean;
+		onActivity(listener: () => void): () => void;
+	};
 }) {
 	const { store, goals, conversation, settings, inference, queue, workspaces } =
 		ports;
@@ -143,53 +200,46 @@ export function createRegisteredGoals(ports: {
 			sourcesCurrent,
 			notify,
 		});
-	const machine = createGoalVerification({ goals, workspaces, sourcesCurrent });
-	const semantic = createGoalSemanticVerification({
+	const ordinary =
+		ports.claude &&
+		createGoalClaude({
+			claude: ports.claude,
+			goals,
+			capabilities: ports.capabilities,
+			enabled,
+			notify,
+			sourceIsUser(db, ref) {
+				const source = conversation.sourceInTransaction(db, ref);
+				return source.state === "available" && source.message.role === "user";
+			},
+			sourcesCurrent,
+		});
+	const ordinaryPermit = (
+		db: Database,
+		row: Parameters<GoalProgressPorts["surface"]>[1],
+	) =>
+		goals
+			.goalPermitsInTransaction(db, access, row)
+			.find((permit) => ordinary?.usesWorkspace(db, row, permit));
+	const verifier = registeredGoalVerifier({
+		...ports,
 		llm,
 		sourcesCurrent,
-		read(db, row, id) {
-			const researchNote = research?.readInTransaction(db, id);
-			if (researchNote) return researchNote;
-			const evidence = row.state.evidence.find((item) => item.ref === id);
-			const original =
-				evidence && ports.markdown.generated.originalInTransaction(db, id);
-			return original &&
-				evidence &&
-				goalDigest([
-					id,
-					original.title,
-					original.markdown,
-					evidence.sources,
-				]) === evidence.digest
-				? { ...original, id, sources: evidence.sources ?? [] }
-				: null;
-		},
+		readResearch: research?.readInTransaction,
+		permit: ordinary ? ordinaryPermit : undefined,
 	});
-	const verifier = composeGoalVerifiers(machine, semantic);
 	const reconcileConfiguration = createGoalPolicyConfiguration({
 		goals,
 		workspaces,
 		binding,
 		available: (db, ref) =>
 			ports.supervision?.goalWorkerAvailableInTransaction(db, ref) ?? false,
-		inferenceConfiguration(db) {
-			const configured = settings.inTransaction(db);
-			const route = configured.routes.llm;
-			const resources = [
-				configured.agency.thinkResourceId,
-				route.fallbackId,
-			].flatMap((id) => configured.resources.filter((item) => item.id === id));
-			return [
-				route,
-				configured.general.reasoningEffort,
-				resources,
-				configured.connections.filter((connection) =>
-					resources.some((resource) => resource.connectionId === connection.id),
-				),
-			];
-		},
+		inferenceConfiguration: (db) =>
+			goalInferenceConfiguration(settings.inTransaction(db)),
 		webPolicy: research?.readPolicy,
+		ordinary,
 	});
+	const idle = createIdleWatch(ports.activity);
 	progress = createGoalProgress({
 		store,
 		goals,
@@ -197,12 +247,18 @@ export function createRegisteredGoals(ports: {
 		enabled,
 		sourcesCurrent,
 		llm,
+		thoughtLedger: createLedger(store),
+		idleUntil: idle.until,
 		legacyAccess: access,
 		onConfigurationChange(listener) {
 			const stopSettings = settings.onChange(listener);
 			const stopWorkers = ports.onWorkerAvailabilityChange?.(listener);
 			const fingerprint = (db: Database) =>
-				goalDigest([binding(db), research?.readPolicy(db)]);
+				goalDigest([
+					binding(db),
+					ordinary?.binding(db),
+					research?.readPolicy(db),
+				]);
 			let current = store.read(fingerprint);
 			const stopBindings = store.onCommit(() => {
 				const next = store.read(fingerprint);
@@ -225,9 +281,15 @@ export function createRegisteredGoals(ports: {
 				? source.message.conversationId
 				: null;
 		},
-		owners: { ...execution?.owners, ...research?.owners },
+		owners: { ...execution?.owners, ...ordinary?.owners, ...research?.owners },
 		surface(db, row, permit) {
-			const local = execution?.surface(db, row, permit);
+			const standard = ordinaryPermit(db, row);
+			const local =
+				standard && ordinary
+					? permit?.id === standard.id
+						? ordinary.surface(db, row, standard)
+						: undefined
+					: execution?.surface(db, row, permit);
 			return {
 				capabilities: [
 					...(local?.capabilities ?? []),
@@ -244,6 +306,8 @@ export function createRegisteredGoals(ports: {
 		checks: verifier.checks,
 		sourceText,
 		...designs,
+		prepareDesign: (db, row) =>
+			ordinaryPermit(db, row) ? null : designs.prepareDesign(db, row),
 		verify: verifier.verify,
 		verificationCurrent: verifier.verificationCurrent,
 		staleVerificationEvidence: verifier.staleVerificationEvidence,
@@ -263,32 +327,6 @@ export function createRegisteredGoals(ports: {
 		reconcileConfiguration,
 	});
 	const reports = createGoalReportDelivery({ ...ports, enabled });
-	function quiet({
-		speechUntil,
-		allUntil,
-	}: {
-		speechUntil: number | null;
-		allUntil: number | null;
-	}) {
-		return store
-			.write((db) => {
-				let controlChanged = false;
-				for (const scope of [PROFILE_SCOPE, `${PROFILE_SCOPE}:agenda-goals`]) {
-					const prior = goals.goalScopeControlInTransaction(db, access, scope);
-					goals.setGoalScopeControlInTransaction(db, access, scope, {
-						speechUntilMs: speechUntil,
-						allUntilMs: allUntil,
-					});
-					if ((prior?.allUntilMs ?? null) !== allUntil) {
-						progress.rescheduleScopeInTransaction(db, access, scope);
-						controlChanged = true;
-					}
-				}
-				if (controlChanged && allUntil === null)
-					progress.configurationChangedInTransaction(db);
-			})
-			.then(progress.wake);
-	}
 	function forgetInTransaction(db: Database, purge: ForgetPurge) {
 		const messages = new Set(purge.messageIds);
 		for (const {
@@ -316,6 +354,7 @@ export function createRegisteredGoals(ports: {
 			for (const attempt of attempts) {
 				if (
 					research?.forgetInTransaction(db, row, attempt) ||
+					ordinary?.forgetInTransaction(db, row, attempt) ||
 					execution?.forgetInTransaction(db, row, attempt)
 				)
 					goals.releaseForgottenGoalWorkInTransaction(
@@ -327,6 +366,8 @@ export function createRegisteredGoals(ports: {
 						attempt.permitRevision,
 					);
 			}
+			// The turns thought about this goal carry its text and material: they go with it.
+			purgeSubjectInTransaction(db, goalSubject(row.goalId));
 			progress.submitInTransaction(db, row);
 		}
 	}
@@ -335,10 +376,12 @@ export function createRegisteredGoals(ports: {
 
 	return {
 		progress,
+		recoverWorkspaceChecks: () => store.write(recoverGoalWorkspaceChecks),
 		reply,
 		list: reply.list,
 		reports,
-		quiet,
+		quiet: (input: Parameters<typeof updateGoalQuiet>[3]) =>
+			updateGoalQuiet(store, goals, progress, input),
 		readDesign: (db: Database, id: string) =>
 			designs.readInTransaction(db, id) ??
 			research?.readInTransaction(db, id) ??
@@ -346,5 +389,55 @@ export function createRegisteredGoals(ports: {
 		forgetInTransaction,
 		adoptNote,
 		authority: execution?.authority,
+		/**
+		 * At start: a turn left running belongs to a process that is gone, and turns finished more than
+		 * `THOUGHT_RETENTION_MS` ago leave the ledger.
+		 */
+		thoughts: {
+			recover: () =>
+				store.write((db) => {
+					const nowMs = Date.now();
+					abandonRunsInTransaction(db, {
+						idleSinceMs: nowMs,
+						mode: "library",
+						nowMs,
+					});
+					pruneRunsInTransaction(db, {
+						finishedBeforeMs: nowMs - THOUGHT_RETENTION_MS,
+					});
+				}),
+		},
 	};
+}
+
+function updateGoalQuiet(
+	store: SqliteStore,
+	goals: GoalStore,
+	progress: ReturnType<typeof createGoalProgress>,
+	{
+		speechUntil,
+		allUntil,
+	}: {
+		speechUntil: number | null;
+		allUntil: number | null;
+	},
+) {
+	return store
+		.write((db) => {
+			let controlChanged = false;
+			for (const scope of [PROFILE_SCOPE, `${PROFILE_SCOPE}:agenda-goals`]) {
+				const prior = goals.goalScopeControlInTransaction(db, access, scope);
+				goals.setGoalScopeControlInTransaction(db, access, scope, {
+					speechUntilMs: speechUntil,
+					allUntilMs: allUntil,
+				});
+				if ((prior?.allUntilMs ?? null) !== allUntil) {
+					progress.rescheduleScopeInTransaction(db, access, scope);
+					controlChanged = true;
+				}
+			}
+			if (controlChanged && allUntil === null)
+				progress.configurationChangedInTransaction(db);
+		})
+		.then(progress.wake);
 }

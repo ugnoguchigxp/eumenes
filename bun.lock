@@ -14,7 +14,7 @@
         "@playwright/test": "1.61.1",
         "@tanstack/react-query": "5.101.0",
         "bmp-ts": "1.0.9",
-        "eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.14-38738821f743-f732d88535f4.tgz",
+        "eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.15-7fc268574f0a-047687db250e.tgz",
         "eumenes-canvas": "file:vendor/canvas/eumenes-canvas-0.1.2-92cb8c200232.tgz",
         "eumenes-collaboration": "./vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
         "eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.3-eumenes.2-a88153a824ec.tgz",
@@ -23,6 +23,7 @@
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
         "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz",
         "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
+        "eumenes-thought-plan": "file:vendor/thought-plan/eumenes-thought-plan-0.2.0-6686cf56b513.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
         "eumenes_router": "file:vendor/router/eumenes_router-0.0.3-5167c9f6fe48.tgz",
         "google-auth-library": "11.1.0",
@@ -1471,7 +1472,7 @@
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
 
-    "eumenes-agency": ["eumenes-agency@vendor/agency/eumenes-agency-0.1.14-38738821f743-f732d88535f4.tgz", { "dependencies": { "zod": "4.6.7" }, "peerDependencies": { "@openai/codex-sdk": "0.160.0", "eumenes-memory": "0.0.4", "eumenes-memory-host": "0.1.0 || 0.2.0" }, "optionalPeers": ["@openai/codex-sdk", "eumenes-memory", "eumenes-memory-host"] }, "sha512-R059QHvLpzEYhPj0hR3YqQFjnFRR0Tz2o8YM16m2cLqLyRpCLt52qMyqKBtRo+5k5OVsTRoBWjpfl57WLhJKgA=="],
+    "eumenes-agency": ["eumenes-agency@vendor/agency/eumenes-agency-0.1.15-7fc268574f0a-047687db250e.tgz", { "dependencies": { "zod": "4.6.7" }, "peerDependencies": { "@openai/codex-sdk": "0.160.0", "eumenes-memory": "0.0.4", "eumenes-memory-host": "0.1.0 || 0.2.0" }, "optionalPeers": ["@openai/codex-sdk", "eumenes-memory", "eumenes-memory-host"] }, "sha512-cBbozQ9FQ2a0xEAfS+qacNwPUTtTq8IJ0M9QfgnRXOd/IkJBF2yPJ0oK2yFQPLzIroe7EdLnIKPun9KiffOlFA=="],
 
     "eumenes-canvas": ["eumenes-canvas@vendor/canvas/eumenes-canvas-0.1.2-92cb8c200232.tgz", { "dependencies": { "cannon-es": "0.20.0", "pngjs": "7.0.0", "three": "0.187.0", "typescript": "5.9.3" } }, "sha512-F1w33gu79b/51QW59hMxSXqbYFydbH1TTvQALmdorZ8soIuLdpaJT/1cqlp4nPJprzEwI5S4FNWzunBAJrA3ig=="],
 
@@ -1490,6 +1491,8 @@
     "eumenes-skill-smith": ["eumenes-skill-smith@vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz", { "dependencies": { "mdast-util-from-markdown": "2.0.2", "zod": "4.6.6" } }, "sha512-fGUFl27vgEHcA/wjcWgHmcsg5k2vKOEOx0cW5k53dKv8oll39BIyNlc5SbJZKF8bA36Y9hjj3OXKKbBUe/2hSg=="],
 
     "eumenes-steer": ["eumenes-steer@vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz", {}, "sha512-d3viR9CIK/qNKPBav9hR2bIY+kNl1fPyQW4a893LrkKvlA8EsUzQRH9StDWfku3QTBnNoBNjYK/lCbeCmcQHYg=="],
+
+    "eumenes-thought-plan": ["eumenes-thought-plan@vendor/thought-plan/eumenes-thought-plan-0.2.0-6686cf56b513.tgz", { "dependencies": { "@modelcontextprotocol/sdk": "1.31.0" }, "peerDependencies": { "openai": "7.51.0", "zod": "^4.4.3" }, "optionalPeers": ["openai"] }, "sha512-dB3FsRgygi3ZCspykOhxc04LixzXUN+oGcFTR0G99uXj9jPvxd54rpqMD/ZejGuqbFMioAmeRWLoe49Jy8nrDQ=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz", {}, "sha512-FDhxfk81KyuIKcgTHDyuX9SrYaOhKZa1aL0dkkwEausKzm1gRVCsLPNGfloiPoQUEtOc0rMvEr5LJVoWN3W6Hw=="],
 
