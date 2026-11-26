@@ -382,3 +382,28 @@ test("a running ticket whose request is no longer saved is not carried; its item
 	expect(carried.tickets).toEqual([]);
 	expect(carried.agent.items.map((i) => i.id)).toEqual(["i1"]);
 });
+
+test("a media assignment's record is told by its title and description, not as JSON", () => {
+	const note = noteFromResult({
+		id: "n2",
+		ticket: { ...ticket, question: "夕焼けの海の絵を1枚生成してください。" },
+		summary: JSON.stringify({
+			status: "completed",
+			summary: JSON.stringify({
+				id: "b62",
+				title: "夕焼けの海",
+				description: "夕焼けで染まる空と海の風景絵を1枚生成します。",
+				artifactId: "image_6a",
+				width: 512,
+			}),
+			fulfilled: ["夕焼けの海の絵を1枚生成した"],
+			links: ["eumenes://image/image_6a"],
+		}),
+		at: 5,
+	});
+	expect(note!.summary).toBe(
+		"「夕焼けの海」：夕焼けで染まる空と海の風景絵を1枚生成します。",
+	);
+	expect(note!.markdown).not.toContain("artifactId");
+	expect(note!.markdown).toContain("- eumenes://image/image_6a");
+});

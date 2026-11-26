@@ -48,6 +48,29 @@ const lines = (value: unknown) =>
 	Array.isArray(value) ? value.map(text).filter(Boolean) : [];
 
 /**
+ * What a result's summary says, for the person who reads the report. A media assignment's summary is the record of
+ * what it made (JSON): its title and description are told, the rest (ids, model, sizes) is the record's own.
+ */
+function readable(summary: string): string {
+	if (!summary.startsWith("{")) return summary;
+	try {
+		const record: unknown = JSON.parse(summary);
+		if (!record || typeof record !== "object" || Array.isArray(record))
+			return summary;
+		const { title, description } = record as {
+			title?: unknown;
+			description?: unknown;
+		};
+		const told = [text(title) && `「${text(title)}」`, text(description)]
+			.filter(Boolean)
+			.join("：");
+		return told;
+	} catch {
+		return summary;
+	}
+}
+
+/**
  * The work report an assignment comes back as: the same kind of note as a research, so the agent reads, shows and
  * tells it the same way. Sections without content are left out.
  */
@@ -63,7 +86,9 @@ function reportNote(input: {
 	const request = input.ticket.question
 		.replace(/\n?相手が示したURL:.*$/su, "")
 		.trim();
-	const summary = text(result?.summary) || (result ? "" : input.summary.trim());
+	const summary = readable(
+		text(result?.summary) || (result ? "" : input.summary.trim()),
+	);
 	const fulfilled = lines(result?.fulfilled);
 	const missing = lines(result?.missing);
 	const links = lines(result?.links);
