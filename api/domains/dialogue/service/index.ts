@@ -47,13 +47,11 @@ import type {
 } from "../contracts";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { byId, interruptUnfinished, listRuns } from "../repository";
-import { dropRunResults, forgetWork } from "../repository/work";
-import { forgetWorkResources } from "../repository/resources";
 import { createAgentSync } from "./agent-sync";
 import {
-	closeRetiredTodosInTransaction,
-	flushRetiredCancellations,
-} from "./todo-closure";
+	forgetRetiredTodoTracesInTransaction,
+	type RetiredResearchErase,
+} from "./retired-todo-traces";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createCompactionSummaryHandler } from "./compaction-summary";
 import { createGenerationHandler } from "./generation-handler";
@@ -89,7 +87,7 @@ const log = getLogger("dialogue");
 /** A corrected message is shown as corrected: the log's frozen copy of it is rewritten (section 13). */
 function registerCorrectionHook(deps: DialogueDeps) {
 	deps.conversation.addCorrectHook?.((db, messageId, at) => {
-		clearOffersFromMessage(db, messageId, at);
+		clearOffersFromMessage(db, messageId);
 		const found = deps.conversation.messageInTransaction(db, messageId);
 		if (!found) return;
 		const { message } = found;
@@ -114,40 +112,11 @@ function registerCorrectionHook(deps: DialogueDeps) {
 	});
 }
 
-/**
- * The TODO rows the retired ledger left still hold the words of the messages they came from: forgetting clears them
- * (their results leave the log, their resources are no longer shown), and a report deleted at its owner leaves no copy.
- */
-function forgetRetiredWork(
-	deps: DialogueDeps,
-	db: Database,
-	messageIds: readonly string[],
-) {
-	const at = deps.clock();
-	const forgotten = forgetWork(db, messageIds, at);
-	if (forgotten.length === 0) return;
-	forgetWorkResources(db, forgotten, at);
-	deps.continuity.events.forgetMessagesInTransaction(
-		db,
-		forgotten.map((row) => `work:${row.id}`),
-		at,
-	);
-}
-
-/**
- * What follows a change elsewhere: forgetting and deleted reports reach what the retired TODO ledger left (section
- * 13); a correction and a forget reach the conversation's input.
- */
+/** What follows a change elsewhere: a correction and a forget reach the conversation's input. */
 function registerChangeHooks(deps: DialogueDeps) {
-	deps.memory?.registerForgetPurge((db, purge) =>
-		forgetRetiredWork(deps, db, purge.messageIds),
-	);
-	deps.agents?.registerDataDeletion?.((db, runId) => {
-		dropRunResults(db, runId, deps.clock());
-	});
 	registerCorrectionHook(deps);
 	deps.conversation.addRetractHook?.((db, messageId) => {
-		clearOffersFromMessage(db, messageId, deps.clock());
+		clearOffersFromMessage(db, messageId);
 		deps.contextInputs?.invalidate();
 	});
 	registerForgetHook(deps);
@@ -281,8 +250,13 @@ export function createDialogueService({
 		agents,
 		logFile: logFile ?? (() => undefined),
 	});
+	let eraseRetiredResearch: RetiredResearchErase | undefined;
 	const service = {
 		...createSpecialistHost(deps),
+		/** The owner that forgets the research runs a dropped TODO named; registered before `recover`. */
+		registerRetiredResearchErase(erase: RetiredResearchErase) {
+			eraseRetiredResearch = erase;
+		},
 		acceptExistingInTransaction: intake.acceptExistingInTransaction,
 		executionCommands: executionCommands(deps),
 		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */
@@ -347,15 +321,13 @@ export function createDialogueService({
 				for (const run of interruptUnfinished(db, clock()))
 					runEndedInTransaction(deps, db, run, "interrupted");
 			});
-			// The TODOs and confirmations the retired ledger left open are closed once, the work cancelled at its owner.
-			const retired = await store.write((db) =>
-				closeRetiredTodosInTransaction(deps, db),
+			// What the dropped TODO ledger made elsewhere is forgotten once.
+			const forgotten = await store.write((db) =>
+				forgetRetiredTodoTracesInTransaction(deps, db, eraseRetiredResearch),
 			);
-			if (retired.cancelled > 0) flushRetiredCancellations(deps.queue);
-			if (retired.closed > 0 || retired.cancelled > 0)
-				log.info("dialogue.retired_todos_closed", {
-					count: retired.closed,
-					outcome: `cancelled:${retired.cancelled}`,
+			if (forgotten > 0)
+				log.info("dialogue.retired_todo_traces_forgotten", {
+					count: forgotten,
 				});
 		},
 		get(runId: string) {

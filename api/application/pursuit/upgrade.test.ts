@@ -1,5 +1,4 @@
-import { researchSourceIds } from "../../domains/dialogue";
-import { forgetRetiredResearch } from "./forget-research";
+import { forgetPursuitReports } from "../../domains/pursuit";
 import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -51,7 +50,7 @@ test("Eumenes upgrades an existing schema 8 pursuit database through its migrati
 	}
 });
 
-test("forgetting the source erases a retired report and its old research records", async () => {
+test("forgetting a retired research run erases its report and old research records, and leaves the other runs", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "pursuit-forget-"));
 	const store = openStore(join(dir, "db"), applicationMigrations);
 	const removed: string[] = [];
@@ -77,18 +76,8 @@ INSERT INTO pursuit_documents(run_id,epoch,id,url,title,text,fetched_at,truncate
 INSERT INTO pursuit_runs(id,conversation_id,state,epoch,revision,deadline,step,data_json,created_at,updated_at)
  VALUES('other','main','completed',0,0,0,1,'{}',1,1);
 INSERT INTO pursuit_runs(id,conversation_id,state,epoch,revision,deadline,step,data_json,created_at,updated_at)
- VALUES('note-run','main','completed',0,0,0,1,'{}',1,1);
-INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
- VALUES('todo','main','run','web.research','toolchain:web.research@1','task','old request','title','done',1,'report','key','date','date','["message"]');
-INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
- VALUES('kept-todo','main','kept-run','web.research','toolchain:web.research@1','task','kept request','kept','done',1,'kept','kept-key','date','date','["other-message"]');
-INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
- VALUES('other-todo','main','other-run','other.toolchain','toolchain:other@1','task','other request','other','done',1,'other','other-key','date','date','["message"]');
-INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
- VALUES('note-todo','main','note-run','web.note','toolchain:web.note@1','task','note request','note','done',1,'note-run','note-key','date','date','["message"]');
-INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
- VALUES('blank-todo','main','blank-run','web.research','toolchain:web.research@1','task','blank request','blank','done',1,'','blank-key','date','date','["message"]');`);
-			forgetRetiredResearch(
+ VALUES('note-run','main','completed',0,0,0,1,'{}',1,1);`);
+			forgetPursuitReports(
 				db,
 				["unrelated"],
 				1,
@@ -96,14 +85,9 @@ INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revis
 				(id) => notices.push(id),
 			);
 			expect(removed).toEqual([]);
-			// Forget clears the TODO's words. The hook still has to see source_ref.
-			db.query(
-				"UPDATE dialogue_work SET request='', title='', question=NULL, result_json=NULL WHERE id='todo'",
-			).run();
-			expect(researchSourceIds(db, ["message"])).toEqual(["report"]);
-			forgetRetiredResearch(
+			forgetPursuitReports(
 				db,
-				["message"],
+				["report"],
 				2,
 				(id) => removed.push(id),
 				(id) => notices.push(id),
@@ -143,9 +127,9 @@ INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revis
 					.query("SELECT data_json FROM pursuit_runs WHERE id='note-run'")
 					.get(),
 			).toEqual({ data_json: "{}" });
-			forgetRetiredResearch(
+			forgetPursuitReports(
 				db,
-				["message"],
+				["report"],
 				3,
 				(id) => removed.push(id),
 				(id) => notices.push(id),

@@ -32,7 +32,7 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 - **会話**: 候補は「有効catalog ∩ host対応adapter ∩ 現在の可用性」。会話担当がtoolchainの関数を選ぶ → command担当がbindingのtoolsだけを見て一操作（invoke）か確認質問（clarify）を返す → agent-runtimeの`action`経路 → tool-runtime → registry → adapter → domain。即時回答型・session型を除き、会話担当の `delegate` は依頼項目（assignment）を作り、ホストが利用者の依頼として確認なしで起動する（[担当への依頼と結果の報告](assignments.md)）。
 - **UI**: ランチャーは `GET /api/toolchain-artifacts` の一件ずつ。共通host（`web/src/domains/toolchain-artifacts`）が登録artifactを開き、書込みは `POST /api/toolchain-actions` が受付・domain実行・receipt参照を一つのtransactionで保存する。
-- **質問**: clarifyは担当の質問として会話エージェントの状態 `assignments[].question` に出て、利用者の答えを返事の `assignment(answer)` で渡すと、同じ凍結revisionで再開する。質問の保存表 `command_interactions` と、画面から答える口（`/api/toolchain-interactions`）は2026-11-25に廃止した（表は行を残して書き込みを止めた）。登録済みrevisionに残る `answer`・`questionDefinition` の欄は、今は読まれない。
+- **質問**: clarifyは担当の質問として会話エージェントの状態 `assignments[].question` に出て、利用者の答えを返事の `assignment(answer)` で渡すと、同じ凍結revisionで再開する。質問の保存表 `command_interactions` と、画面から答える口（`/api/toolchain-interactions`）は2026-11-25に廃止した（表は2026-11-26に行ごと消した）。登録済みrevisionに残る `answer`・`questionDefinition` の欄は、今は読まれない。
 
 ### 日常の複数操作を接続するtask型
 

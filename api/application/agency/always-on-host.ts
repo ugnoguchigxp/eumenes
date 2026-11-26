@@ -41,12 +41,21 @@ const log = getLogger("agency");
  * it. Host orchestration only: the agent keeps the list of things to do and decides when and which; the host feeds it
  * the conversation, hands its tickets to the toolchains and the speech path, and saves what it owes across a restart.
  */
+/** The host's clock and timers: the deps' own (tests), else the real ones. */
+function hostTimers(deps: AgencyHostDeps) {
+	return {
+		now: deps.nowMs ?? Date.now,
+		setTimer:
+			deps.setTimer ??
+			((fn: () => void, ms: number): unknown => setTimeout(fn, ms)),
+		clearTimer:
+			deps.clearTimer ??
+			((id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>)),
+	};
+}
+
 export function createAlwaysOnHost(deps: AgencyHostDeps) {
-	const now = deps.nowMs ?? Date.now;
-	const setTimer = deps.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
-	const clearTimer =
-		deps.clearTimer ??
-		((id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>));
+	const { now, setTimer, clearTimer } = hostTimers(deps);
 	const convs = new Map<string, AgendaScope>();
 	const persisted = new Map<string, number>();
 	const recovering = new Set<string>();

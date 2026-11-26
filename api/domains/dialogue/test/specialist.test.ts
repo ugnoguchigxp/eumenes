@@ -365,7 +365,6 @@ test("a saved item starts the session from it; the fill offers exactly the issue
 	// Changing a saved item is handed over at once, with no confirmation: the session starts from it.
 	expect(await h.session()).toMatchObject({ label: "保存済み item-1" });
 	expect(h.work()[0]!.savedRef).toBe("item-1");
-	expect(h.rows("SELECT id FROM dialogue_confirmations")).toEqual([]);
 });
 
 test("an item on screen the host did not issue is not shown", async () => {
@@ -390,7 +389,6 @@ test("a change of a saved item is handed over at once, naming the item and askin
 	h.state.specialist.push(reply("開きました"));
 	const asked = await h.ask("保存済み2の見出しを直して");
 	expect(asked.announcement).toBe("「制作担当」に頼みます。");
-	expect(h.rows("SELECT id FROM dialogue_confirmations")).toEqual([]);
 	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
 	expect(h.work()[0]!.savedRef).toBe("item-2");
 });
@@ -407,7 +405,6 @@ test("a request to make something new is handed to the specialist at once, on a 
 	);
 	h.state.specialist.push(reply("どんな雰囲気にしますか。"));
 	await h.ask("イヤホンのランディングページを作りたいです");
-	expect(h.rows("SELECT id FROM dialogue_confirmations")).toEqual([]);
 	expect(await h.session()).toMatchObject({ label: "新規" });
 	expect(h.work()[0]!.savedRef).toBeNull();
 	expect(h.state.specialistPrompts).toHaveLength(1);
@@ -425,7 +422,6 @@ test("an item the host never issued is refused: nothing starts and no confirmati
 	);
 	const refused = await h.ask("見出しを直して");
 	expect(h.answerText(refused.id)).toBe("その依頼は今の担当で実行できません。");
-	expect(h.rows("SELECT ref FROM dialogue_confirmations")).toEqual([]);
 	expect(await h.session()).toBeNull();
 	expect(h.work()).toHaveLength(0);
 	expect(h.state.specialistPrompts).toHaveLength(0);

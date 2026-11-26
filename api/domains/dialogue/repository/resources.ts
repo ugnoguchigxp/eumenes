@@ -247,8 +247,8 @@ export function resourcesOfWorks(
 
 /**
  * Forgetting reaches the resources of the work that came from a forgotten message (section 4.2): the resources it
- * made are no longer shown (the number stays taken). `works` are the TODO rows the retired ledger left and the
- * agency's work roots, whichever the resources were entered under.
+ * made are no longer shown (the number stays taken). `works` are the agency's work roots the resources were
+ * entered under.
  */
 export function forgetWorkResources(
 	db: Database,

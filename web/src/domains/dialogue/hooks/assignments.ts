@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../../client";
 import { queryRoots } from "../../../queryKeys";
 
@@ -15,7 +15,7 @@ export function useAssignmentArtifacts(
 	conversationId: string,
 	open: (adapterRef: string, targetRef?: string) => unknown,
 ) {
-	const loadedAt = useRef(Date.now());
+	const [loadedAt] = useState(() => Date.now());
 	const opened = useRef(new Set<string>());
 	const status = useQuery({
 		queryKey: [
@@ -33,8 +33,8 @@ export function useAssignmentArtifacts(
 		for (const a of assignments) {
 			if (opened.current.has(a.assignment)) continue;
 			opened.current.add(a.assignment);
-			if (a.at < loadedAt.current) continue;
+			if (a.at < loadedAt) continue;
 			open(a.adapterRef, a.targetRef);
 		}
-	}, [assignments, open]);
+	}, [assignments, open, loadedAt]);
 }

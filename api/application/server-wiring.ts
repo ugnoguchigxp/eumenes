@@ -8,6 +8,7 @@ import {
 } from "../domains/dialogue";
 import { createGitObservation } from "../domains/git-observation";
 import type { createMemoryService } from "../domains/memory";
+import { forgetPursuitReports } from "../domains/pursuit";
 import {
 	createLarmCollector,
 	createLarmRepository,
@@ -42,7 +43,6 @@ import { buildMarkdown } from "./markdown/markdown-composition";
 import { generatedImageInput } from "./media/generated-image-input";
 import type { createLiveBridge } from "./media/live-bridge";
 import { buildAnalysisFactory } from "./media/visual-perception";
-import { forgetRetiredResearch } from "./pursuit/forget-research";
 import type { createLateResources } from "./resources/late";
 import type { buildResources } from "./resources/wiring";
 import { createSchedulerDiagnostics } from "./scheduler/scheduler-diagnostics";
@@ -201,15 +201,16 @@ export function registerForgetPurges(deps: {
 	memory.registerForgetPurge((db, purge) =>
 		deps.knowledge.forgetSupervisionSourcesInTransaction(db, purge.messageIds),
 	);
-	memory.registerForgetPurge((db, purge) => {
-		forgetRetiredResearch(
+	// The research runs a dropped TODO named are forgotten once at startup, with the Web research they read.
+	deps.dialogue.registerRetiredResearchErase((db, runIds) =>
+		forgetPursuitReports(
 			db,
-			purge.messageIds,
+			runIds,
 			Date.now(),
 			(id) => deps.webResearch.forgetInTransaction(db, id),
 			(id) => deps.dialogue.revokeExecutionNoticeInTransaction(db, id),
-		);
-	});
+		),
+	);
 }
 
 export function buildMonitoringService(

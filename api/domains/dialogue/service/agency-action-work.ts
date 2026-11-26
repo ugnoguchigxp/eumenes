@@ -2,12 +2,6 @@ import type { Database } from "bun:sqlite";
 import type { ExecutionView } from "../../tool-runtime";
 import type { ResourceRegistry } from "../../resources";
 import { forgetWorkResources } from "../repository/resources";
-import {
-	archiveWork,
-	eraseWorkBySource,
-	updateWork,
-	workBySource,
-} from "../repository/work";
 import { createResourceLedger } from "./resource-ledger";
 
 /**
@@ -37,7 +31,6 @@ export function agencyActionWork(
 				workId: rootId,
 				links,
 			});
-			closeLegacyTodo(db, view, new Date(now()).toISOString());
 		},
 		link(
 			db: Database,
@@ -55,52 +48,11 @@ export function agencyActionWork(
 	};
 }
 
-/**
- * Work the agency started before it held its work alone has a TODO row: it ends with the work, so no row stays open
- * in the conversation's list.
- */
-function closeLegacyTodo(db: Database, view: ExecutionView, at: string) {
-	const legacy = workBySource(db, view.id);
-	if (!legacy || legacy.status === "done") return;
-	const outcome =
-		view.status === "completed"
-			? "succeeded"
-			: view.status === "cancelled"
-				? "cancelled"
-				: view.status === "interrupted"
-					? "interrupted"
-					: view.status === "failed"
-						? "failed"
-						: "partial";
-	if (
-		updateWork(
-			db,
-			legacy.id,
-			legacy.revision,
-			{
-				status: "done",
-				outcome,
-				questionId: null,
-				question: null,
-				result: view.result,
-			},
-			at,
-		)
-	)
-		archiveWork(db, legacy.id, at);
-}
-
-/**
- * The work's origin was forgotten: the resources it made are no longer shown (their numbers stay taken). Work started
- * before the agency held its work alone also loses its TODO row and the resources entered under it.
- */
+/** The work's origin was forgotten: the resources it made are no longer shown (their numbers stay taken). */
 export function eraseAgencyActionWork(
 	db: Database,
-	work: { root_id: string; execution_id?: string | null },
+	work: { root_id: string },
 	now: number,
 ) {
-	const at = new Date(now).toISOString();
-	forgetWorkResources(db, [{ id: work.root_id }], at);
-	if (work.execution_id)
-		forgetWorkResources(db, eraseWorkBySource(db, work.execution_id, at), at);
+	forgetWorkResources(db, [{ id: work.root_id }], new Date(now).toISOString());
 }

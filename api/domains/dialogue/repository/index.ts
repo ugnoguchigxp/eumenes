@@ -1,5 +1,6 @@
 import { forgetHiddenMigration } from "./forget-hidden";
 import { memoryRefsMigration } from "./memory-refs";
+import { dropRetiredTodosMigration } from "./retired-todos";
 import {
 	assignmentImagesMigration,
 	generatedImagesMigration,
@@ -516,6 +517,7 @@ CREATE TABLE dialogue_search_offers (
 	forgetHiddenMigration,
 	memoryRefsMigration,
 	assignmentImagesMigration,
+	dropRetiredTodosMigration,
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

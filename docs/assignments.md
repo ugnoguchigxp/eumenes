@@ -34,7 +34,7 @@
 | `assignment` ツール | `api/application/agency/always-on-assignments.ts` |
 | 作業報告メモ（`reportNote`）と文書への保存 | `api/application/agency/always-on-memory.ts` |
 | 起動を一件ずつの開始鍵にする（一つの発言から複数件） | `api/domains/agent-runtime/service/execution-single.ts`・`execution-pipeline.ts`（`startKey`） |
-| 起動時の TODO の閉鎖 | `api/domains/dialogue/service/todo-closure.ts`（`recover()` から呼ぶ） |
+| 旧 TODO の表の削除と、その痕跡の忘却 | `api/domains/dialogue/repository/retired-todos.ts`（マイグレーション）、`api/domains/dialogue/service/retired-todo-traces.ts`（`recover()` から呼ぶ） |
 
 ## `delegate` の結果
 
@@ -204,8 +204,7 @@ refused: invalid_answer（回答の形: {"type":"object","properties":{…}}）
 | 担当がいない | agenda が会話を担当していなければ `delegate` は `agency_unavailable`。ローカル（Ruri 振り分け）経路の `handWith` も `delegate` を呼ぶだけ |
 | 期限 | 項目は2時間で期限切れになり、`やり遂げられなかった`。再起動をまたぐ項目は agency のチェックポイントから戻り、起動中の実行は引き継いで二重に起動しない |
 | 失敗 | 担当の失敗・期限切れ・権限の取消は `やり遂げられなかった`。取消（`やめた`）とは別に扱い、エージェントが失敗を話す |
-| 起動時の閉鎖 | 起動のたびに、開いたまま残った TODO 行と確認・質問の行を閉じる（`todo-closure.ts`）。task の実行中のものは持ち主へ取消を送り、TODO は `interrupted` で閉じる。依頼項目へは移さない。開いた行が無ければ何もしないので、効くのは最初の一回だけ |
-| 表 | `dialogue_work`・`dialogue_confirmations`・`command_interactions` は行を残し、書き込みを止めた。表を消すかは別のマイグレーションで決める |
+| 旧 TODO の記録 | 表ごと消した（2026-11-26、`dialogue/0049-drop-retired-todos`）。TODO・確認・コマンドの質問フォーム・TODO を鍵にした最初の画像の表が対象。TODO が作ったものも一緒に消す。古い発言の添付チップは非表示にし、短期記憶の TODO 結果は「あったこと」だけにし、旧調べもの報告は Web の調べものごと消す。チップと報告はマイグレーションと次の起動で一度だけ消え（`retired-todo-traces.ts`）、画像・音楽・文書そのものは各画面に残る |
 | 通知 | TODO の通知 API（`/api/todo-notices*`）・TODO 画面・質問フォーム（`/api/toolchain-interactions*`）は廃止した。完了と質問の知らせは、エージェントの発言だけ |
 | 登録目標・自律行動 | 変更しない。登録目標の実作業（`goalWork.delegation`）と、agency が自分で始める作業の上限と承認はそのまま |
 
@@ -218,7 +217,7 @@ refused: invalid_answer（回答の形: {"type":"object","properties":{…}}）
 | 依頼項目の作成・取消・回答・作業報告メモ・忘却 | `bun test api/application/agency/always-on-assignments.test.ts` |
 | 種別ごとの起動（画像・曲・command の質問・pipeline の `routedSteps`・開始詳細の改ざん・playlist） | `bun test api/application/agency/assignment-kinds.test.ts` |
 | 取消が LARM に届く・権限の取消・構造化回答・出典付きのメモ | `bun test api/application/agency/assignment-repairs.test.ts` |
-| 起動時の閉鎖 | `bun test api/domains/dialogue/test/todo-closure.test.ts` |
+| 旧 TODO の表の削除 | `bun test ./api/domains/dialogue/test/retired-todos.test.ts` |
 | TODO 画面の入口を launcher から外す migration | `bun test api/domains/capabilities/test/agency-todos-retire.test.ts` |
 | 確認なしの依頼・`agency_unavailable` | `bun test api/domains/dialogue/test/talk-work.test.ts` |
 | 会話・agency | `bun run verify -- --domain dialogue` |

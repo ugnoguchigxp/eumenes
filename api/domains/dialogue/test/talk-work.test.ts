@@ -42,16 +42,6 @@ const delegate = (toolchain: string, request: string) => ({
 	calls: [{ name: "delegate", args: { toolchain, request } }],
 });
 
-const confirmations = () =>
-	h!.store.read(
-		(db) =>
-			db
-				.query<{ n: number }, []>(
-					"SELECT COUNT(*) AS n FROM dialogue_confirmations",
-				)
-				.get()!.n,
-	);
-
 test("conversation and discussion do not start a toolchain search", async () => {
 	h = await setup({ conversationAgent: handing });
 	h.state.steps.push({
@@ -142,7 +132,6 @@ test("a reply that agreed to make something finds the toolchain and hands it the
 		toolchainId: IMAGE.id,
 		request: "夕暮れの猫の絵を描いてください",
 	});
-	expect(confirmations()).toBe(0);
 });
 
 test("a change of what exists is no longer confirmed: the request is the agent's assignment at once", async () => {
@@ -162,7 +151,6 @@ test("a change of what exists is no longer confirmed: the request is the agent's
 	expect(assigned.map((a) => a.request)).toEqual([
 		"壁紙を夕暮れの猫に差し替える",
 	]);
-	expect(confirmations()).toBe(0);
 });
 
 /**
@@ -220,10 +208,9 @@ async function delegateDirect(
 	};
 }
 
-test("a request naming a saved item (modify_existing) becomes an assignment with no confirmation, and the confirmations stay as they were", async () => {
+test("a request naming a saved item (modify_existing) becomes an assignment with no confirmation", async () => {
 	h = await setup({ conversationAgent: handing });
 	h.state.steps.push({ text: "承知しました。" });
-	const before = confirmations();
 	const { agency, assigned } = agencyOf();
 	const { outcome, run } = await delegateDirect(agency, {
 		toolchain: IMAGE.id,
@@ -244,7 +231,6 @@ test("a request naming a saved item (modify_existing) becomes an assignment with
 		details: { target: "wallpaper-1", resolveUnsaved: "discard" },
 	});
 	expect(assigned[0]!.source.runId).toBe(run.id);
-	expect(confirmations()).toBe(before);
 });
 
 test("an assignment carries the binding's adapter for its screen to open; a toolchain without a binding carries none", async () => {
@@ -275,7 +261,6 @@ test("agency_unavailable: the agenda does not serve the conversation, so nothing
 		code: `${IMAGE.title}: agency_unavailable`,
 	});
 	expect(assigned).toHaveLength(0);
-	expect(confirmations()).toBe(0);
 	// The same through the delegate call alone.
 	h.state.steps.push({ text: "はい。" });
 	const direct = await delegateDirect(agencyOf(false).agency, {

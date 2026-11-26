@@ -10,6 +10,7 @@ import {
 	createAgencyActions,
 	stopAgencyExecution,
 	type AgencyActionDeps,
+	type AgencyStartInput,
 } from "./agency-actions";
 import { agencyForgetting } from "./agency-forgetting";
 import { refreshAgencyDependencies } from "./agency-memory";
@@ -33,22 +34,17 @@ import {
 } from "../repository/agency";
 import type { MemoryService } from "../../memory";
 import type { AgentRuntime } from "../../agent-runtime";
-import type { ExecutionReference } from "../../tool-runtime";
-import type {
-	AssignmentDetails,
-	AssignmentSource,
-} from "../contracts/agency-always-on";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { agencyObservations } from "../repository/agency-observations";
 
-export function createAgencyStatePort(
-	deps: AgencyActionDeps & {
-		agents?: AgentRuntime;
-		toolchains?: ToolchainRoutingPort | undefined;
-		now: () => number;
-		memory?: Pick<MemoryService, "referenceInputs">;
-	},
-) {
+type AgencyStateDeps = AgencyActionDeps & {
+	agents?: AgentRuntime;
+	toolchains?: ToolchainRoutingPort | undefined;
+	now: () => number;
+	memory?: Pick<MemoryService, "referenceInputs">;
+};
+
+export function createAgencyStatePort(deps: AgencyStateDeps) {
 	const actions = createAgencyActions(deps);
 	const forgetting = agencyForgetting(deps);
 	const revoke = (db: Database, id: string) => {
@@ -201,30 +197,7 @@ export function createAgencyStatePort(
 					.map((w) => w.root_id),
 			);
 		},
-		startInTransaction(
-			db: Database,
-			input: {
-				rootId: string;
-				conversationId: string;
-				epoch: number;
-				ticketId: string;
-				intentId?: string;
-				candidateId?: string;
-				question: string;
-				revisionId: string;
-				deadline: number;
-				outboundIntervalMs: number;
-				sourceRefs: readonly string[];
-				arguments?: Record<string, unknown>;
-				/** Work the user asked for (`delegate`): the user's request is its authority, not the agency's budget. */
-				assignment?: boolean;
-				references?: readonly ExecutionReference[];
-				/** An assignment's user-message source: the toolchain takes the work as the user's. */
-				source?: AssignmentSource;
-				/** An assignment's other `delegate` fields, as they were given. */
-				details?: AssignmentDetails;
-			},
-		) {
+		startInTransaction(db: Database, input: AgencyStartInput) {
 			if (actions.available()) return actions.start(db, input);
 			if (input.assignment) throw new Error("agency_execution_unavailable");
 			if (!deps.agents || !deps.toolchains)
@@ -302,51 +275,58 @@ export function createAgencyStatePort(
 			revokeAgencyWork(db, id);
 		},
 		revokeInTransaction: revoke,
-		/**
-		 * The agency's settings changed: the checkpoint is kept for the user's own requests (the assignments, their items
-		 * and tickets, the works that run them), under the new digest and the same epoch. What else the agency held, and
-		 * the works behind it, go as a revoke takes them. False (nothing is changed) when the record holds no request of
-		 * the user's: the caller revokes it.
-		 */
-		carryAssignmentsInTransaction(
+		carryAssignmentsInTransaction: (
 			db: Database,
 			conversationId: string,
 			settingsDigest: string,
-		) {
-			const record = agencyRecords(db).find(
-				(r) => r.conversationId === conversationId,
-			);
-			if (!record || !isAgendaSnapshot(record.snapshot)) return false;
-			const carried = carryAssignments(record.snapshot);
-			if (!carried) return false;
-			const kept = new Set(carried.tickets.map((t) => t.id));
-			for (const w of agencyWorks(db, conversationId))
-				if (!kept.has(w.ticket_id)) {
-					if (w.execution_id) eraseAgencyActionWork(db, w, deps.now());
-					if (w.execution_id) stopAgencyExecution(deps, db, w, true);
-					deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
-					revokeAgencyWork(db, w.root_id);
-				}
-			const sourceRefs = agendaSources(carried);
-			if (
-				!saveAgency(
-					db,
-					{ ...record, snapshot: carried, settingsDigest, sourceRefs },
-					deps.now(),
-				)
-			)
-				throw new Error("agency_checkpoint_stale");
-			refreshAgencyDependencies(
-				db,
-				deps.memory,
-				conversationId,
-				record.scope,
-				sourceRefs,
-			);
-			return true;
-		},
+		) => carryAgencyAssignments(deps, db, conversationId, settingsDigest),
 		...forgetting,
 	};
 }
+/**
+ * The agency's settings changed: the checkpoint is kept for the user's own requests (the assignments, their items
+ * and tickets, the works that run them), under the new digest and the same epoch. What else the agency held, and
+ * the works behind it, go as a revoke takes them. False (nothing is changed) when the record holds no request of
+ * the user's: the caller revokes it.
+ */
+function carryAgencyAssignments(
+	deps: AgencyStateDeps,
+	db: Database,
+	conversationId: string,
+	settingsDigest: string,
+) {
+	const record = agencyRecords(db).find(
+		(r) => r.conversationId === conversationId,
+	);
+	if (!record || !isAgendaSnapshot(record.snapshot)) return false;
+	const carried = carryAssignments(record.snapshot);
+	if (!carried) return false;
+	const kept = new Set(carried.tickets.map((t) => t.id));
+	for (const w of agencyWorks(db, conversationId))
+		if (!kept.has(w.ticket_id)) {
+			if (w.execution_id) eraseAgencyActionWork(db, w, deps.now());
+			if (w.execution_id) stopAgencyExecution(deps, db, w, true);
+			deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
+			revokeAgencyWork(db, w.root_id);
+		}
+	const sourceRefs = agendaSources(carried);
+	if (
+		!saveAgency(
+			db,
+			{ ...record, snapshot: carried, settingsDigest, sourceRefs },
+			deps.now(),
+		)
+	)
+		throw new Error("agency_checkpoint_stale");
+	refreshAgencyDependencies(
+		db,
+		deps.memory,
+		conversationId,
+		record.scope,
+		sourceRefs,
+	);
+	return true;
+}
+
 export type AgencyStatePort = ReturnType<typeof createAgencyStatePort>;
 export type { AgencyRecord };

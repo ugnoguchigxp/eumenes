@@ -300,7 +300,7 @@ live（実モデル・実 Claude Code）での確認は、利用者の指示が�
 | 依頼の詳細 `AssignmentDetails`（`inputs`・`target`・`diagnosticRef`・`resolveUnsaved`・`routedSteps`）を項目に保存し、起動前に照合する（`agency_origin_stale`） | 同上 |
 | 確認の廃止: `delegate` の `mode`・`revises`・`announcement`・`impact`、`approve_confirmation`・`decline_confirmation`、確認台帳への書き込み。取り返しのつかない操作の判断は、Claude Code 自身の質問（`assignments` → `assignment(answer)`） | 実装済み |
 | TODO の廃止: `work` ツール、run を待つ dispatch、TODO 台帳への書き込み、`/api/todo-notices*`、`/api/toolchain-interactions*`、Web の TODO 画面と通知カード、command の質問フォーム、`agency.todos` の bundle（launcher から外す migration とその試験を含む） | 実装済み。表 `dialogue_work`・`dialogue_confirmations`・`command_interactions` は行を残して書き込みを止めた |
-| 起動時の閉鎖（`todo-closure.ts`）: 開いた TODO・確認・質問の行を一度だけ閉じ、task の実行中のものは持ち主へ取消を送る | 実装・fixture 試験済み（`todo-closure.test.ts`） |
+| 起動時の閉鎖（`todo-closure.ts`）: 開いた TODO・確認・質問の行を一度だけ閉じ、task の実行中のものは持ち主へ取消を送る | 実装し、本番で開いた行が 0 件になった後に削除した（第14節） |
 | `agency_unavailable`: agenda が会話を担当していなければ `delegate` は断る | 実装・fixture 試験済み（`talk-work.test.ts`） |
 | 第1段の続きで直したもの: 取消が LARM に届かない、構造化回答、command の結果、作業報告の出典、画像・音楽の空き待ちの再試行、Claude Code の完了通知の二重 | 実装・fixture 試験済み（`assignment-repairs.test.ts`） |
 
@@ -310,7 +310,35 @@ live（実モデル・実 Claude Code）での確認は、利用者の指示が�
 | --- | --- |
 | 読まれないデータ | 登録済みの capability revision には、command の質問フォームのための `answer`・`questionDefinition` の欄が残っている。読むコードは無い。revision は書き換えず（既存の版は変えない規則）、次に版を上げるときに外す |
 | 即時性の高い command の報告 | タイマーなどの短い command も非同期の依頼になり、結果を毎回メモ（文書）にして報告する。問題になれば、その担当を `instant` へ移す（データドリブン、版を上げる）。決めていない |
-| 表の扱い | `dialogue_work`・`dialogue_confirmations`・`command_interactions` を消すマイグレーションは作っていない（別に決める） |
+| 表の扱い | 第14節で表ごと消した |
 | 画像のモデルへの提示 | 依頼で作った画像を会話モデルに見せる観測は残した。鍵を TODO の id から依頼の作業 root と利用者の run に付け替えた（`dialogue_assignment_images`）。利用者が頼んだ画像も、agency 自身の調べものの画像も見つかる |
 | 検証 | 固定試験は domain ごとに通っている。全体スイートの一括実行と独立レビューはコミット時点で未了。**live（実モデル・実 Claude Code・実 LARM）の確認と実機器の確認は未実施**で、利用者の指示を待つ。画面（Web）の描画・操作も実画面では未確認 |
 | 試験の登録 | `always-on-assignments.test.ts`・`assignment-kinds.test.ts`・`assignment-repairs.test.ts` は `scripts/domains.ts` の統合試験一覧に載っていない（ファイルを指定して流す） |
+
+## 14. 旧 TODO の記録を表ごと消す（2026-11-26・利用者の決定）
+
+利用者の決定は二つ。旧 TODO の記録を表ごと消し、旧 TODO の痕跡を全部消す。TODO 経由で「忘れる」が届いていた記録も一緒に消す。
+
+| 対象 | 扱い | 本番の件数（消す前） |
+| --- | --- | --- |
+| `dialogue_work`・`dialogue_confirmations`・`command_interactions`・`command_interaction_events`・`dialogue_generated_images` | `dialogue/0049-drop-retired-todos` で表ごと削除。直前のバックアップは移行処理が自動で取る | TODO 781・確認 30・質問 3・旧画像 6 |
+| TODO が作ったリソース（古い発言の添付チップ） | 同じマイグレーションで `forgotten_at` を付けて非表示にする。番号は使用済みのまま | 83（会話 20） |
+| 短期記憶の TODO 結果（`work:<id>` の出来事） | `dialogue_retired_todo_traces` に入れ、起動時に continuity の忘却（`forgetMessagesInTransaction`）で「あったこと」だけにする | 159 |
+| 旧調べもの（`web.research` TODO の `source_ref`） | 同じ表に入れ、起動時に Pursuit の忘却（`forgetPursuitReports`、Web の調べもの・通知を含む）で消す。持ち主が登録されるまで待つ | 19 |
+
+マイグレーションが実行できるのは SQL だけなので、持ち主の規則が要る忘却は起動時の一度きりの処理（`retired-todo-traces.ts`）に分けた。
+
+消したコード:
+- `todo-closure.ts`。
+- 旧 TODO 行を閉じる・消す処理（`closeLegacyTodo`・`eraseWorkBySource`）。
+- 忘却の経路（`forgetWork`・`researchSourceIds`・`forgetRetiredResearch`）。
+- 報告の削除の経路（`dropRunResults`）と、それだけが使っていた agent-runtime の `registerDataDeletion`。
+- 検索の提案の取消が確認の表に書く処理。
+- 消した表を読む試験。
+
+旧表を作ったマイグレーションの SQL は、新しい DB でも順に再生するので、適用時のまま残す。
+
+検証:
+- 固定試験 `retired-todos.test.ts` で、旧表に行を入れた DB を移行し、次の三点を確かめる。表が消えること。TODO のリソースだけが隠れること。起動時の忘却が持ち主ごとに一度だけ動き、調べものは持ち主の登録を待つこと。
+- 本番 DB の写しにマイグレーションを当て、外部キー違反が無いことを確かめた（写しは削除済み）。
+

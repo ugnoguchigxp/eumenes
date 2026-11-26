@@ -24,18 +24,9 @@ export function latestSearch(db: Database, conversationId: string) {
 		.get(conversationId);
 }
 
-export function clearOffersFromMessage(
-	db: Database,
-	messageId: string,
-	at: string,
-) {
+export function clearOffersFromMessage(db: Database, messageId: string) {
 	db.query(
 		`UPDATE dialogue_search_offers SET search_json=NULL WHERE message_id=? OR EXISTS
 		(SELECT 1 FROM json_each(search_json,'$.sources') WHERE json_extract(value,'$.id')=?)`,
 	).run(messageId, messageId);
-	db.query(
-		`UPDATE dialogue_confirmations SET superseded_at=COALESCE(superseded_at,?),revision_sources_json=NULL
-		WHERE used_at IS NULL AND (superseded_at IS NULL OR revision_sources_json IS NOT NULL)
-		AND EXISTS(SELECT 1 FROM json_each(message_ids_json) WHERE value=?)`,
-	).run(at, messageId);
 }

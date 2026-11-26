@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 
-/** The first form, keyed by the TODO; no longer written or read. */
+/** The first form, keyed by the TODO; dropped by `dialogue/0049-drop-retired-todos`. */
 export const generatedImagesMigration: Migration = {
 	id: "dialogue/0041-generated-images",
 	after: ["dialogue/0040-specialist-parked"],

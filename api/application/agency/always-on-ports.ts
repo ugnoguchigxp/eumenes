@@ -553,7 +553,7 @@ function buildAgendaStatus(input: AgendaPortsInput, id: string) {
 }
 
 export function createAgendaPorts(input: AgendaPortsInput) {
-	const { deps, convs, serving, changed } = input;
+	const { deps, convs, serving } = input;
 	const dialoguePort: AgencyLayerPort & {
 		/** The memory excluded records (a forget on its way, with a reference or without): the agency lets them go at once. */
 		memoryExcludedInTransaction(

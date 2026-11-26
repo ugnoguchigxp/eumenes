@@ -2,11 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { expect, test, vi } from "vitest";
-import type { EumenesClient } from "../../../../../client";
-import { useArtifactWorkspace } from "../../artifact";
-import { useToolchainArtifacts } from "../../toolchain-artifacts/launcher";
-import { queryRoots } from "../../../queryKeys";
-import { useAssignmentArtifacts } from "./assignments";
+import type { EumenesClient } from "../../../client";
+import { useArtifactWorkspace } from "../domains/artifact";
+import { useToolchainArtifacts } from "../domains/toolchain-artifacts/launcher";
+import { queryRoots } from "../queryKeys";
+import { useAssignmentArtifacts } from "../domains/dialogue";
 
 type Listed = {
 	assignment: string;

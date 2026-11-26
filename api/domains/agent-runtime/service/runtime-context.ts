@@ -61,10 +61,6 @@ export type RuntimeState = {
 	bindings: Map<string, ReturnType<ToolRuntime["bind"]>>;
 	/** key: "task:<id>" | "inv:<id>" */
 	reconcileFailures: Map<string, number>;
-	/** Told, in the deleting transaction, when a run's task data (its report) is deleted or expires. */
-	dataDeleted: Array<
-		(db: import("bun:sqlite").Database, rootRunId: string) => void
-	>;
 	abortJobs: Set<string>;
 	abortRequests: Set<string>;
 	releases: Set<string>;
@@ -90,7 +86,6 @@ export function createRuntimeState(): RuntimeState {
 		actionPrepared: new Map(),
 		bindings: new Map(),
 		reconcileFailures: new Map(),
-		dataDeleted: [],
 		abortJobs: new Set(),
 		abortRequests: new Set(),
 		releases: new Set(),

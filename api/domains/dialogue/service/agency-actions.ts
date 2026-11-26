@@ -52,6 +52,78 @@ export type AgencyActionDeps = {
 	queue?: Pick<QueueService, "list" | "flushCancellations">;
 	now(): number;
 };
+/** What the agency asks to start: its research, or an assignment the user asked for. */
+export type AgencyStartInput = {
+	rootId: string;
+	conversationId: string;
+	epoch: number;
+	ticketId: string;
+	intentId?: string;
+	candidateId?: string;
+	question: string;
+	revisionId: string;
+	deadline: number;
+	outboundIntervalMs: number;
+	sourceRefs: readonly string[];
+	arguments?: Record<string, unknown>;
+	/** Work the user asked for (`delegate`): the user's request is its authority, not the agency's budget. */
+	assignment?: boolean;
+	references?: readonly ExecutionReference[];
+	/** An assignment's user-message source: the toolchain takes the work as the user's. */
+	source?: AssignmentSource;
+	/** An assignment's other `delegate` fields, as they were given. */
+	details?: AssignmentDetails;
+};
+
+/** Starts the work at its owner: a task toolchain's owner, a pipeline, or a selected execution of the runtime. */
+function launch(
+	deps: AgencyActionDeps,
+	db: Database,
+	input: AgencyStartInput,
+	/** The agency's own source, or the user's words an assignment runs as. */
+	source:
+		NonNullable<ReturnType<typeof autonomousActionSource>> | AssignmentSource,
+) {
+	const entry = deps
+		.toolchains!.catalogInTransaction(db)
+		.find((e) => e.revisionId === input.revisionId)!;
+	const owner =
+		entry.runtime.execution === "task"
+			? deps.toolchains!.taskInTransaction?.(db, input.revisionId)
+			: undefined;
+	const references = [...(input.references ?? [])];
+	const view = owner
+		? owner.startInTransaction(db, {
+				source,
+				request: input.question,
+				references,
+				toolchainRevisionId: input.revisionId,
+				bindingRevisionId: entry.runtime.binding?.bindingRevisionId,
+				deadline: input.deadline,
+			})
+		: entry.runtime.execution === "pipeline"
+			? deps.agents!.executions.startPipelineInTransaction(db, {
+					source,
+					toolchainRevisionId: input.revisionId,
+					deadline: input.deadline,
+					references,
+					...(input.details?.routedSteps
+						? { routedSteps: input.details.routedSteps }
+						: {}),
+					startKey: input.rootId,
+				})
+			: deps.agents!.executions.startSelectedInTransaction(db, {
+					source,
+					chainRevisionId: input.revisionId,
+					request: input.question,
+					arguments: input.arguments,
+					references,
+					deadline: input.deadline,
+					startKey: input.rootId,
+				});
+	return view;
+}
+
 export function createAgencyActions(deps: AgencyActionDeps) {
 	const digest = (value: unknown) =>
 		hash(canonicalJson(value, { keyOrder: "codeUnit", omitUndefined: true }));
@@ -89,30 +161,7 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 	return {
 		available: () => !!deps.execution?.(),
 		catalog,
-		start(
-			db: Database,
-			input: {
-				rootId: string;
-				conversationId: string;
-				epoch: number;
-				ticketId: string;
-				intentId?: string;
-				candidateId?: string;
-				question: string;
-				revisionId: string;
-				deadline: number;
-				outboundIntervalMs: number;
-				sourceRefs: readonly string[];
-				arguments?: Record<string, unknown>;
-				/** Work the user asked for (`delegate`): the user's request is its authority, not the agency's budget. */
-				assignment?: boolean;
-				references?: readonly ExecutionReference[];
-				/** An assignment's user-message source: the toolchain takes the work as the user's. */
-				source?: AssignmentSource;
-				/** An assignment's other `delegate` fields, as they were given. */
-				details?: AssignmentDetails;
-			},
-		) {
+		start(db: Database, input: AgencyStartInput) {
 			const port = deps.execution?.();
 			if (!port || !deps.agents)
 				throw new Error("agency_execution_unavailable");
@@ -252,43 +301,7 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 					input.rootId,
 					provenance,
 				);
-			const entry = deps
-				.toolchains!.catalogInTransaction(db)
-				.find((e) => e.revisionId === input.revisionId)!;
-			const owner =
-				entry.runtime.execution === "task"
-					? deps.toolchains!.taskInTransaction?.(db, input.revisionId)
-					: undefined;
-			const references = [...(input.references ?? [])];
-			const view = owner
-				? owner.startInTransaction(db, {
-						source,
-						request: input.question,
-						references,
-						toolchainRevisionId: input.revisionId,
-						bindingRevisionId: entry.runtime.binding?.bindingRevisionId,
-						deadline: input.deadline,
-					})
-				: entry.runtime.execution === "pipeline"
-					? deps.agents.executions.startPipelineInTransaction(db, {
-							source,
-							toolchainRevisionId: input.revisionId,
-							deadline: input.deadline,
-							references,
-							...(input.details?.routedSteps
-								? { routedSteps: input.details.routedSteps }
-								: {}),
-							startKey: input.rootId,
-						})
-					: deps.agents.executions.startSelectedInTransaction(db, {
-							source,
-							chainRevisionId: input.revisionId,
-							request: input.question,
-							arguments: input.arguments,
-							references,
-							deadline: input.deadline,
-							startKey: input.rootId,
-						});
+			const view = launch(deps, db, input, source);
 			linkAgencyExecution(db, input.rootId, view.id);
 			return view.id;
 		},
