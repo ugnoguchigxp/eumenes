@@ -141,6 +141,9 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				deps.conversation.latestOrdinalInTransaction(db, c.id),
 			);
 			const before = digest();
+			// Whether the step ran for the conversation on screen: what it wrote is for that screen. A step off screen
+			// wrote only what was promised there, which is told there wherever the screen is.
+			const onScreen = c.id === active();
 			const { diagnosis, work } = deps.store.read((db) => ({
 				diagnosis: deps.backgroundDiagnostic?.(db, c.id) ?? null,
 				work: workObservation(deps, db, c),
@@ -184,7 +187,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				(diagnosis &&
 					deps.backgroundDiagnostic?.(db, c.id)?.digest !== diagnosis.digest) ||
 				workObservation(deps, db, c)?.digest !== work?.digest ||
-				active() !== c.id
+				(onScreen && active() !== c.id)
 					? "stale"
 					: busy(c)
 						? "busy"
