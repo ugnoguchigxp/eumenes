@@ -154,9 +154,13 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			try {
 				c.stepDiagnostic = diagnosis;
 				c.stepWork = work;
+				// A conversation not on screen hears only what the agent promised it (a report, an assignee's question).
 				out = await c.agent.step(
 					now(),
-					() => ({ busy: busy(c) || c.id !== active() || !on() }),
+					() => ({
+						busy: busy(c) || !on(),
+						promisedOnly: c.id !== active(),
+					}),
 					controller.signal,
 				);
 			} finally {

@@ -1,0 +1,197 @@
+diff --git a/package.json b/package.json
+index f5de896..c58b051 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+ 	"name": "eumenes-agency",
+-	"version": "0.1.13",
++	"version": "0.1.14",
+ 	"private": true,
+ 	"license": "MIT",
+ 	"type": "module",
+diff --git a/src/agenda/agent.ts b/src/agenda/agent.ts
+index d30a419..77380de 100644
+--- a/src/agenda/agent.ts
++++ b/src/agenda/agent.ts
+@@ -188,6 +188,9 @@ export interface AgendaAgent {
+ 	snapshot(now: number): AgendaSnapshot;
+ }
+ 
++/** A line owed to the user: a report of what they asked for, or an assignee's question. */
++const promisedLine = (i: AgendaItem) => i.kind === "talk" && i.promised;
++
+ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
+ 	const intervalSec = deps.speechIntervalSec ?? defaultSpeechIntervalSec;
+ 	if (!speechIntervals.includes(intervalSec))
+@@ -315,6 +318,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
+ 		if (
+ 			st.planDue &&
+ 			!host().busy &&
++			!host().promisedOnly &&
+ 			(st.planRetryAt === null || st.planRetryAt <= now)
+ 		)
+ 			planned = await plan(st, now, signal);
+@@ -401,7 +405,12 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
+ 				speechHeld(st, item)
+ 			)
+ 				dropReady();
+-			else if (open !== null && open <= now && !host().busy) {
++			else if (
++				open !== null &&
++				open <= now &&
++				!host().busy &&
++				(!host().promisedOnly || promisedLine(item))
++			) {
+ 				const line = st.ready.ticket;
+ 				st.ready = null;
+ 				return { ...none, line, held: true, open };
+@@ -418,7 +427,9 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
+ 			// ahead, and it starts at once when the turn ends (the host steps again then). Seen
+ 			// again after the check below, which takes a call's time.
+ 			if (host().busy) break;
+-			const item = speakable(st, now).find(due);
++			const item = speakable(st, now).find(
++				(i) => due(i) && (!host().promisedOnly || promisedLine(i)),
++			);
+ 			if (!item) break;
+ 			if (item.kind === "ask" && !checkedNow.has(item.id)) {
+ 				checkedNow.add(item.id);
+diff --git a/src/agenda/contracts.ts b/src/agenda/contracts.ts
+index 80528cc..0955970 100644
+--- a/src/agenda/contracts.ts
++++ b/src/agenda/contracts.ts
+@@ -321,6 +321,11 @@ export type AgendaTicket =
+ export interface StepHost {
+ 	/** Typing, a reply being made or speech being read out: nothing is planned or said. */
+ 	readonly busy: boolean;
++	/**
++	 * The conversation is not the one on screen: nothing is planned, and only what was promised
++	 * (a report of work the user asked for, an assignee's question) is said there.
++	 */
++	readonly promisedOnly?: boolean;
+ }
+ 
+ export interface CallRecord {
+diff --git a/src/agenda/plan.ts b/src/agenda/plan.ts
+index d56a5e4..6d89c45 100644
+--- a/src/agenda/plan.ts
++++ b/src/agenda/plan.ts
+@@ -92,6 +92,9 @@ export async function plan(
+ 		stamp: stampOf(st),
+ 		said: st.said,
+ 		items: st.items.filter((i) => !isAssignment(i)),
++		assignments: st.items.filter(
++			(i) => isAssignment(i) && (i.status === "open" || i.status === "doing"),
++		),
+ 		known: knownNow,
+ 		plans: plansNow,
+ 		goals: goalsNow,
+diff --git a/src/agenda/prompt.ts b/src/agenda/prompt.ts
+index e659986..cc87e69 100644
+--- a/src/agenda/prompt.ts
++++ b/src/agenda/prompt.ts
+@@ -62,6 +62,7 @@ export function planSystem(persona: string = defaultPersona): string {
+ 		"【先回りする】",
+ 		"- user.plans は、相手が話した予定です（dueAt は期限、null は日付が未定）。user.goals は、相手が枠に入れた目標です。記憶（user.memory）は確かな事実と好みで、予定や目標は持ちません。",
+ 		"- 相手がこれから考えそうなこと、聞きそうなことを先回りして research にします（user.plans の予定の下調べ、user.goals の目標に役立つ情報、user.memory の好きなものの新しい動き、困っていることの解決の手がかり）。予定で決まっていないこと（宿、同行者など）は、ask で聞くか、決めるのに役立つ下調べにします。dueAt を過ぎた予定は、済んだものとして扱い、先回りの材料にしません。",
++		"- inProgress は、利用者が担当に頼んでまだ終わっていない仕事です。終わったもの・できたものとして話す talk や ask は足しません（結果はできたときに知らせます）。",
+ 		"- notes・researchedBefore・researching と同じテーマの調べものは、言い方を変えても足しません（同じ結果を何度も受け取ることになります。ホストも似たテーマを断ります）。次に調べるなら、まだ扱っていない別の話題や観点にします。ただし天気・ニュース・上映や営業の時間・価格のように時期で変わる情報で、メモが古い（at が now より大きく前で、今の時期のものでない）ときは、今の情報を調べ直す research を足してかまいません。",
+ 		"- 相手が話した話題で、まだメモにない観点があれば research を足します。調べものは一度に一つずつ順に進むので、続けて調べたいことは待ちの列に入れておいてかまいません。",
+ 		"- 調べた結果を全部伝えようとはしません。メモは記録に残り、後の会話で使えます。talk にするのは、雑談のネタになりそうなもの、相手が喜びそう・驚きそうなものだけです。",
+@@ -308,6 +309,8 @@ export interface PlanInput {
+ 	readonly doNotRaise?: readonly string[];
+ 	readonly notes: readonly NoteRef[];
+ 	readonly researching: AgendaItem | null;
++	/** Work the user asked a toolchain for that has not ended: it is not done, so nothing is said of its result. */
++	readonly assignments?: readonly AgendaItem[];
+ 	readonly quiet: Quiet;
+ 	/** The name the last plan gave the topic of the user's words (null: none yet). */
+ 	readonly lastFocus?: string | null;
+@@ -417,6 +420,15 @@ export function planData(input: PlanInput): string {
+ 					secAgo: secAgo(now, input.researching.createdAt),
+ 				}
+ 			: null,
++		...(input.assignments?.length
++			? {
++					inProgress: input.assignments.map((i) => ({
++						assignee: i.delegatedTo,
++						request: i.text.slice(0, 80),
++						...(i.question ? { question: i.question.slice(0, 300) } : {}),
++					})),
++				}
++			: {}),
+ 		notes: [...input.notes]
+ 			.sort((a, b) => b.at - a.at)
+ 			.slice(0, PLAN_NOTES)
+diff --git a/test/agenda/assignments.test.ts b/test/agenda/assignments.test.ts
+index 0e3a62a..2738cca 100644
+--- a/test/agenda/assignments.test.ts
++++ b/test/agenda/assignments.test.ts
+@@ -590,3 +590,66 @@ test("an assignment the user sent from a screen rests on that message, with no w
+ 	// The item rests on the screen's message, not on the last words heard (u1).
+ 	expect("item" in r && r.item.refs).toEqual(["form-1"]);
+ });
++
++test("in a conversation not on screen only a promised report is said, and nothing is planned", async () => {
++	const { agent, m } = setup();
++	assign(agent, "夕焼けの海の絵を描く");
++	const offScreen = () => ({ busy: false, promisedOnly: true });
++	const t = research((await agent.step(0, offScreen, sig())).tickets)[0]!;
++	const note: NoteRef = {
++		id: "n9",
++		title: "夕焼けの海",
++		summary: "描いた",
++		at: 60_000,
++		refs: [],
++	};
++	noteStore.push(note);
++	agent.researchReturned({
++		ticketId: t.id,
++		at: 60_000,
++		status: "succeeded",
++		note,
++	});
++	const spoken: AgendaTicket[] = [];
++	for (const now of [70_000, 200_000, 400_000])
++		spoken.push(...(await agent.step(now, offScreen, sig())).tickets);
++	expect(spoken).toMatchObject([
++		{ kind: "speak", itemKind: "talk", noteId: "n9" },
++	]);
++	expect(m.kinds).not.toContain("plan");
++});
++
++test("the planner sees the assignments still running, so it does not talk of them as done", async () => {
++	const prompts: string[] = [];
++	const llm: LlmPort = {
++		complete<T>(req: LlmRequest<T>) {
++			prompts.push(req.prompt);
++			const plan = req.system.includes("この呼び出しは「計画」");
++			return Promise.resolve({
++				value: (plan ? { add: [], drop: [], focus: "" } : {}) as T,
++				call: {
++					purpose: plan ? "plan" : "compose",
++					at: 0,
++					model: "m",
++					latencyMs: 0,
++					inputTokens: 0,
++					outputTokens: 0,
++					code: "ok",
++				},
++			} as never);
++		},
++	} as unknown as LlmPort;
++	const agent = createAgendaAgent({ llm, startedAt: 0, notes: () => [] });
++	agent.observe({
++		id: "u1",
++		who: "user",
++		text: "夕焼けの海の絵を描いて",
++		at: 0,
++	});
++	assign(agent, "夕焼けの海の絵を描く", "画像生成");
++	agent.infoChanged(1);
++	await agent.step(1, idle, sig());
++	const planPrompt = prompts.find((p) => p.includes("inProgress"));
++	expect(planPrompt).toBeDefined();
++	expect(planPrompt).toContain("夕焼けの海の絵を描く");
++});
