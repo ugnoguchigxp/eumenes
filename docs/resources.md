@@ -1,6 +1,6 @@
 # リソースURI（`eumenes://`）
 
-Eumenes が作ったもの（生成物）・TODO・会話の出来事を、`eumenes://<種類>/<ID>` の URI で指す。URI を解決すると、その種類の画面で開く・指し示す・再生する・読むことができる。設計と実装の記録は [resource-uri-implementation-plan-2026-10-25.md](../spec/resource-uri-implementation-plan-2026-10-25.md)。
+Eumenes が作ったもの（生成物）・会話の出来事を、`eumenes://<種類>/<ID>` の URI で指す。URI を解決すると、その種類の画面で開く・指し示す・再生する・読むことができる。設計と実装の記録は [resource-uri-implementation-plan-2026-10-25.md](../spec/resource-uri-implementation-plan-2026-10-25.md)。
 
 ## 書式
 
@@ -20,8 +20,8 @@ eumenes://<kind>/<id>[?action=open|play|read]
 
 | 読み手 | 見せ方 |
 | --- | --- |
-| 会話エージェント（Router の選択） | 番号 `a<n>` だけ（`## State` の仕事・提示中・共有中の行）。URI と ID は見せない。担当への引継ぎは State に出た `a<n>` を最大8件 `refs` に付ける |
-| agency | 見せない。`HostTodo` の `title`（`[担当名] 依頼文`）と `nextActions`（種類の操作の言葉）で種類を伝える |
+| 会話エージェント（Router の選択） | 番号 `a<n>` だけ（`## State` の提示中・共有中の行）。URI と ID は見せない。担当への引継ぎは State に出た `a<n>` を最大8件 `refs` に付ける |
+| agency | 見せない。担当の作った物は、作業を鍵にした `a<n>` で台帳に入り、作業報告の発言に資源チップとして付く（[assignments.md](assignments.md)） |
 | サブエージェント | `RESOURCES` 区画に URI・種類・表示名・要約。ホストが付ける `resource.read`（一時ファイルの文書は `offset` で続き）で読み、`scratch.write` で一時ファイルに書き出し、作ったものを `finish.links` に書く |
 
 台帳の登録元には `work`（担当が作った）・`viewed`（画面に表示中だった）・`attached`（利用者の添付・長い貼り付け、2026-11-07）がある。持ち主のない内容は kind `scratch` の[一時ファイル](scratch.md)になる。

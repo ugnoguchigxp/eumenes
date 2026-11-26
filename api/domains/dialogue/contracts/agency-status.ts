@@ -64,4 +64,19 @@ export const agencyStatusSchema = z.object({
 		openIntents: z.number(),
 		inFlight: z.number(),
 	}),
+	/**
+	 * The assignments the user asked a toolchain for that started, each with the adapter whose registered screen the
+	 * Web opens once when the assignment first appears. `at` is when the toolchain took the work (epoch ms): the Web
+	 * opens what started after its page loaded. `targetRef` only when it is known at the start.
+	 */
+	assignments: z
+		.array(
+			z.object({
+				assignment: z.string(),
+				adapterRef: z.string(),
+				at: z.number(),
+				targetRef: z.string().optional(),
+			}),
+		)
+		.default([]),
 });

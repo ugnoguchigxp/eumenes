@@ -116,6 +116,15 @@ export async function executeRun(input: RunInput): Promise<RunOutcome> {
 			"precondition_failed",
 			`initial_timers ${first.timers.length} != ${input.fixture.expectedInitial.timers}`,
 		);
+	else if (
+		first.kanban &&
+		input.fixture.expectedInitial.cards !== undefined &&
+		first.kanban.cards.length !== input.fixture.expectedInitial.cards
+	)
+		stopRun(
+			"precondition_failed",
+			`initial_cards ${first.kanban.cards.length} != ${input.fixture.expectedInitial.cards}`,
+		);
 	const poller = setInterval(() => {
 		void tick().then(() => {
 			if (hostFailures >= 10)

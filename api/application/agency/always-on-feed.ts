@@ -4,7 +4,7 @@ import type { OutboxEvent } from "../../domains/conversation";
 import type { Message } from "../../domains/conversation/contracts";
 import { imageReferenceText } from "../../domains/conversation";
 import type { AgendaHearing } from "./always-on-heard";
-import { noteRef, type AgendaScope } from "./always-on-scope";
+import { noteRef, ROUTED_WAIT_MS, type AgendaScope } from "./always-on-scope";
 import { recoverAgendaScope } from "./always-on-recovery";
 import { keepPosition } from "./always-on-position";
 import { withheldIds } from "./always-on-recall";
@@ -59,6 +59,8 @@ export function feedAgenda(input: {
 	show(c: AgendaScope, noteIds: readonly string[], runId: string): void;
 	/** A reply is in the conversation: the exchange is complete (the records writer reads it, behind the talk). */
 	exchanged(c: AgendaScope): void;
+	/** The words a Live session said of the lines it was handed: they carry those lines' resource chips. */
+	linked(c: AgendaScope, messageId: string, workRefs: readonly string[]): void;
 }) {
 	const { deps, c, event, at, hearing } = input;
 	if (event.kind === "retracted") {
@@ -100,6 +102,15 @@ export function feedAgenda(input: {
 		c.calls.delete(m.runId);
 		c.shows.delete(m.runId);
 		c.given.delete(m.runId);
+	}
+	// What a Live session says of the lines handed to it is its own transcript: the work behind them shows there.
+	if (c.routed.size && m.attribution?.namespace === "live-voice") {
+		const waiting = [...c.routed.values()].filter(
+			(line) => at - line.at < ROUTED_WAIT_MS,
+		);
+		c.routed.clear();
+		const refs = [...new Set(waiting.flatMap((line) => line.findings))];
+		if (refs.length) input.linked(c, m.id, refs);
 	}
 	c.revision++;
 	c.touched = at;

@@ -142,7 +142,7 @@ test("a delegation is the agent's assignment: no announcement, the run goes on a
 			.log()
 			.map((e) => h!.fields(e))
 			.find((fields) => fields.action === "delegate"),
-	).toMatchObject({ toolchain: IMAGE.id, assignment: "a1" });
+	).toMatchObject({ toolchain: IMAGE.id, request: "猫の絵" });
 });
 
 test("an answer delivery uses the emotion of the reply, never judged again", async () => {

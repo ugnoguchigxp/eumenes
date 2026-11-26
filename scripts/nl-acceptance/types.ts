@@ -78,6 +78,12 @@ const faultSchema = z.strictObject({
 	/** 1-based index among matching requests. */
 	nth: z.number().int().positive(),
 });
+const cardSeed = z.strictObject({
+	title: z.string().min(1).max(200),
+	prompt: z.string().min(1).max(7850),
+	/** The harness adds a card to the task board; it starts in the todo column. */
+	state: z.literal("todo"),
+});
 export const fixtureSchema = z
 	.strictObject({
 		fixtureId: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -87,14 +93,21 @@ export const fixtureSchema = z
 		stack: z.enum(["fixture", "product"]),
 		/** Harness-side seeding before the tester starts; the judge sees these in the initial snapshot. */
 		seedTimers: z.array(timerSeed).max(10),
+		/** Task board cards the harness registers before the tester starts (through the board's registered action). */
+		seedCards: z.array(cardSeed).max(10).default([]),
 		/** Harness-controlled faults. The tester is never told about them. */
 		faults: z.array(faultSchema).max(5),
-		expectedInitial: z.strictObject({ timers: z.number().int().min(0) }),
+		expectedInitial: z.strictObject({
+			timers: z.number().int().min(0),
+			/** Checked only when the criteria read the board. */
+			cards: z.number().int().min(0).optional(),
+		}),
 	})
 	.readonly();
 export type FixtureDef = z.infer<typeof fixtureSchema>;
 
-const hostReads = ["timers"] as const;
+const hostReads = ["timers", "conversation", "kanban"] as const;
+export type HostRead = (typeof hostReads)[number];
 export const criteriaSchema = z
 	.strictObject({
 		criteriaId: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -186,12 +199,36 @@ export type HostTimer = {
 	remainingSeconds: number;
 	originRunId: string | null;
 };
+/** A message of the conversation, as the conversation API returns it (text cut to a fixed length). */
+export type HostMessage = {
+	id: string;
+	role: "user" | "assistant";
+	text: string;
+	createdAt: string;
+};
+export type HostKanbanCard = {
+	id: string;
+	title: string;
+	column: "todo" | "running" | "finished";
+	revision: number;
+};
+export type HostKanbanRun = {
+	id: string;
+	cardId: string;
+	kind: string;
+	state: string;
+	origin: string;
+};
 /** One readonly observation of the host. `atMs` is the runner clock, `serverNowMs` the server's. */
 export type HostSnapshot = {
 	seq: number;
 	atMs: number;
 	serverNowMs: number;
 	timers: HostTimer[];
+	/** Present only when the criteria read the conversation (oldest first, the latest messages). */
+	messages?: HostMessage[];
+	/** Present only when the criteria read the task board. */
+	kanban?: { cards: HostKanbanCard[]; runs: HostKanbanRun[] };
 };
 /** A timer_action receipt seen passively in an /api response body (never injected, never replayed). */
 export type ObservedReceipt = {

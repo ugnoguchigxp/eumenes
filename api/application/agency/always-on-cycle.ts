@@ -234,6 +234,8 @@ async function handleTicket(
 				status: "failed",
 				note: null,
 			});
+			// An assignment that did not start ends here: what would start it is no longer held.
+			c.assignments.delete(ticket.itemId);
 			// The host's refusal remembers the operation and its evidence. Leaving an autonomous failed item
 			// in the agenda would also veto the same request when the model has a new evidence revision.
 			if (outcome.refusal && !ticket.requested && !ticket.promised)

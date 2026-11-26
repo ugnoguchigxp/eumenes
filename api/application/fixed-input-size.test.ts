@@ -270,12 +270,7 @@ async function measure() {
 			"read_world",
 		]),
 		"tools.talkWork": toolsNamed(["find_toolchain", "delegate"]),
-		"tools.workControls": toolsNamed([
-			"approve_confirmation",
-			"decline_confirmation",
-			"work",
-			"discard_for_pending_switch",
-		]),
+		"tools.workControls": toolsNamed(["discard_for_pending_switch"]),
 		"tools.agenda": agency.agendaTools,
 		"tools.goalReply": goalTools,
 	};

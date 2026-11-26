@@ -1,7 +1,9 @@
 import type { DraftReport } from "../contracts/requirements";
 /** Test-only model stub. It exercises host contracts, not semantic accuracy. */
 export function fixtureResearchOutput(data: any, raw: string) {
-	if (data.reportMode === "guided-web") return guidedOutput(raw);
+	// The candidate package (the one whose packet presents candidates) reports a result kind as well.
+	if (data.reportMode === "guided-web")
+		return guidedOutput(raw, data.candidates !== undefined);
 	if (data.reportMode === "search") return raw;
 	let action: any;
 	try {
@@ -63,10 +65,11 @@ export const fixtureVerification = (draft: DraftReport) => ({
 });
 
 /**
- * Stubs write one report shape (outcome/summary/claims). The guided contract reports
- * completion, an answer and claim statuses instead; translate a finish into that form.
+ * Stubs write one report shape (outcome/summary/claims). The guided and search contracts report
+ * completion, an answer and claim statuses instead (the candidate package also names its result kind); translate a
+ * finish into that form.
  */
-function guidedOutput(raw: string) {
+function guidedOutput(raw: string, candidates: boolean) {
 	let action: any;
 	try {
 		action = JSON.parse(raw);
@@ -90,6 +93,8 @@ function guidedOutput(raw: string) {
 				}),
 			),
 			limitations: report.limitations ?? [],
+			// A candidate report names its kind: these stubs report page facts, not candidates.
+			...(candidates ? { resultKind: "facts", candidateRefs: [] } : {}),
 		},
 	});
 }

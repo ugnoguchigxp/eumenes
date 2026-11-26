@@ -276,7 +276,17 @@ async function assignTo(
 			const run = current(tx);
 			touchRefs(x, tx, run, chosen);
 			recordChoice(x, tx, run, chosen);
-			// Last in the writer: the agent takes the item only when everything above holds.
+			const adapterRef = deps
+				.toolchains!.catalogInTransaction(tx)
+				.find((e) => e.revisionId === chosen.card.revisionId)?.runtime
+				.binding?.adapterRef;
+			// Everything that can throw comes first: `assign` changes the agent's memory outside this transaction, so it
+			// is the last statement and nothing after it may fail (a refusal throws and rolls the rest back).
+			acted(tx, actionKey(`delegate:${chosen.card.id}`), {
+				action: "delegate",
+				toolchain: chosen.card.id,
+				request: eventText(deps, chosen.request),
+			});
 			const outcome = deps.agency!.assign!({
 				toolchainId: chosen.card.id,
 				revisionId: chosen.card.revisionId,
@@ -285,15 +295,10 @@ async function assignTo(
 				references: chosen.references ?? [],
 				source: { conversationId, messageId, runId, request, digest },
 				...(details ? { details } : {}),
+				...(adapterRef ? { adapterRef } : {}),
 			});
 			if (outcome.status === "refused")
 				throw new AssignmentRefused(outcome.code, outcome.id);
-			acted(tx, actionKey(`delegate:${chosen.card.id}`), {
-				action: "delegate",
-				toolchain: chosen.card.id,
-				request: eventText(deps, chosen.request),
-				assignment: outcome.id,
-			});
 			return outcome.id;
 		});
 	} catch (error) {

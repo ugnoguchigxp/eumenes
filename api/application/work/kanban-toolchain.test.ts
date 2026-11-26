@@ -7,6 +7,7 @@ import {
 	ask,
 	assignmentAgenda,
 	cancelAssignment,
+	ended,
 	executions,
 	items,
 	until as untilAgent,
@@ -273,7 +274,8 @@ test("running as the agent's assignment queues the user's words under the work-o
 		// "...push まで": only the work is registered, in the user's words.
 		await say(a, "README を直して push までやるタスクを登録して");
 		expect(cardsOf(h)[0]!.prompt).toBe("README を直して push まで");
-		expect((await say(a, "それを実行して")).status).toBe("completed");
+		// A run lasts as long as Claude Code works: the assignment ends with the card, not when it is queued.
+		await ask(a, "kanban.manage", "それを実行して");
 		await untilAgent(a, () => claude.spawned.length > 0);
 		const run = claude.spawned[0]!;
 		expect(run.command.at(-1)).toBe(
@@ -304,6 +306,11 @@ test("running as the agent's assignment queues the user's words under the work-o
 			cardsOf(h).find((c) => c.column === "finished" && c.label === "done"),
 		);
 		expect(card.lastReport).toContain("README を更新しました");
+		await untilAgent(a, () => ended(a, 2));
+		expect(executions(a).map((e) => e.status)).toEqual([
+			"completed",
+			"completed",
+		]);
 		// The notification center gets the notice; the conversation gets nothing.
 		const notices = h.kanban!.notices(10).notices;
 		expect(notices.map((notice) => notice.kind)).toEqual(["done"]);
@@ -335,11 +342,12 @@ test("a status question reads the board: a Done card's report comes from the lis
 	try {
 		await addCard(h, "テスト修正", "秘密の依頼本文");
 		await addCard(h, "文書整理");
-		await say(a, "テスト修正を実行して");
+		await ask(a, "kanban.manage", "テスト修正を実行して");
 		await untilAgent(a, () => claude.spawned.length > 0);
 		const run = claude.spawned[0]!;
 		await finishRun(h, run, run.command.at(-1)!, "テストを 3 件直しました。");
 		await until(() => cardsOf(h).some((card) => card.label === "done"));
+		await untilAgent(a, () => ended(a));
 		expect((await say(a, "テスト修正の報告を教えて")).status).toBe("completed");
 		// The sub-agent's snapshot has ids and states, never a prompt or a report.
 		const sent = h.commandContexts.at(-1)!;

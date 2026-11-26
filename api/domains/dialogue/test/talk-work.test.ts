@@ -173,6 +173,7 @@ async function delegateDirect(
 	agency: AgencyLayerPort,
 	args: Parameters<typeof delegateTool>[2],
 	card: ToolchainCard = { ...IMAGE, minImpact: "modify_existing" },
+	adapterRef?: string,
 ) {
 	const run = await h!.say("壁紙を変えてほしい");
 	const store = h!.store;
@@ -184,6 +185,16 @@ async function delegateDirect(
 			clock: () => new Date().toISOString(),
 			agency,
 			toolchains: {
+				catalogInTransaction: () => [
+					{
+						id: card.id,
+						revisionId: card.revisionId,
+						runtime: {
+							execution: card.execution,
+							...(adapterRef ? { binding: { adapterRef } } : {}),
+						},
+					},
+				],
 				recordSelectionInTransaction: () => "selection",
 			},
 		},
@@ -234,6 +245,19 @@ test("a request naming a saved item (modify_existing) becomes an assignment with
 	});
 	expect(assigned[0]!.source.runId).toBe(run.id);
 	expect(confirmations()).toBe(before);
+});
+
+test("an assignment carries the binding's adapter for its screen to open; a toolchain without a binding carries none", async () => {
+	h = await setup({ conversationAgent: handing });
+	h.state.steps.push({ text: "承知しました。" }, { text: "承知しました。" });
+	const { agency, assigned } = agencyOf();
+	const args = { toolchain: IMAGE.id, request: "夕暮れの猫の絵を描く" };
+	await delegateDirect(agency, args, IMAGE, "adapter:fake.image@1");
+	await delegateDirect(agency, args, IMAGE);
+	expect(assigned.map((a) => a.adapterRef)).toEqual([
+		"adapter:fake.image@1",
+		undefined,
+	]);
 });
 
 test("agency_unavailable: the agenda does not serve the conversation, so nothing is handed over", async () => {

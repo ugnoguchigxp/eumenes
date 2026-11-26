@@ -88,6 +88,11 @@ export type AgendaAssignment = {
 	/** The user's words the request was made in: the toolchain takes the work as the user's, not the agency's. */
 	source: AssignmentSource;
 	details?: AssignmentDetails;
+	/**
+	 * The adapter whose registered screen the Web opens once the assignment has started (the user's own `delegate`
+	 * request only: a screen form's screen is open already).
+	 */
+	adapterRef?: string;
 };
 
 /** The user-message source of an assignment (a standard execution source without host-issued extras). */
@@ -177,6 +182,7 @@ const snapshotSchema = z.strictObject({
 					digest: z.string().min(1),
 				}),
 				details: assignmentDetails.optional(),
+				adapterRef: z.string().min(1).optional(),
 			}),
 		)
 		.optional(),
@@ -241,15 +247,25 @@ export function forgetAgenda(
 			.filter((n) => gone([...n.refs, ...(n.inputs ?? [])]))
 			.map((n) => `note:${n.id}`),
 	);
+	// An assignment rests on the user's words it was asked in: with them it goes, and its item and ticket with it.
+	const lostAssignments = new Set(
+		(value.assignments ?? [])
+			.filter((a) => gone([a.source.messageId]))
+			.map((a) => a.itemId),
+	);
 	const tickets = value.tickets.filter(
-		(t) => !gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lost.has(r)),
+		(t) =>
+			!gone([...t.refs, ...t.inputs]) &&
+			!t.refs.some((r) => lost.has(r)) &&
+			!lostAssignments.has(t.itemId),
 	);
 	const retained = new Set(tickets.map((ticket) => ticket.id));
-	const lostItems = new Set(
-		value.tickets
+	const lostItems = new Set([
+		...value.tickets
 			.filter((ticket) => !retained.has(ticket.id))
 			.map((ticket) => ticket.itemId),
-	);
+		...lostAssignments,
+	]);
 	const items = value.agent.items.filter(
 		(i) =>
 			!lostItems.has(i.id) && !gone(i.refs) && !i.refs.some((r) => lost.has(r)),
@@ -281,5 +297,35 @@ export function forgetAgenda(
 					),
 				}
 			: {}),
+	};
+}
+
+/**
+ * What a change of the agency's settings leaves of a checkpoint: the user's own requests. Their items, the assignments
+ * (what starts them) and the tickets of the ones that run stay as they are; everything else the agency held (its own
+ * research, what it meant to say, the notes it kept) goes, as a revoked checkpoint always lost it. A ticket whose
+ * assignment is gone (it cannot be checked or continued) is dropped and its item stays, so the start that follows
+ * ends it as failed and the agent tells the user. Null when no request of the user is held.
+ */
+export function carryAssignments(
+	value: AgendaHostSnapshot,
+): AgendaHostSnapshot | null {
+	const items = value.agent.items.filter((i) => i.delegatedTo !== undefined);
+	if (!items.length) return null;
+	const held = new Set(items.map((i) => i.id));
+	const assignments = (value.assignments ?? []).filter((a) =>
+		held.has(a.itemId),
+	);
+	const tickets = value.tickets.filter(
+		(t) => t.assignment && assignments.some((a) => a.itemId === t.itemId),
+	);
+	return {
+		kind: "agenda",
+		version: 1,
+		revision: value.revision + 1,
+		agent: { ...value.agent, items },
+		tickets,
+		notes: [],
+		assignments,
 	};
 }

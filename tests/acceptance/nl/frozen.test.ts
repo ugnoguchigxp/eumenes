@@ -37,7 +37,6 @@ describe("the committed frozen set", () => {
 			"timer-expiry-01",
 			"timer-invalid-input-01",
 			"timer-network-loss-01",
-			"timer-question-continuation-01",
 			"timer-ui-purpose-01",
 		]);
 	});
@@ -93,7 +92,6 @@ describe("the committed frozen set", () => {
 		expect(needs).toEqual([
 			"timer-conversation-cancel-01",
 			"timer-conversation-start-01",
-			"timer-question-continuation-01",
 		]);
 	});
 });

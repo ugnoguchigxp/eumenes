@@ -10,7 +10,7 @@
 
 ## HTTP API
 
-全操作は既存のloopback API認証とOrigin検査を使う。ownerや会話の出所をクライアントが指定することはできない。会話から登録するときは、applicationが保存済みユーザー入力を確認してtrusted contextを注入する入口を利用する。
+全操作は既存のloopback API認証とOrigin検査を使う。ownerや会話の出所をクライアントが指定することはできない。会話から登録するときは、applicationが保存済みユーザー入力を確認してtrusted contextを注入する入口を利用する。会話エージェントの `delegate` から始まる作業は、会話エージェント自身の担当（assignment）として記録され、起動前の確認なしで利用者の依頼として始まる。進捗と質問は会話の `assignments`、結果は作業報告メモで返り、回答・変更・取消は `assignment` ツールで渡す（[担当への依頼と結果の報告](assignments.md)）。
 
 | 操作 | 内容 |
 | --- | --- |

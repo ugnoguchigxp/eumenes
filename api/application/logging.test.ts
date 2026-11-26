@@ -38,16 +38,20 @@ test("real backend persists startup, correlated job failure and final shutdown w
 			: [];
 	}
 	try {
-		let ready: { port: number } | undefined;
+		// The server listens first and answers only "starting" until recovery and start are done.
+		let ready = false;
 		await waitFor(
 			() => {
-				ready = entries().find((entry) => entry.event === "server.listening");
-				return !!ready || child.exitCode !== null;
+				ready = entries().some((entry) => entry.event === "server.ready");
+				return ready || child.exitCode !== null;
 			},
 			{ timeout: 10000 },
 		);
-		expect(ready).toBeDefined();
-		const base = `http://127.0.0.1:${ready!.port}`;
+		expect(ready).toBe(true);
+		const { port } = entries().find(
+			(entry) => entry.event === "server.listening",
+		);
+		const base = `http://127.0.0.1:${port}`;
 		const requestId = crypto.randomUUID();
 		const response = await fetch(`${base}/api/runs`, {
 			method: "POST",

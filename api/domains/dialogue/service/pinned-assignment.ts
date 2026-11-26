@@ -76,22 +76,7 @@ export async function pinnedGeneration(
 			current.conversationId,
 			final.seqs,
 		);
-		const outcome = agency.assign({
-			toolchainId: card.id,
-			revisionId: card.revisionId,
-			title: card.title,
-			request,
-			references: [],
-			source: {
-				conversationId: source.conversationId,
-				messageId: source.messageId,
-				runId: source.runId,
-				request: source.request,
-				digest: source.digest,
-			},
-			userMessage: { id: source.messageId, text: source.request },
-		});
-		if (outcome.status === "refused") throw new Error(outcome.code);
+		// `assign` changes the agent's memory outside this transaction: it is the last statement that can throw.
 		deps.continuity.events.appendInTransaction(tx, {
 			conversationId: current.conversationId,
 			at: jstSeconds(Date.parse(deps.clock())),
@@ -101,7 +86,6 @@ export async function pinnedGeneration(
 				action: "delegate",
 				toolchain: card.id,
 				request,
-				assignment: outcome.id,
 			},
 			dedupeKey: `${current.id}:pinned`,
 		});
@@ -119,6 +103,22 @@ export async function pinnedGeneration(
 			functionName: card.functionName,
 			request,
 		});
+		const outcome = agency.assign({
+			toolchainId: card.id,
+			revisionId: card.revisionId,
+			title: card.title,
+			request,
+			references: [],
+			source: {
+				conversationId: source.conversationId,
+				messageId: source.messageId,
+				runId: source.runId,
+				request: source.request,
+				digest: source.digest,
+			},
+			userMessage: { id: source.messageId, text: source.request },
+		});
+		if (outcome.status === "refused") throw new Error(outcome.code);
 		log.info("dialogue.pinned_operation", { toolchainId: card.id });
 	});
 	return { text: "" };

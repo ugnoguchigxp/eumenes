@@ -9,23 +9,34 @@ import {
 	returnAgencyWork,
 	type AgencyWorkRow,
 } from "../repository/agency";
-import { isAgendaSnapshot } from "../contracts/agency-always-on";
+import {
+	isAgendaSnapshot,
+	type AssignmentSource,
+} from "../contracts/agency-always-on";
 
 /**
- * The user's words an assignment runs as (the source its toolchain took the work under), or null for the agency's own
- * work. An assignment is held to those words, not to the agency's own grant: a toolchain revoked meanwhile still
- * reports how its work ended (a failure), where the agency's own work, made invalid by the revocation, is dropped.
+ * Whose work this is: the agency's own (`none`), or an assignment of the user's, held to the words it was asked in
+ * (`held`: not to the agency's own grant, so a toolchain revoked meanwhile still reports how its work ended, and a
+ * change of the agency's settings leaves the work its owner). An assignment whose request is no longer saved is
+ * `missing`: nothing vouches for its result.
  */
-function assignmentSource(db: Database, w: AgencyWorkRow) {
+function workOrigin(
+	db: Database,
+	w: AgencyWorkRow,
+):
+	| { kind: "none" }
+	| { kind: "held"; source: AssignmentSource }
+	| { kind: "missing" } {
 	const record = agencyRecords(db).find(
 		(r) => r.conversationId === w.conversation_id && r.epoch === w.epoch,
 	);
-	if (!record || !isAgendaSnapshot(record.snapshot)) return null;
+	if (!record || !isAgendaSnapshot(record.snapshot)) return { kind: "none" };
 	const ticket = record.snapshot.tickets.find((t) => t.id === w.ticket_id);
-	return ticket?.assignment
-		? (record.snapshot.assignments?.find((a) => a.itemId === ticket.itemId)
-				?.source ?? null)
-		: null;
+	if (!ticket?.assignment) return { kind: "none" };
+	const source = record.snapshot.assignments?.find(
+		(a) => a.itemId === ticket.itemId,
+	)?.source;
+	return source ? { kind: "held", source } : { kind: "missing" };
 }
 
 /** Reconciles both historical read-only work and shared action executions before releasing their authority. */
@@ -177,9 +188,15 @@ export function agencyResults(
 			const w = agencyWork(db, rootId);
 			let adopted = true;
 			if (w?.execution_id) {
-				const own = autonomousActionSource(db, rootId, deps.now());
-				const source = own && (assignmentSource(db, w) ?? own);
+				const origin = workOrigin(db, w);
+				const source =
+					origin.kind === "held"
+						? origin.source
+						: origin.kind === "none"
+							? autonomousActionSource(db, rootId, deps.now())
+							: null;
 				if (
+					w.revoked ||
 					!currentAgencyWork(db, w) ||
 					!source ||
 					!deps.execution?.()?.validSourceInTransaction(db, source)

@@ -39,6 +39,7 @@ import {
 } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
 import { quietThought } from "./always-on-thoughts";
+import { recentScreens } from "./always-on-screens";
 import { heldMemoryRefs } from "./always-on-recall";
 import {
 	ASSIGNMENT,
@@ -231,6 +232,8 @@ type AgendaPortsInput = {
 	changed(): void;
 	/** The memory excluded these records: what the scope holds on them goes (a scope that cites none is left alone). */
 	exclude(c: AgendaScope, refs: readonly string[]): void;
+	/** Saves the checkpoints that changed (the same save a research is started with). */
+	save(): Promise<boolean>;
 };
 
 function readNoteText(
@@ -440,6 +443,7 @@ async function executeAgendaReply(
 						arguments: call.arguments,
 						messageId: userMessage(),
 						at: now(),
+						save: input.save,
 					});
 				return own.call(call, signal);
 			},
@@ -543,6 +547,8 @@ function buildAgendaStatus(input: AgendaPortsInput, id: string) {
 				: 0,
 			inFlight: c?.tickets.length ?? 0,
 		},
+		// Kept for a while after the work ends: a short assignment still opens its screen when the Web reads late.
+		assignments: c ? recentScreens(c, now()) : [],
 	});
 }
 
@@ -575,10 +581,9 @@ export function createAgendaPorts(input: AgendaPortsInput) {
 				at: input.now(),
 				requested: true,
 				delegatedTo: request.title,
-				// A form the user sent on a screen is their request, though the agent heard no words of it.
-				...(request.userMessage
-					? { userRef: { id: request.userMessage.id } }
-					: {}),
+				// The item rests on the user's words the request was made in (a form they sent on a screen is their request
+				// too, though the agent heard no words of it): forgetting those words reaches the item.
+				userRef: { id: request.source.messageId },
 			});
 			if ("rejected" in asked) {
 				const same =
@@ -606,6 +611,10 @@ export function createAgendaPorts(input: AgendaPortsInput) {
 				source: { ...request.source },
 				...(request.details
 					? { details: structuredClone(request.details) }
+					: {}),
+				// Its screen opens when the work starts. A screen form's assignment opens nothing: its screen is open already.
+				...(request.adapterRef && !request.userMessage
+					? { adapterRef: request.adapterRef }
 					: {}),
 			});
 			c.revision++;

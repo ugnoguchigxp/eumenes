@@ -141,6 +141,8 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 			const snapshot =
 				record.snapshot as import("eumenes-agency").AgencySnapshot;
 			const agenda = isAgendaSnapshot(record.snapshot) ? record.snapshot : null;
+			// The user's request is held by the agenda's checkpoint only: nothing else can vouch for an assignment.
+			if (input.assignment && !agenda) throw new Error("agency_origin_stale");
 			if (agenda) assertAgendaTicket(agenda, input);
 			const active = agencyWorks(db, input.conversationId).filter(
 				(w) => !!w.execution_id,
@@ -491,6 +493,7 @@ function assertAgendaTicket(
 		sourceRefs: readonly string[];
 		assignment?: boolean;
 		references?: readonly ExecutionReference[];
+		source?: AssignmentSource;
 		details?: AssignmentDetails;
 	},
 ) {
@@ -508,4 +511,10 @@ function assertAgendaTicket(
 		digest([...own.inputs].sort()) !== digest([...input.sourceRefs].sort())
 	)
 		throw new Error("agency_origin_stale");
+	// The words the work runs as are the ones the user's request was saved with, never others.
+	if (input.assignment) {
+		const held = agenda.assignments?.find((a) => a.itemId === own.itemId);
+		if (!held || (input.source && digest(held.source) !== digest(input.source)))
+			throw new Error("agency_origin_stale");
+	}
 }

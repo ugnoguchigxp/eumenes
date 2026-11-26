@@ -272,3 +272,45 @@ live（実モデル・実 Claude Code）での確認は、利用者の指示が�
 | 確認の廃止 | dialogue・application/agency | `modify_existing` の依頼も確認なしで依頼項目になる。確認の台帳への書込み0件 |
 | 削除 | dialogue・Web | 参照0件（grep）。`bun run verify -- --domain dialogue` と影響 domain |
 | 移行 | dialogue | 開いている TODO が起動後に0件、task の実行は取消済み |
+
+## 13. 担当への依頼で、その担当の画面も開く（2026-11-26・利用者の要望）
+
+利用者の要望（2026-11-26「会話エージェントが、ツールチェーンから担当を見つけて引き継ぐと、それに引かれてアーティファクトも起動する形にしたい」）。
+
+| 事柄 | 規則 |
+| --- | --- |
+| 開く時点 | 利用者の依頼から作った依頼項目が受け付けられたとき、1回だけ |
+| 開く画面 | 担当の binding の `adapterRef` を `sourceBindings` に持つ、登録済みの画面（Web の `openByAdapter(adapterRef, targetRef)` が引くもの）。対応する画面がない担当は開かない |
+| 開かないもの | agency が自分から始める調べもの。画面のフォーム送信から作った依頼（その画面はすでに開いている）。instant・session（session は今の専門担当の画面の開き方のまま） |
+| Claude Code | 受け付けで「Claude Code」画面を開く既存の仕組み（`useClaudeCodeArtifacts`、`spec/claude-code-task-terminal-view-2026-11-25.md`）を使い、二重に開かない |
+| 合図 | 会話の状態の読み取り（Web が読む agency の状態）に、起動した依頼項目ごとの `{ assignment, adapterRef, at, targetRef? }` を載せる（起動の成功時に記録し、10分間残す）。Web は、ページの読み込み時刻より後に起動した依頼項目の画面だけを一度開く |
+| 対象の参照 | 担当の実行が作った対象（例: 曲・画像の資源）がまだ無い時点で開くので、`targetRef` は持てるときだけ付ける。無ければ画面の既定の表示 |
+
+検証は fixture のみ: 依頼の受付で状態に画面の合図が載る（サーバー）、新しい合図で1回だけ開き再読み込みでは開かない（Web）、調べもの・画面フォーム送信・Claude Code では開かない。
+
+## 12. 実施記録（第2段）
+
+2026-11-26。第2段（§11 と [実装設計](toolchain-assignment-stage2-implementation-2026-11-25.md)）をコミット `c2fc0969` で実装した。文書は [docs/assignments.md](../docs/assignments.md) に登録した。
+
+### 12.1 届けたもの
+
+| 内容 | 状態 |
+| --- | --- |
+| すべての種別を依頼項目にする: 画像・音楽（作成・再生）・Excalidraw・command・pipeline・画面のフォーム送信。起動は task の持ち主の `TaskLifecyclePort`、または agent-runtime の選んだ実行（`startSelectedInTransaction`・`startPipelineInTransaction`）。一つの発言から複数件頼めるよう、開始鍵 `startKey` を足した | 実装・fixture 試験済み（`assignment-kinds.test.ts`） |
+| 依頼の詳細 `AssignmentDetails`（`inputs`・`target`・`diagnosticRef`・`resolveUnsaved`・`routedSteps`）を項目に保存し、起動前に照合する（`agency_origin_stale`） | 同上 |
+| 確認の廃止: `delegate` の `mode`・`revises`・`announcement`・`impact`、`approve_confirmation`・`decline_confirmation`、確認台帳への書き込み。取り返しのつかない操作の判断は、Claude Code 自身の質問（`assignments` → `assignment(answer)`） | 実装済み |
+| TODO の廃止: `work` ツール、run を待つ dispatch、TODO 台帳への書き込み、`/api/todo-notices*`、`/api/toolchain-interactions*`、Web の TODO 画面と通知カード、command の質問フォーム、`agency.todos` の bundle（launcher から外す migration とその試験を含む） | 実装済み。表 `dialogue_work`・`dialogue_confirmations`・`command_interactions` は行を残して書き込みを止めた |
+| 起動時の閉鎖（`todo-closure.ts`）: 開いた TODO・確認・質問の行を一度だけ閉じ、task の実行中のものは持ち主へ取消を送る | 実装・fixture 試験済み（`todo-closure.test.ts`） |
+| `agency_unavailable`: agenda が会話を担当していなければ `delegate` は断る | 実装・fixture 試験済み（`talk-work.test.ts`） |
+| 第1段の続きで直したもの: 取消が LARM に届かない、構造化回答、command の結果、作業報告の出典、画像・音楽の空き待ちの再試行、Claude Code の完了通知の二重 | 実装・fixture 試験済み（`assignment-repairs.test.ts`） |
+
+### 12.2 残り
+
+| 残り | 内容 |
+| --- | --- |
+| 読まれないデータ | 登録済みの capability revision には、command の質問フォームのための `answer`・`questionDefinition` の欄が残っている。読むコードは無い。revision は書き換えず（既存の版は変えない規則）、次に版を上げるときに外す |
+| 即時性の高い command の報告 | タイマーなどの短い command も非同期の依頼になり、結果を毎回メモ（文書）にして報告する。問題になれば、その担当を `instant` へ移す（データドリブン、版を上げる）。決めていない |
+| 表の扱い | `dialogue_work`・`dialogue_confirmations`・`command_interactions` を消すマイグレーションは作っていない（別に決める） |
+| 画像のモデルへの提示 | 依頼で作った画像を会話モデルに見せる観測は残した。鍵を TODO の id から依頼の作業 root と利用者の run に付け替えた（`dialogue_assignment_images`）。利用者が頼んだ画像も、agency 自身の調べものの画像も見つかる |
+| 検証 | 固定試験は domain ごとに通っている。全体スイートの一括実行と独立レビューはコミット時点で未了。**live（実モデル・実 Claude Code・実 LARM）の確認と実機器の確認は未実施**で、利用者の指示を待つ。画面（Web）の描画・操作も実画面では未確認 |
+| 試験の登録 | `always-on-assignments.test.ts`・`assignment-kinds.test.ts`・`assignment-repairs.test.ts` は `scripts/domains.ts` の統合試験一覧に載っていない（ファイルを指定して流す） |

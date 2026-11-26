@@ -20,6 +20,8 @@ test("defaults are the values the server used before the config was centralised"
 		worldPollMs: undefined,
 		worldCursorSecret: undefined,
 		larmProviderHosts: undefined,
+		contextStill: { url: undefined, token: undefined },
+		knowledgeSelectionResourceId: undefined,
 		toolchainEnabled: true,
 		historyToolsEnabled: true,
 		webResearchToolsEnabled: true,

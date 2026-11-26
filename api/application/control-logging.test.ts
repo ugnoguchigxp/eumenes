@@ -1,6 +1,19 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../infrastructure/logger";
-import { harness, forbidden } from "./toolchain/toolchain.fixture";
+import { createBrowser } from "../domains/browser";
+import { registerBrowserEffects } from "./browser/browser-effects";
+import {
+	FakeDriver,
+	FakeEncoder,
+	FakeFiles,
+	fakeBrave,
+	fakeResolver,
+} from "../domains/browser/test/fakes";
+import { forbidden } from "./toolchain/toolchain.fixture";
+import {
+	assignmentFixture,
+	type AssignmentFixture,
+} from "./toolchain/assignment.fixture";
 
 afterEach(() => configureLogging({ level: "silent" }));
 function capture() {
@@ -15,27 +28,55 @@ function capture() {
 	});
 	return { lines, entries: () => lines.map((line) => JSON.parse(line)) };
 }
-async function run(h: Awaited<ReturnType<typeof harness>>) {
-	const response = await h.request("/api/runs", {
-		requestId: crypto.randomUUID(),
-		conversationId: "main",
-		text: "東京の天気を調べて PRIVATE_REQUEST",
+type FixtureOptions = Parameters<typeof assignmentFixture>[0];
+/** An assignment fixture whose web search toolchain is available (it needs a connected browser service; its steps are not used). */
+function searchFixture(options: FixtureOptions = {}) {
+	return assignmentFixture({
+		browser: (store, queue) => {
+			const service = createBrowser({
+				store,
+				queue,
+				driver: new FakeDriver(),
+				encoder: new FakeEncoder(),
+				files: new FakeFiles(),
+				webOrigins: [],
+				resolveHost: fakeResolver(),
+				canAutoConnect: () => true,
+				runTaskStep: async () => {
+					throw new Error("fixture_browser_step_unused");
+				},
+			});
+			return {
+				service,
+				effects: registerBrowserEffects({ queue, service }),
+				requests: { userMessageInTransaction: () => null },
+			};
+		},
+		...options,
 	});
-	expect(response.status).toBe(202);
-	const run = await response.json();
-	expect(
-		(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-	).toBe("completed");
-	return run;
+}
+
+/** The user's request handed to the web search toolchain as the agent's assignment; the work runs to its end. */
+async function run(f: AssignmentFixture) {
+	await f.h.toolchain.capabilities.seed();
+	await f.h.browser!.service.setting.save(fakeBrave(f.h.dir));
+	const { source, result } = await f.assign(
+		"東京の天気を調べて PRIVATE_REQUEST",
+		"web.service-search",
+	);
+	expect(result).toMatchObject({ status: "accepted" });
+	await f.settled();
+	return { id: source.runId };
 }
 
 test("an unknown tool name invokes nothing and receives one bounded correction", async () => {
 	const output = capture();
-	const h = await harness({ badExecutionRefOnce: true });
+	const f = await searchFixture({ badExecutionRefOnce: true });
+	const { h } = f;
 	try {
-		await run(h);
+		await run(f);
 		expect(h.acquisitions).toBe(2);
-		expect(h.reported()).toContain("26度");
+		expect(f.reported()).toContain("26度");
 		const issues = output
 			.entries()
 			.filter((entry) => entry.event === "agent.control_validation_issue");
@@ -55,19 +96,20 @@ test("an unknown tool name invokes nothing and receives one bounded correction",
 				.some((context) => context.includes("一度だけ修正")),
 		).toBe(false);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
 test("a search timeout is correlated across agent, web and queue and searches stop at the budget", async () => {
 	const output = capture();
-	const h = await harness({
+	const f = await searchFixture({
 		acquire: async () => {
 			throw new Error("web_timeout");
 		},
 	});
+	const { h } = f;
 	try {
-		const r = await run(h);
+		const r = await run(f);
 		const rows = output.entries();
 		const failed = rows.find((entry) => entry.event === "agent.tool_failed");
 		expect(failed).toMatchObject({
@@ -87,8 +129,8 @@ test("a search timeout is correlated across agent, web and queue and searches st
 					entry.event === "queue.settled" && entry.jobId === failed.jobId,
 			),
 		).toMatchObject({ reason: "web_timeout", status: "failed" });
-		// Guided research has two searches; when both time out the failure is reported, not searched further.
-		expect(h.acquisitions).toBe(2);
+		// The search package allows one lookup; its timeout is reported, not searched again.
+		expect(h.acquisitions).toBe(1);
 		expect(rows.some((entry) => entry.event === "agent.tool_completed")).toBe(
 			false,
 		);
@@ -100,17 +142,17 @@ test("a search timeout is correlated across agent, web and queue and searches st
 		])
 			expect(text).not.toContain(secret);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
 test("a malformed report after a successful read is diagnosed once per attempt without private text", async () => {
 	const output = capture();
-	const h = await harness({
+	const f = await searchFixture({
 		workerReportOutput: '{"action":',
 	});
 	try {
-		const r = await run(h);
+		const r = await run(f);
 		const rows = output.entries();
 		const completed = rows.find(
 			(entry) =>
@@ -156,13 +198,13 @@ test("a malformed report after a successful read is diagnosed once per attempt w
 		])
 			expect(text).not.toContain(secret);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
 test("valid JSON with a missing report field records the field and expected type, not its private contents", async () => {
 	const output = capture();
-	const h = await harness({
+	const f = await searchFixture({
 		workerOutput: JSON.stringify({
 			action: "finish",
 			report: {
@@ -180,8 +222,9 @@ test("valid JSON with a missing report field records the field and expected type
 			},
 		}),
 	});
+	const { h } = f;
 	try {
-		const r = await run(h);
+		const r = await run(f);
 		const issue = output
 			.entries()
 			.find(
@@ -196,8 +239,9 @@ test("valid JSON with a missing report field records the field and expected type
 			expectedType: "string",
 			actualType: "undefined",
 			controlAction: "finish",
-			issueCount: 2,
-			reportedIssueCount: 2,
+			// The summary, the candidate package's result kind and candidate refs, and the unknown key.
+			issueCount: 4,
+			reportedIssueCount: 4,
 		});
 		expect(
 			output
@@ -212,16 +256,17 @@ test("valid JSON with a missing report field records the field and expected type
 		expect(feedback.content).toContain("invalid_control_json");
 		expect(feedback.content).not.toContain("PRIVATE");
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });
 
 for (const options of [{ badToolArgs: true }, { badQuote: true }])
 	test(`action rejection logs precise diagnostics: ${JSON.stringify(options)}`, async () => {
 		const output = capture();
-		const h = await harness(options);
+		const f = await searchFixture(options);
+		const { h } = f;
 		try {
-			const r = await run(h);
+			const r = await run(f);
 			const issues = output
 				.entries()
 				.filter((entry) => entry.event === "agent.control_validation_issue");
@@ -246,6 +291,6 @@ for (const options of [{ badToolArgs: true }, { badQuote: true }])
 				options.badToolArgs ? "invalid_tool_input" : "invalid_evidence",
 			);
 		} finally {
-			await h.close();
+			await f.close();
 		}
 	});

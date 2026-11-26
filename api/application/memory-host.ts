@@ -21,7 +21,7 @@ import {
 	type HostConfig,
 	type HostResult,
 } from "eumenes-memory-host";
-import type { MemoryService } from "../domains/memory";
+import type { ForgetPurge, MemoryService } from "../domains/memory";
 import { PRINCIPAL, PROFILE_SCOPE } from "../domains/memory/contracts";
 import { getLogger } from "../infrastructure/logger";
 
@@ -129,7 +129,10 @@ export function createMemoryHostConnection(
 		)
 			throw Error("memory_host_config_invalid");
 	}
-	memory.registerForgetPurge((db, purge) => {
+	function invalidateDerived(
+		db: MemoryDb,
+		{ itemIds, forgetIds = [] }: Pick<ForgetPurge, "itemIds" | "forgetIds">,
+	) {
 		if (!host || !lastValidConfiguration) return;
 		// App-owned erasure must not depend on the readability of client credentials.
 		// The callback is synchronous; external requests always re-read current configuration.
@@ -138,13 +141,14 @@ export function createMemoryHostConnection(
 		try {
 			host.invalidateDerivedInTransaction(db, {
 				scopeKeys: purgeConfiguration.scopeKeys,
-				itemIds: purge.itemIds,
-				forgetIds: purge.forgetIds ?? [],
+				itemIds,
+				forgetIds,
 			});
 		} finally {
 			purgeConfiguration = previous;
 		}
-	});
+	}
+	memory.registerForgetPurge(invalidateDerived);
 	return {
 		profilePath,
 		socketPath,
@@ -187,6 +191,13 @@ export function createMemoryHostConnection(
 					port: {
 						...memory.sharedHost,
 						isReady: () => accepting && memory.sharedHost.isReady(),
+						applyHostIntent: (db, intent, forgetId) =>
+							memory.sharedHost.applyHostIntent(
+								db,
+								intent,
+								forgetId,
+								(tx, itemIds) => invalidateDerived(tx, { itemIds }),
+							),
 					},
 					resolveSource: memory.sharedHost.resolveSource,
 				});

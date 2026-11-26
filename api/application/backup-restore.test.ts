@@ -33,6 +33,7 @@ import { buildServices } from "./server-services";
 import { createLifecycles } from "./server-lifecycles";
 import { createLifecycleRunner } from "./lifecycle";
 import { backupDatabaseOnRequest } from "./db-backup";
+import { saveItem } from "../domains/memory/test/memory.fixture";
 
 const close = (services: Awaited<ReturnType<typeof buildServices>>) =>
 	createLifecycleRunner(
@@ -68,6 +69,22 @@ test("offline backup restores history, encrypted fixture credentials and queued 
 					text,
 					createdAt: new Date().toISOString(),
 				} as never);
+		});
+		expect(await source.memory.recover()).toMatchObject({ healthy: true });
+		await source.memoryHost.recover();
+		expect(source.memoryHost.status().state).toBe("recovered");
+		const item = await saveItem(source.store, source.memory, {
+			conversationId: "main",
+			messageId: forgotten,
+			kind: "habit",
+			semanticKey: "restore-drill-habit",
+			text: "後で忘却する試験発言",
+			quote: "後で忘却する試験発言",
+		});
+		await source.store.write((db) => {
+			db.query(
+				"INSERT INTO host_item_use(item_id, last_used_day) VALUES (?, 1)",
+			).run(item.id);
 		});
 		const settings = source.settings.get();
 		const connectionId = crypto.randomUUID();
@@ -113,7 +130,7 @@ test("offline backup restores history, encrypted fixture credentials and queued 
 		await source.memory.recover();
 		await source.memory.forget({
 			conversationId: "main",
-			itemIds: [],
+			itemIds: [item.id],
 			messageIds: [forgotten],
 		});
 		// Retire real sidecars from a different generation before restoring its main file.
@@ -134,6 +151,20 @@ test("offline backup restores history, encrypted fixture credentials and queued 
 		const recovery = await restored.memory.recover();
 		expect(recovery.healthy).toBe(true);
 		expect(recovery.reapplied).toBeGreaterThan(0);
+		const usage = () =>
+			restored!.store.read((db) =>
+				db
+					.query("SELECT item_id FROM host_item_use WHERE item_id = ?")
+					.get(item.id),
+			);
+		expect(usage()).toEqual({ item_id: item.id });
+		const fence = restored.store.read(restored.memory.forgetSeqInTransaction);
+		await restored.memoryHost.recover();
+		expect(restored.memoryHost.status().state).toBe("recovered");
+		expect(usage()).toBeNull();
+		expect(restored.store.read(restored.memory.forgetSeqInTransaction)).toBe(
+			fence,
+		);
 		expect(restored.settings.diagnostics().keyError).toBeNull();
 		expect(restored.settings.credential(connection)).toBe(
 			"restore-fixture-credential",

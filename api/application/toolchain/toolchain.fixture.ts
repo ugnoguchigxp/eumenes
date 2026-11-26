@@ -468,7 +468,10 @@ export async function harness(options: HarnessOptions = {}) {
 						options.badToolArgs && first
 							? { unexpected: "bad" }
 							: hit
-								? { url: hit.url }
+								? // A candidate the host presented has a reference, not a URL.
+									hit.url
+									? { url: hit.url }
+									: { candidateRef: hit.reference }
 								: { query: data.task.question.slice(0, 400) },
 				});
 			}

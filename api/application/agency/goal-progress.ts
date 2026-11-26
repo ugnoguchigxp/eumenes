@@ -12,6 +12,7 @@ import type {
 } from "eumenes-agency/agenda/runtime";
 import { z } from "zod";
 import type { HandlerDefinition, QueueService } from "../../domains/queue";
+import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
 	continueAfterDesignFailure,
@@ -38,6 +39,8 @@ import {
 	type GoalCheckCandidate,
 	type GoalSurface,
 } from "./goal-progress-context";
+
+const log = getLogger("agency");
 
 export const GOAL_ADVANCE_KIND = "agency.goal.advance";
 const scope = "agency-goals";
@@ -270,6 +273,14 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 		note: string,
 		claimId: string,
 	) {
+		// The step is cleared below; this line keeps which step could not go on, for the goal's later reading.
+		log.warn("agency.goal_parked", {
+			reason: note,
+			jobId: claimId,
+			subjectId: row.goalId,
+			kind: row.state.next?.kind ?? "none",
+			workRevision: row.progressVersion,
+		});
 		advance(
 			db,
 			row,

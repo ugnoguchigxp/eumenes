@@ -52,19 +52,29 @@ export function createAgendaCheckpoints(input: {
 			gone([...n.refs, ...(n.inputs ?? [])]),
 		);
 		const lostRefs = new Set(lost.map((n) => `note:${n.id}`));
+		// An assignment rests on the user's words it was asked in: with them it goes, with its item and its ticket.
+		const lostAssignments = new Set(
+			[...c.assignments.values()]
+				.filter((a) => gone([a.source.messageId]))
+				.map((a) => a.itemId),
+		);
 		const lostTickets = new Set(
 			c.tickets.filter(
 				(t) =>
-					gone([...t.refs, ...t.inputs]) || t.refs.some((r) => lostRefs.has(r)),
+					gone([...t.refs, ...t.inputs]) ||
+					t.refs.some((r) => lostRefs.has(r)) ||
+					lostAssignments.has(t.itemId),
 			),
 		);
 		c.agent.forget([
 			...set,
 			...aliases,
 			...lostRefs,
+			...lostAssignments,
 			...[...lostTickets].map((ticket) => ticket.itemId),
 		]);
-		if (lostTickets.size) c.agent.infoChanged(now());
+		for (const itemId of lostAssignments) c.assignments.delete(itemId);
+		if (lostTickets.size || lostAssignments.size) c.agent.infoChanged(now());
 		// A records pass in flight is not kept (it read the words as they were).
 		c.forgetSeq++;
 		// Thoughts carry no refs: any forget takes them all off the screen.

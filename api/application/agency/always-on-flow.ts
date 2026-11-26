@@ -21,6 +21,7 @@ import {
 import { getLogger } from "../../infrastructure/logger";
 import type { AgencyHostDeps } from "./host-types";
 import { prepareResearch } from "./research-admission";
+import { openScreen } from "./always-on-screens";
 
 export { researchRevision } from "./research-admission";
 
@@ -131,7 +132,9 @@ export async function startResearch(input: {
 			db,
 			citableNotes(c),
 			{ ...ticket, text: item?.text ?? ticket.text },
-			seenRefs(deps, c, input.now()),
+			// A research rests on what the agent has seen lately. An assignment rests on the user's words it was asked in
+			// (the item's refs), and the resources it names are checked by their owner: nothing unrelated may end it.
+			assignment ? [] : seenRefs(deps, c, input.now()),
 			assignment?.revisionId,
 		),
 	);
@@ -195,6 +198,16 @@ export async function startResearch(input: {
 	};
 	if (!taken) c.tickets.push(held);
 	held.agentTicketId = ticket.id;
+	/** The toolchain took the work just now: its screen (if the user's request has one) is told to the Web. */
+	const started = () => {
+		if (assignment?.adapterRef)
+			openScreen(c, {
+				assignment: ticket.itemId,
+				adapterRef: assignment.adapterRef,
+				at: input.now(),
+			});
+		return markResearchAccepted(c, held, ticket, input.now());
+	};
 	c.revision++;
 	try {
 		// Another change of the conversation may move the checkpoint meanwhile: save again, at once.
@@ -230,13 +243,12 @@ export async function startResearch(input: {
 				outboundIntervalMs: 0,
 			});
 		});
-		return markResearchAccepted(c, held, ticket, input.now());
+		return started();
 	} catch (error) {
 		const code = toErrorCode(error, "agency_research_failed");
 		if (code === "request_conflict") return fail(code, held);
 		const receipt = researchReceipt(deps, c, held.id);
-		if (receipt === "accepted")
-			return markResearchAccepted(c, held, ticket, input.now());
+		if (receipt === "accepted") return started();
 		let retry: string | undefined;
 		if (receipt === "unknown") retry = "agency_research_receipt_unavailable";
 		if (receipt === "missing") {
@@ -276,7 +288,7 @@ export async function deliverSpeak(input: {
 }): Promise<"appended" | "routed"> {
 	const { deps, c, ticket, at } = input;
 	const messageId = speechId(c, ticket.id);
-	return deps.store.write((db) => {
+	const delivered = await deps.store.write((db) => {
 		const state = input.current(db);
 		if (state === "busy") throw new Error(SPEECH_BUSY);
 		if (state !== "ok") throw new Error("agency_origin_stale");
@@ -305,7 +317,20 @@ export async function deliverSpeak(input: {
 			input: context,
 		});
 	});
+	// A line the Live session says is a message of its own transcript: the chips go to it when it appears.
+	const findings = findingWorkRefs(c, ticket.refs);
+	if (delivered === "routed" && findings.length) {
+		c.routed.set(messageId, { at, findings });
+		for (const old of c.routed.keys()) {
+			if (c.routed.size <= ROUTED_KEPT) break;
+			c.routed.delete(old);
+		}
+	}
+	return delivered;
 }
+
+/** How many lines handed to Live are waited on for their transcript. */
+const ROUTED_KEPT = 16;
 
 /** The work (ticket ids) behind the notes a line cites: the line links to their resources. */
 export function findingWorkRefs(c: AgendaScope, refs: readonly string[]) {
@@ -474,6 +499,13 @@ export async function prepareNoteDisplay(
 			label: document.label,
 		});
 	};
+}
+
+export function logChipLinkFailure(conversationId: string, error: unknown) {
+	log.warn("agency.chip_link_failed", {
+		subjectId: conversationId,
+		reason: toErrorCode(error, "chip_link_failed"),
+	});
 }
 
 export function logNoteDisplayFailure(conversationId: string, error: unknown) {

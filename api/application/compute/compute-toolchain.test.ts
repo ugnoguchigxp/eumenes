@@ -2,24 +2,18 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contr
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { fixture, remote } from "../../domains/compute/test/compute.fixture";
-import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
+import { TASK_TOOLCHAIN } from "../toolchain/task-delegation.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
 import { taskPlan, taskItem } from "../toolchain/task-plan.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-test("conversation selects registered Python tool, persists action receipt and reports the result through the TODO", async () => {
+test("an assignment of the task toolchain selects the registered Python tool, persists the action receipt and reports the result", async () => {
 	const f = await fixture();
 	let calls = 0;
-	const h = await harness({
+	const a = await assignmentFixture({
 		everyday: true,
 		computePort: f.port,
 		discoveryTarget: () => "execute_task",
-		// The conversation hands the request to the task execution (a search, then the hand-over).
-		firstRound: (_tools, _question, messages) =>
-			searchThenDelegate(
-				(candidate) => candidate.id === "task.execute",
-				"1+1をPythonで計算して",
-				{ announcement: "計算します。", impact: "create" },
-			)(messages),
 		command: () =>
 			JSON.stringify({
 				action: "invoke",
@@ -57,33 +51,15 @@ test("conversation selects registered Python tool, persists action receipt and r
 			};
 		},
 	});
+	const { h } = a;
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "1+1をPythonで計算して",
-		});
-		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
-		const executions = () =>
-			h.store.read((db) =>
-				h.toolchain.agents.executions.listInTransaction(db, "main"),
-			);
-		await waitFor(
-			() =>
-				["completed", "failed", "partial"].includes(
-					executions()[0]?.status ?? "",
-				),
-			{ timeout: 8000 },
-		);
-		expect(executions()[0]?.status).toBe("completed");
+		const { result } = await a.assign("1+1をPythonで計算して", TASK_TOOLCHAIN);
+		expect(result).toMatchObject({ status: "accepted" });
+		await a.settled();
+		expect(a.executions()[0]?.status).toBe("completed");
 		expect(calls).toBe(3);
-		// The finished task is the TODO's result, which the agency reports.
-		await waitFor(
-			() => h.reported().includes("Pythonで計算した結果は2です。"),
-			{
-				timeout: 8000,
-			},
-		);
+		// The finished task's result is what the agent reports.
+		expect(a.reported()).toContain("Pythonで計算した結果は2です。");
 		expect(h.commandContexts[0]).toContain("python_submit");
 		expect(h.commandContexts[0]).not.toContain("fixture-secret");
 		const actions = h.store.read((db) =>
@@ -148,7 +124,7 @@ test("conversation selects registered Python tool, persists action receipt and r
 				"cancelled",
 		);
 	} finally {
-		await h.close();
+		await a.close();
 		await f.close();
 	}
 }, 20000);
@@ -156,55 +132,36 @@ test("conversation selects registered Python tool, persists action receipt and r
 test("recovering an unknown acceptance sends a new completion notice without duplicating either state", async () => {
 	const f = await fixture();
 	f.state.submitError = new TypeError("fixture disconnect");
-	const h = await harness({
-		computePort: f.port,
-		routeTool: "compute_python",
-		command: () =>
-			JSON.stringify({
-				action: "invoke",
-				tool: "python_submit",
-				arguments: { code: "result=2" },
-			}),
-		parent: () => "計算を受け付けました。",
-	});
+	const h = await harness({ computePort: f.port });
 	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "Pythonで計算して",
+		// A job of the conversation's own origin is announced by the host; an assignment's job is reported by its execution.
+		await h.store.write((db) => {
+			h.compute!.commandInTransaction(
+				db,
+				CONVERSATION_DEFAULT_PRINCIPAL,
+				"main",
+				"conversation",
+				"python_submit",
+				{ code: "result=2" },
+				crypto.randomUUID(),
+			);
 		});
-		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
 		await waitFor(
 			() =>
 				h.compute!.list(CONVERSATION_DEFAULT_PRINCIPAL)[0]?.state ===
 				"indeterminate",
 		);
 		const job = h.compute!.list(CONVERSATION_DEFAULT_PRINCIPAL)[0]!;
-		expect(
+		const notices = (state: string) =>
 			h.conversation
 				.get("main")
-				.messages.filter(
-					(m) => m.id === `compute-notice:${job.id}:indeterminate`,
-				),
-		).toHaveLength(1);
+				.messages.filter((m) => m.id === `compute-notice:${job.id}:${state}`);
+		expect(notices("indeterminate")).toHaveLength(1);
 		f.state.submitError = null;
 		await h.compute!.reconcile(CONVERSATION_DEFAULT_PRINCIPAL, job.id);
-		await waitFor(() =>
-			h.conversation
-				.get("main")
-				.messages.some((m) => m.id === `compute-notice:${job.id}:completed`),
-		);
-		expect(
-			h.conversation
-				.get("main")
-				.messages.filter((m) => m.id === `compute-notice:${job.id}:completed`),
-		).toHaveLength(1);
-		expect(
-			h.conversation
-				.get("main")
-				.messages.find((m) => m.id === `compute-notice:${job.id}:completed`)
-				?.text,
-		).toContain("計算結果: 2");
+		await waitFor(() => notices("completed").length > 0);
+		expect(notices("completed")).toHaveLength(1);
+		expect(notices("completed")[0]?.text).toContain("計算結果: 2");
 	} finally {
 		await h.close();
 		await f.close();

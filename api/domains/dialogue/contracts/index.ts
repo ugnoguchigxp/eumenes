@@ -303,6 +303,11 @@ export interface AgencyLayerPort {
 		source: import("./agency-always-on").AssignmentSource;
 		details?: import("./agency-always-on").AssignmentDetails;
 		/**
+		 * The toolchain binding's adapter, for the user's own `delegate` request: the status tells the Web to open that
+		 * adapter's registered screen. Not given for a screen's form submit (the screen is open already).
+		 */
+		adapterRef?: string;
+		/**
 		 * A screen's form submit: its message is not words of the talk (an artifact), yet it is the user's own action
 		 * on the screen, so the agent takes it as the user's request for this assignment only.
 		 */

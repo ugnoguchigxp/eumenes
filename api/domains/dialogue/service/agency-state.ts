@@ -1,6 +1,10 @@
 import { readAgencyRecords } from "./agency-state-memory";
 import { agencyResults } from "./agency-results";
-import { isAgendaSnapshot } from "../contracts/agency-always-on";
+import {
+	agendaSources,
+	carryAssignments,
+	isAgendaSnapshot,
+} from "../contracts/agency-always-on";
 import { eraseAgencyActionWork } from "./agency-action-work";
 import {
 	createAgencyActions,
@@ -298,6 +302,49 @@ export function createAgencyStatePort(
 			revokeAgencyWork(db, id);
 		},
 		revokeInTransaction: revoke,
+		/**
+		 * The agency's settings changed: the checkpoint is kept for the user's own requests (the assignments, their items
+		 * and tickets, the works that run them), under the new digest and the same epoch. What else the agency held, and
+		 * the works behind it, go as a revoke takes them. False (nothing is changed) when the record holds no request of
+		 * the user's: the caller revokes it.
+		 */
+		carryAssignmentsInTransaction(
+			db: Database,
+			conversationId: string,
+			settingsDigest: string,
+		) {
+			const record = agencyRecords(db).find(
+				(r) => r.conversationId === conversationId,
+			);
+			if (!record || !isAgendaSnapshot(record.snapshot)) return false;
+			const carried = carryAssignments(record.snapshot);
+			if (!carried) return false;
+			const kept = new Set(carried.tickets.map((t) => t.id));
+			for (const w of agencyWorks(db, conversationId))
+				if (!kept.has(w.ticket_id)) {
+					if (w.execution_id) eraseAgencyActionWork(db, w, deps.now());
+					if (w.execution_id) stopAgencyExecution(deps, db, w, true);
+					deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
+					revokeAgencyWork(db, w.root_id);
+				}
+			const sourceRefs = agendaSources(carried);
+			if (
+				!saveAgency(
+					db,
+					{ ...record, snapshot: carried, settingsDigest, sourceRefs },
+					deps.now(),
+				)
+			)
+				throw new Error("agency_checkpoint_stale");
+			refreshAgencyDependencies(
+				db,
+				deps.memory,
+				conversationId,
+				record.scope,
+				sourceRefs,
+			);
+			return true;
+		},
 		...forgetting,
 	};
 }

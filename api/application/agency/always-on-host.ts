@@ -289,6 +289,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		heard: (c) => hearing.flush(c, now()),
 		changed: schedule,
 		exclude: excludeRefs,
+		save: () => save(),
 	});
 	return {
 		recover: () => recoverAgendaRecords(deps, goalAgenda, hostDigest),

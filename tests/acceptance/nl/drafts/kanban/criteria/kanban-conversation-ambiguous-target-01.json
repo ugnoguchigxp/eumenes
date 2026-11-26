@@ -1,29 +1,28 @@
 {
 	"criteriaId": "kanban-conversation-ambiguous-target-01",
-	"version": 1,
+	"version": 2,
 	"caseId": "kanban-conversation-ambiguous-target-01",
-	"hostReads": ["kanban", "interactions"],
+	"hostReads": ["conversation", "kanban"],
 	"successMarkers": [],
 	"items": [
 		{
 			"id": "C1",
-			"statement": "対象を選ぶ質問（waiting_input）が保存され、再読み込みを挟んでも回答後に completed となり、receipt に結びつく",
-			"check": "interaction-lifecycle",
+			"statement": "どのタスクかの質問がエージェントの発言として会話に出て、利用者の答えのあとに同じ頼みごとが続いてrunができる。質問は3件以内",
+			"check": "assignee-question",
 			"params": {
-				"sequence": ["waiting_input", "completed"],
-				"maxQuestions": 3,
-				"requireReceiptRef": true,
-				"reloadBetween": true
+				"result": "kanban-run",
+				"minQuestions": 1,
+				"maxQuestions": 3
 			},
 			"required": true
 		},
 		{
 			"id": "C2",
-			"statement": "質問の選択肢が、ボードの二枚のカードだけである",
-			"check": "interaction-choices",
+			"statement": "質問が、ボードの二枚のカードを選べる形で示している",
+			"check": "question-mentions",
 			"params": {
-				"labelsInclude": ["README の手順修正", "ログイン画面のバグ修正"],
-				"maxChoices": 2
+				"result": "kanban-run",
+				"labels": ["README の手順修正", "ログイン画面のバグ修正"]
 			},
 			"required": true
 		},
@@ -34,7 +33,7 @@
 			"params": {
 				"seeded": {
 					"ログイン画面のバグ修正": {
-						"column": "running"
+						"column": ["running", "finished"]
 					},
 					"README の手順修正": {
 						"column": "todo"
@@ -45,11 +44,12 @@
 		},
 		{
 			"id": "C4",
-			"statement": "run は一件だけ",
+			"statement": "runは一件だけで、カードは増えず、選ばれたカード以外は変わらない（質問のたびに別の担当を作らない）",
 			"check": "kanban-no-extra-changes",
 			"params": {
 				"maxNewCards": 0,
-				"maxRuns": 1
+				"maxRuns": 1,
+				"mayChange": ["ログイン画面のバグ修正"]
 			},
 			"required": true
 		}

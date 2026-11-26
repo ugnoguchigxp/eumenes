@@ -5,6 +5,7 @@ export {
 	useRuns,
 	useSubmit,
 } from "./hooks";
+export { useAssignmentArtifacts } from "./hooks/assignments";
 export { useRunProgress } from "./hooks/progress";
 export {
 	useSpecialistCommand,

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createDocling } from "../../domains/docling";
-import { harness } from "../toolchain/toolchain.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
 
 test("registered Docling chain runs its profile/Skill/tool and returns one launcher without connecting upstream", async () => {
 	let posts = 0;
@@ -16,12 +16,12 @@ test("registered Docling chain runs its profile/Skill/tool and returns one launc
 			throw new Error("not_expected");
 		}) as import("../../domains/docling").DoclingFetch,
 	});
-	const h = await harness({
+	const f = await assignmentFixture({
 		docling,
-		routeTool: "docling_desk",
 		command: () =>
 			JSON.stringify({ action: "invoke", tool: "docling.open", arguments: {} }),
 	});
+	const { h } = f;
 	try {
 		const entries = (await (await h.request("/api/toolchain-artifacts")).json())
 			.artifacts as Array<{ artifactId: string; title: string }>;
@@ -36,18 +36,15 @@ test("registered Docling chain runs its profile/Skill/tool and returns one launc
 		);
 		expect(source.status).toBe(200);
 		expect((await source.json()).data.configured).toBe(true);
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "Docling Deskを開いて",
-		});
-		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 10000 });
-		expect(done?.status).toBe("completed");
+		const { result } = await f.assign("Docling Deskを開いて", "docling.desk");
+		expect(result).toMatchObject({ status: "accepted" });
+		await f.settled();
+		expect(f.executions()).toMatchObject([{ status: "completed" }]);
 		expect(h.commandContexts.join("\n")).toContain("別タブ");
 		expect(h.commandContexts.join("\n")).toContain(
 			"文書の取り込み、OCR、変換を実行したとは説明しない",
 		);
-		expect(h.reported()).toContain("ready_for_open");
+		expect(f.reported()).toContain("ready_for_open");
 		expect(posts).toBe(0);
 		await h.toolchain.capabilities.seed();
 		expect(
@@ -59,6 +56,6 @@ test("registered Docling chain runs its profile/Skill/tool and returns one launc
 			),
 		).toHaveLength(1);
 	} finally {
-		await h.close();
+		await f.close();
 	}
 });

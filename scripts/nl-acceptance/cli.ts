@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { launchDriver, LOCALE, TIMEZONE, VIEWPORT } from "./driver";
 import { EVIDENCE_ROOT, makeRunId, openRunStore } from "./evidence";
+import { withDrafts, type Runnable } from "./drafts";
 import { freeze, loadFrozen, type FrozenSet } from "./frozen";
 import { createHostReader } from "./host";
 import { judge } from "./judge";
@@ -24,6 +25,7 @@ const USAGE = `使い方:
   bun scripts/nl-acceptance.ts --run --case <caseId> --group baseline|standard|variant-a|variant-b [--runs N]
   bun scripts/nl-acceptance.ts --run --pilot --baseline-url <url>
   bun scripts/nl-acceptance.ts --list | --freeze | --rejudge <runDir>
+  （未凍結の drafts/<group> のケースも --case で指定できる。--list に [未凍結] と出る）
 オプション:
   --baseline-url <url>      現行UIのorigin（baseline群）。--baseline-api-url でAPIのoriginを分けられる
   --with-product-llm        会話LLMを使うcaseを許可する（保存済みLARM設定を隔離サーバへ設定APIで保存）
@@ -36,7 +38,7 @@ const repoRoot = resolve(import.meta.dir, "../..");
 
 function printPlan(frozen: FrozenSet, plan: Plan, pilot: boolean) {
 	const lines = [
-		`凍結ファイル: ${Object.keys(frozen.digests).length} 件（lock 検証済み）`,
+		`凍結ファイル: ${Object.keys(frozen.digests).filter((f) => !f.startsWith("drafts/")).length} 件（lock 検証済み。未凍結の drafts は lock の対象外）`,
 		`実行計画: ${plan.entries.length} run、予算上限の合計 ${plan.maxCostUSD} USD${plan.totalCapUSD !== null ? `（総上限 ${plan.totalCapUSD} USD）` : ""}`,
 		pilot ? "pilot: 失敗しても自動で再実行しない" : "",
 	].filter(Boolean);
@@ -209,7 +211,10 @@ export async function main(argv: string[]): Promise<number> {
 		);
 		return 0;
 	}
-	const { set: frozen, issues } = loadFrozen();
+	const { set: frozenOnly, issues } = loadFrozen();
+	// Unfrozen drafts that parse are runnable beside the frozen cases; the pilot stays frozen-only.
+	const runnable: Runnable | null = frozenOnly ? withDrafts(frozenOnly) : null;
+	const frozen = runnable?.set ?? null;
 	if (values.rejudge) {
 		if (!frozen) {
 			console.error(issues.join("\n"));
@@ -240,8 +245,10 @@ export async function main(argv: string[]): Promise<number> {
 	if (values.list) {
 		for (const c of frozen.cases.values())
 			console.log(
-				`${c.caseId}@${c.version}  ${c.requires.productLlm ? "[--with-product-llm] " : ""}${c.goal}`,
+				`${c.caseId}@${c.version}  ${runnable!.draftCaseIds.has(c.caseId) ? "[未凍結] " : ""}${c.requires.productLlm ? "[--with-product-llm] " : ""}${c.goal}`,
 			);
+		for (const skip of runnable!.skipped)
+			console.log(`${skip.caseId}  [未凍結・実行不可: ${skip.reason}]`);
 		return 0;
 	}
 	if (!values["dry-run"] && !values.run) {
@@ -249,6 +256,13 @@ export async function main(argv: string[]): Promise<number> {
 		return 2;
 	}
 	const pilot = values.pilot === true;
+	const notRunnable = runnable!.skipped.find((k) => k.caseId === values.case);
+	if (notRunnable) {
+		console.error(
+			`実行計画を作れません:\n  - draft_not_runnable ${notRunnable.caseId} ${notRunnable.reason}`,
+		);
+		return 1;
+	}
 	const plan = buildPlan(frozen, {
 		pilot,
 		caseId: values.case,

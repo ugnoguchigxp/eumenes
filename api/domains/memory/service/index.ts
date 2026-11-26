@@ -445,8 +445,8 @@ export function createMemoryService(
 		},
 		...immediate.operations,
 		/**
-		 * Registers a purge that runs inside every forget's transaction, and again for every block journal line at
-		 * startup (so it must be idempotent). The steward deletes its decisions and inbox bodies here.
+		 * Registers a purge that runs inside the forget transaction and during journal recovery when reapplied.
+		 * Hooks must be idempotent. The steward deletes its decisions and inbox bodies here.
 		 */
 		registerForgetPurge(
 			hook: (db: Database, purge: ForgetPurge) => void,

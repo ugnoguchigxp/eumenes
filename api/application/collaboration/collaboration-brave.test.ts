@@ -25,7 +25,8 @@ import {
 } from "../browser/browser-task.fixture";
 import { createTaskRunner } from "../browser/browser-task-runner";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
-import { legacyTaskHarness as harness } from "./legacy-task.fixture";
+import { assignmentFixture } from "../toolchain/assignment.fixture";
+import { importLegacyTask } from "./legacy-task.fixture";
 
 const origin = "https://example.com";
 const excerpt = "準備ができたら、設定画面で接続先を保存します。";
@@ -144,7 +145,7 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 		]);
 		let service!: BrowserService;
 		let originalTab: string | undefined;
-		const h = await harness({
+		const f = await assignmentFixture({
 			pipelines: true,
 			webResearch: true,
 			discoveryTarget: (query) =>
@@ -167,6 +168,9 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 						store,
 						capabilities,
 						inference: model.ports,
+						// An assignment's browser task reads the execution's source through the service.
+						taskExecutionSourceInTransaction: (db, frozen) =>
+							service.taskExecutionSourceInTransaction(db, frozen),
 					}),
 				});
 				return {
@@ -186,18 +190,17 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 							},
 						)(messages)
 					: question.includes(request)
-						? searchThenDelegate(
-								(card) =>
-									card.id ===
-									(fromConversation
-										? "browser.operate"
-										: "collaboration.brave"),
-								request,
-								{
-									announcement: "ブラウザで開きます。",
-									impact: "create",
-								},
-							)(messages)
+						? // A browser request is the agent's assignment (the test hands it over); a Brave session is the conversation's own.
+							fromConversation
+							? { text: "承知しました。" }
+							: searchThenDelegate(
+									(card) => card.id === "collaboration.brave",
+									request,
+									{
+										announcement: "ブラウザで開きます。",
+										impact: "create",
+									},
+								)(messages)
 						: { text: "一覧を開きました。" },
 			command: () =>
 				JSON.stringify({
@@ -266,10 +269,12 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 				};
 			},
 		});
+		const { h } = f;
+		await importLegacyTask(h);
 		const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-brave-"));
 		const say = async (text: string) => {
 			const response = await h.request("/api/runs", {
-				conversationId: "main",
+				conversationId: f.conversationId,
 				requestId: crypto.randomUUID(),
 				text,
 			});
@@ -284,7 +289,7 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 			waitFor(
 				() =>
 					h.conversation
-						.get("main")
+						.get(f.conversationId)
 						.messages.some((message) => message.text === text),
 				{
 					timeout: 7000,
@@ -293,10 +298,11 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 				throw new Error(
 					JSON.stringify({
 						messages: h.conversation
-							.get("main")
+							.get(f.conversationId)
 							.messages.map((message) => message.text),
 						calls: model.state.calls.length,
-						session: h.dialogue.specialistSession("main")?.toolchainId,
+						session: h.dialogue.specialistSession(f.conversationId)
+							?.toolchainId,
 						available: service.availability(),
 					}),
 				);
@@ -308,12 +314,12 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 				await service.settled();
 				originalTab = service.tabs()[0]!.tabRef;
 			}
-			await say(request);
 			if (fromConversation) {
+				await f.assign(request, "browser.operate");
 				await waitFor(
 					() =>
 						service
-							.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, "main")
+							.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, f.conversationId)
 							.some((task) => task.state === "completed"),
 					{ timeout: 7000 },
 				);
@@ -321,12 +327,17 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 					.tabs()
 					.find((tab) => tab.url === `${origin}/list`)!.tabRef;
 				expect(driver.connectCount).toBe(1);
-			} else await waitForAnswer("一覧を開きました。");
+			} else {
+				await say(request);
+				await waitForAnswer("一覧を開きました。");
+			}
 			if (!originalTab) throw new Error("opened_browser_tab_missing");
-			const dedicated = h.dialogue.specialistSession("main");
+			const dedicated = h.dialogue.specialistSession(f.conversationId);
 			if (fromConversation) expect(dedicated).toBeNull();
 			else {
-				const response = await h.request("/api/conversations/main/specialist");
+				const response = await h.request(
+					`/api/conversations/${f.conversationId}/specialist`,
+				);
 				expect(response.status).toBe(200);
 				expect((await response.json()).session).toMatchObject({
 					toolchainId: "collaboration.brave",
@@ -339,25 +350,27 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 			).toBe(`${origin}/list`);
 			await service.openTab("self", null, `${origin}/unrelated`);
 			await say(switchRequest);
-			const common = h.dialogue.specialistSession("main");
+			const common = h.dialogue.specialistSession(f.conversationId);
 			expect(common).toMatchObject({
 				toolchainId: "collaboration.task",
 				agentLabel: "Collaboration",
 			});
 			expect(common?.id).not.toBe(dedicated?.id);
 			expect(
-				service.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, "main"),
+				service.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, f.conversationId),
 			).toHaveLength(1);
 			await say(continuation);
 			await waitForAnswer(excerpt);
-			expect(h.dialogue.specialistSession("main")?.id).toBe(common?.id);
+			expect(h.dialogue.specialistSession(f.conversationId)?.id).toBe(
+				common?.id,
+			);
 			expect(
 				service.tabs().find((tab) => tab.tabRef === originalTab)?.url,
 			).toBe(`${origin}/setup`);
 			expect(driver.readPlaces).toEqual(Array(3).fill(`${origin}/setup`));
 			expect(h.acquisitions).toBe(0);
 			const runs: Run[] = await (
-				await h.request("/api/conversations/main/runs")
+				await h.request(`/api/conversations/${f.conversationId}/runs`)
 			).json();
 			const read = runs.findLast((run) => run.sourceKind === "notice");
 			expect(read).toMatchObject({
@@ -381,7 +394,7 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 			expect(h.spoken).toEqual(sentences);
 			expect(
 				service
-					.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, "main")
+					.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, f.conversationId)
 					.map(({ state, tabRef }) => ({ state, tabRef })),
 			).toEqual([
 				{ state: "completed", tabRef: originalTab },
@@ -389,7 +402,7 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 			]);
 			expect(model.state.cancelled).toHaveLength(1);
 		} finally {
-			await h.close();
+			await f.close();
 			rmSync(dir, { recursive: true, force: true });
 		}
 	},

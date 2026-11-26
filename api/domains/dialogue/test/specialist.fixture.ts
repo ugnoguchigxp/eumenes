@@ -145,6 +145,8 @@ export async function setup(options: Options = {}) {
 		gone: new Set<string>(),
 		/** A safe code the next operations are refused with. */
 		invokeError: null as string | null,
+		/** The error the selection record throws (a write that fails after the hand-over's earlier statements). */
+		selectionError: null as string | null,
 		/** A refusal the fake work document's commit throws (as a domain does, a plain Error(code)). */
 		commitError: null as string | null,
 		/** A repair hint the refusal carries (as the ui adapter's errors do). */
@@ -511,7 +513,10 @@ export async function setup(options: Options = {}) {
 		},
 		sessionSetInTransaction: (_db: unknown, revisionId: string) =>
 			specialist.setInTransaction(_db as never, revisionId),
-		recordSelectionInTransaction: () => "selection",
+		recordSelectionInTransaction: () => {
+			if (state.selectionError) throw new Error(state.selectionError);
+			return "selection";
+		},
 		settleSelectionInTransaction: () => {},
 		commandSetInTransaction: () => {
 			throw new Error("unexpected_command");

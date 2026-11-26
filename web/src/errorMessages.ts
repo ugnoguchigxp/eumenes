@@ -99,7 +99,6 @@ const messages: Record<string, string> = {
 		"音声の順序が正しくありません。もう一度話してください。",
 	voice_audio_capacity:
 		"再生待ちの音声が多すぎます。再生が終わってから話してください。",
-	voice_preview_busy: "試聴中です。終わってからもう一度お試しください。",
 	stale_voice_generation: "音声セッションが切り替わりました。",
 	stale_voice_preview: "試聴の内容が古くなりました。もう一度お試しください。",
 	voice_input_stale: "発話の続きが届いたため、文字起こしをまとめ直しています。",

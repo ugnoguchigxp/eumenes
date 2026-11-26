@@ -4,6 +4,8 @@ import type {
 	CheckStatus,
 	Criteria,
 	FailureClass,
+	HostKanbanCard,
+	HostMessage,
 	HostSnapshot,
 	HostTimer,
 	RunEvidence,
@@ -456,6 +458,196 @@ register("no-extra-side-effects", {
 		);
 		if (stray) return violated("receipt_for_other_timer", stray.action);
 		return ok("no_extra_side_effects");
+	},
+});
+
+/*
+ * Work handed to an assignee: the assignee's question is the agent's message in the conversation,
+ * the user's answer is the next user message, and the result is observed on the host (a timer or a
+ * board run). Order is read from the conversation; "when" is the first host snapshot that shows it.
+ */
+type SeenMessage = HostMessage & { firstIdx: number };
+const QUESTION = /[？?]|(ですか|ますか|でしょうか)[。.\s]*$/;
+const isQuestion = (m: HostMessage) =>
+	m.role === "assistant" && QUESTION.test(m.text);
+const squash = (text: string) => text.replace(/\s+/g, "");
+
+/** Messages that were not in the first snapshot, in conversation order, with the snapshot that first showed them. */
+function newMessages(ctx: Ctx): SeenMessage[] | null {
+	const series = ctx.ev.hostSeries;
+	const first = series[0];
+	if (!first?.messages) return null;
+	const before = new Set(first.messages.map((m) => m.id));
+	const firstIdx = new Map<string, number>();
+	series.forEach((snap, i) => {
+		for (const m of snap.messages ?? [])
+			if (!firstIdx.has(m.id)) firstIdx.set(m.id, i);
+	});
+	const latest = [...series].reverse().find((s) => s.messages)?.messages ?? [];
+	return latest
+		.filter((m) => !before.has(m.id))
+		.map((m) => ({ ...m, firstIdx: firstIdx.get(m.id)! }));
+}
+type Result = "timer" | "kanban-run";
+/** Index of the first snapshot that shows the work's result, or null when it never appears. */
+function resultIdx(ctx: Ctx, result: Result): number | null {
+	const series = ctx.ev.hostSeries;
+	if (result === "timer") {
+		const i = series.findIndex((s) =>
+			s.timers.some((t) => !ctx.initial?.has(t.id)),
+		);
+		return i < 0 ? null : i;
+	}
+	const known = new Set(series[0]?.kanban?.runs.map((r) => r.id));
+	const i = series.findIndex((s) =>
+		s.kanban?.runs.some((r) => !known.has(r.id)),
+	);
+	return i < 0 ? null : i;
+}
+/** The user's request and the assignee's questions asked before the result appeared. */
+function questionsOf(ctx: Ctx, result: Result) {
+	const messages = newMessages(ctx);
+	if (!messages) return null;
+	const request = messages.findIndex((m) => m.role === "user");
+	const at = resultIdx(ctx, result);
+	const after = request < 0 ? [] : messages.slice(request + 1);
+	return {
+		request: request < 0 ? null : messages[request]!,
+		after,
+		at,
+		questions: after.filter(
+			(m) => isQuestion(m) && (at === null || m.firstIdx <= at),
+		),
+	};
+}
+const resultName = z.enum(["timer", "kanban-run"]);
+
+register("assignee-question", {
+	schema: z.strictObject({
+		result: resultName,
+		minQuestions: z.number().int().min(1).default(1),
+		maxQuestions: z.number().int().min(1),
+	}),
+	run(ctx, p) {
+		const view = questionsOf(ctx, p.result);
+		if (!view) return unknown("host_unobserved", undefined, "environment");
+		if (!view.request) return unmet("no_request_message");
+		const { questions, after, at } = view;
+		if (questions.length < p.minQuestions)
+			return unmet("no_question_shown", `${questions.length}件`);
+		if (questions.length > p.maxQuestions)
+			return violated(
+				"too_many_questions",
+				`質問${questions.length}件（上限${p.maxQuestions}件）`,
+			);
+		const answer = after
+			.slice(after.indexOf(questions[0]!) + 1)
+			.find((m) => m.role === "user");
+		if (!answer) return unmet("question_unanswered");
+		if (at === null) return unmet("no_result_after_answer");
+		// The work must have waited for the answer: a result that is already there before it is a guess.
+		if (answer.firstIdx > at)
+			return violated("result_before_answer", "回答より前に結果が出ている");
+		return ok("question_answered_then_result", `質問${questions.length}件`);
+	},
+});
+
+register("question-mentions", {
+	schema: z.strictObject({
+		result: resultName,
+		labels: z.array(z.string().min(1)).min(1),
+	}),
+	run(ctx, p) {
+		const view = questionsOf(ctx, p.result);
+		if (!view) return unknown("host_unobserved", undefined, "environment");
+		const hit = view.questions.some((m) =>
+			p.labels.every((label) => squash(m.text).includes(squash(label))),
+		);
+		return hit
+			? ok("question_offers_labels")
+			: unmet("question_misses_labels", p.labels.join(" / "));
+	},
+});
+
+type Board = { first: HostKanban; latest: HostKanban; all: HostKanban[] };
+type HostKanban = NonNullable<HostSnapshot["kanban"]>;
+function boardOf(ctx: Ctx): Board | null {
+	const all = ctx.ev.hostSeries.flatMap((s) => (s.kanban ? [s.kanban] : []));
+	return all.length
+		? { first: all[0]!, latest: all[all.length - 1]!, all }
+		: null;
+}
+const columns = z.enum(["todo", "running", "finished"]);
+
+register("kanban-cards", {
+	schema: z.strictObject({
+		/** Seeded card title to the column(s) it should end in. */
+		seeded: z.record(
+			z.string(),
+			z.strictObject({ column: z.union([columns, z.array(columns).min(1)]) }),
+		),
+	}),
+	run(ctx, p) {
+		const board = boardOf(ctx);
+		if (!board) return unknown("host_unobserved", undefined, "environment");
+		let notReached: string | null = null;
+		for (const [title, want] of Object.entries(p.seeded)) {
+			const seeds = board.first.cards.filter((c) => c.title === title);
+			if (seeds.length !== 1)
+				return unknown("target_unresolved", title, "environment");
+			const now = board.latest.cards.find((c) => c.id === seeds[0]!.id);
+			if (!now) return violated("card_missing", title);
+			const allowed = Array.isArray(want.column) ? want.column : [want.column];
+			if (allowed.includes(now.column)) continue;
+			// A card that should have been run but is still waiting is unfinished; any other mismatch is wrong state.
+			if (now.column === "todo")
+				notReached ??= `${title}: todo（期待${allowed.join("/")}）`;
+			else
+				return violated(
+					"wrong_column",
+					`${title}: ${now.column}（期待${allowed.join("/")}）`,
+				);
+		}
+		return notReached ? unmet("card_not_moved", notReached) : ok("cards_match");
+	},
+});
+
+register("kanban-no-extra-changes", {
+	schema: z.strictObject({
+		maxNewCards: z.number().int().min(0),
+		maxRuns: z.number().int().min(0),
+		/** Seeded cards (by title) the goal allows to change. */
+		mayChange: z.array(z.string()).default([]),
+	}),
+	run(ctx, p) {
+		const board = boardOf(ctx);
+		if (!board) return unknown("host_unobserved", undefined, "environment");
+		const seeded = new Map<string, HostKanbanCard>(
+			board.first.cards.map((c) => [c.id, c]),
+		);
+		const runsBefore = new Set(board.first.runs.map((r) => r.id));
+		const newCards = new Set<string>();
+		const newRuns = new Set<string>();
+		for (const snap of board.all) {
+			for (const c of snap.cards) {
+				const before = seeded.get(c.id);
+				if (!before) newCards.add(c.id);
+				else if (
+					!p.mayChange.includes(before.title) &&
+					(before.revision !== c.revision || before.column !== c.column)
+				)
+					return violated("other_card_modified", before.title);
+			}
+			for (const r of snap.runs) if (!runsBefore.has(r.id)) newRuns.add(r.id);
+		}
+		if (newCards.size > p.maxNewCards)
+			return violated("extra_cards", `${newCards.size}件`);
+		if (newRuns.size > p.maxRuns)
+			return violated(
+				"extra_runs",
+				`run ${newRuns.size}件（上限${p.maxRuns}件）`,
+			);
+		return ok("no_extra_changes");
 	},
 });
 

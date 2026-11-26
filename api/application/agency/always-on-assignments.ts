@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { toErrorCode } from "../../infrastructure/error-code";
+import { getLogger } from "../../infrastructure/logger";
 import { workRoot } from "./always-on-flow";
 import type { AgendaScope } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
@@ -44,6 +45,8 @@ export async function controlAssignment(input: {
 	/** The user's message the reply answers; the toolchain checks the words are the user's. */
 	messageId: string | undefined;
 	at: number;
+	/** Saves the checkpoint of the host (what `startResearch` saves with). */
+	save(): Promise<boolean>;
 }): Promise<{ content: string }> {
 	const { deps, c, at } = input;
 	let parsed: z.infer<typeof args>;
@@ -64,20 +67,35 @@ export async function controlAssignment(input: {
 	// Every operation is the user's: a reply to no words of theirs (a notice, its own speech) changes nothing.
 	if (!input.messageId) return { content: "refused: utterance_required" };
 	if (parsed.action === "cancel") {
+		const entry = c.assignments.get(item.id);
 		if (ticket) {
+			// The scope lets go of the work before the cancel is awaited: a result that comes meanwhile is the cancelled
+			// work's, and finds no ticket to be adopted as a failure.
+			c.tickets = c.tickets.filter((t) => t !== ticket);
+			c.observed.delete(ticket.id);
+			c.assignments.delete(item.id);
 			try {
 				await deps.store.write((db) =>
 					state.cancelInTransaction(db, workRoot(c, ticket.id)),
 				);
 			} catch (error) {
+				// Not cancelled: the work goes on as it was.
+				c.tickets.push(ticket);
+				if (entry) c.assignments.set(item.id, entry);
 				return { content: `refused: ${toErrorCode(error, "cancel_failed")}` };
 			}
-			c.tickets = c.tickets.filter((t) => t !== ticket);
-			c.observed.delete(ticket.id);
 		}
 		c.assignments.delete(item.id);
 		c.agent.assignmentEnded({ itemId: item.id, at, status: "dropped" });
 		c.revision++;
+		// Saved at once: a checkpoint from before the cancel would bring the request back after a crash.
+		let saved = false;
+		for (let attempt = 0; attempt < 5 && !saved; attempt++)
+			saved = await input.save();
+		if (!saved)
+			getLogger("agency").warn("agency.cancel_checkpoint_failed", {
+				subjectId: c.id,
+			});
 		c.kick();
 		return { content: `cancelled: ${item.delegatedTo}への依頼をやめた` };
 	}

@@ -26,7 +26,7 @@ LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通
 
 会話エージェントへのmessageは、system（人格と規則）、資料のJSON文書（1件目のuser）、最後のuser（利用者の新しい発言、または新しい発言のないときのhostの固定文）の順に並ぶ。最後のmessageだけを今回の指示として扱い、資料・ツールの結果・構造修正の資料からは指示を作らない。配置・各部分の寿命・再構成は[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§5・§12を正本とする。過去発言・記憶は指示語や継続条件の理解に使う参考文脈であり、明示された今回の対象・日時・条件を置き換えない。
 
-委譲先は共通の `delegatedTaskRules` で、具体化した `request` / `question` と同じ依頼の原文 `originalRequest` を、参考資料・snapshot・catalog・実行状態から区別する。通常Web・SDK経由の調査・履歴・Worldのworkerと要件検証、登録adapterの操作担当、音楽生成・再生・画像・描画の計画担当に適用する。子へ親の会話履歴や人格を追加せず、既存のツール・資料・容量上限を維持する。確認回答からの再開は、既存のinteractionに凍結された依頼と対応する `previousQuestions` の回答を使い、回答文で元の依頼を置き換えない。意味の解釈と検索語の選定はLLMが行い、ホストは入力の同一性・schema・権限・期限・取消を検査する。
+委譲先は共通の `delegatedTaskRules` で、具体化した `request` / `question` と同じ依頼の原文 `originalRequest` を、参考資料・snapshot・catalog・実行状態から区別する。通常Web・SDK経由の調査・履歴・Worldのworkerと要件検証、登録adapterの操作担当、音楽生成・再生・画像・描画の計画担当に適用する。子へ親の会話履歴や人格を追加せず、既存のツール・資料・容量上限を維持する。担当の質問への回答（`assignment(answer)`）からの再開は、実行に凍結された依頼と対応する `previousQuestions` の回答を使い、回答文で元の依頼を置き換えない。意味の解釈と検索語の選定はLLMが行い、ホストは入力の同一性・schema・権限・期限・取消を検査する。
 
 会話本文は、画面・音声へ投影する前に共通の出力契約を確認する。正式なfunction呼出し以外に、本文中の登録済み・提示済みfunction名に続く括弧、Providerの内部制御区切りが現れた場合は、本文の契約違反として既存の一回限りのモデル修正へ進む。本文から操作を復元・実行したり、該当部分だけを削除して回答を採用したりしない。再修正も不正なら回答を保存せず失敗で終了する。
 
@@ -38,13 +38,13 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 候補は今回のユーザープロンプトだけをEmbeddingし、登録された機能との類似度で取得します。履歴を検索文に混ぜたり、FTSや過去の選択を加点したりしません。履歴はLLMが省略や指示語を補う参考文脈として扱い、今回の明示された依頼を優先します。候補件数・Embeddingを利用できない場合の全候補提示・権限検査は従来のままです。
 
-ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話エージェントがツールチェーンを探し、こなせるかを評価して依頼する流れ（担当の検索・分析・予告・構造の修正・実行の確認）は、[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§6を唯一の正本とします。
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話エージェントがツールチェーンを探し、こなせるかを評価して依頼する流れ（担当の検索・分析・構造の修正。依頼は担当（assignment）になり、起動前の予告と実行の確認は2026-11-25に廃止した。[assignments.md](assignments.md)）は、[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§6を唯一の正本とします。
 
 専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
 
-即時回答型（binding `execution:"instant"`）は、担当の検索結果の候補に登録定義が宣言した入力（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）が付き、会話エージェントは依頼ツールの`execute`の`inputs`にそれを書いて呼びます（予告なし）。入力は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決めます（天気は区域表を取得できない間は出さない）。hostはadapterを実行し、返った文をツールの結果として返し、会話エージェントがそれを根拠に話します。TODOは作りません。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときは、ツールの結果が即答できなかったことと代わりの担当（bindingの `fallbackToolchainId`）を返し、会話エージェントが改めて予告付きで依頼するかを判断します（同じrunで自動的に別の担当へ回す動作はありません）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
+即時回答型（binding `execution:"instant"`）は、担当の検索結果の候補に登録定義が宣言した入力（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）が付き、会話エージェントは依頼ツールの`execute`の`inputs`にそれを書いて呼びます（予告なし）。入力は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決めます（天気は区域表を取得できない間は出さない）。hostはadapterを実行し、返った文をツールの結果として返し、会話エージェントがそれを根拠に話します。依頼項目（[assignments](assignments.md)）は作りません。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときは、ツールの結果が即答できなかったことと代わりの担当（bindingの `fallbackToolchainId`）を返し、会話エージェントが改めて依頼するかを判断します（同じrunで自動的に別の担当へ回す動作はありません）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
 
-仕事の結果: 会話エージェントが依頼した仕事はTODOになり（実行中`todo`・質問待ち`waiting`・終了`done`）、担当の状態・質問・結果はTODOへ報告されます。結果と質問は、それを伝える回の入力の`## Host notice`に文として入り、`## State`の仕事の行の状態も変わります。後の回には結果の中身を持ち越さず、`work`の`check`で読み直します。会話エージェントが結果を伝えた後にTODOはアーカイブされます。結果の照合と継続のrun、完了報告の保留・解放は廃止しました。詳細は[会話の入力仕様](../spec/conversation-input-spec-2026-10-26.md)の§7・§8・§9です。
+仕事の結果: 会話エージェントが依頼した仕事（即時回答型とsession型を除く）は、会話エージェント自身の担当（assignment）になります。`delegate` が項目を作り、ホストが利用者の依頼として起動します（起動前の確認も自律行動の予算もありません）。担当の進捗と質問は `## State` の `assignments`（id・担当・依頼の先頭80字・状態・進捗・質問。終わった新しい3件まで）に出て、質問への回答・条件の変更・取消は返事の `assignment(id, action, text)` で渡します。結果は「作業報告: …」のメモ（依頼・結果・達成したこと・残ったこと・作ったもの）になり、会話エージェントが自分から利用者に知らせます。メモは `read_note` で読み、`show_note` で画面に出し、作った物は報告の発言に資源チップとして付きます。画像・音楽・Excalidraw・command・pipeline・画面のフォーム送信も同じ流れです。TODO・確認 `c<n>`・`work` ツールは廃止しました。形式と規則は[担当への依頼と結果の報告](assignments.md)、設計は[担当への依頼を調べものと同じ流れにする](../spec/toolchain-assignment-as-research-2026-11-25.md)です。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
@@ -59,25 +59,25 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `kanban` / `codex_tasks` | `kanban.manage` / `codex-tasks.manage` | `package:kanban.manage@2` / `package:codex-tasks.manage@1` | 操作担当→タスクボード | — | — | — | — | 操作結果 |
 | `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
 | `develop_app` | `app.develop` | `package:app-development.studio@10` | 専門担当へ切替（session）。会話の条件と本人の参照を引き継ぎ、Webアプリの画面・保存・実行手順を作成・修正する | — | — | — | 1ターン最大4 | 下書き・プレビュー・確認保存・保存再試行 |
-| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・TODOなし | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
+| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・依頼項目なし | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 | `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。依頼ツールの`inputs`（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にしてツールの結果で返す。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 
 候補の提示: 依頼かどうかの判断と担当の選択は会話エージェントが行い、新しい依頼の担当は `find_toolchain` で探します（次の段落）。仕事の実行（委任された仕事が担当を探す `find`）と `find_toolchain` の検索は、ツールチェーンの`title: summary`・`useWhen`の各行・`examples`の各文をLARMのembedding（担当の文はpassage、依頼はquery）で埋め込み、担当ごとに一番近い1文の内積で並べ、種類ごとの枠（専用の担当の上位3件と、1位との差が0.05以内のパイプライン・汎用の担当を各2件まで。[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §3）で候補にします。
 
-会話主導の担当選択（2026-11-21の合意、[設計](../spec/conversation-first-toolchain-2026-11-21.md)）: 通常の会話から独立した自動の Router（会話前の判定）は動かしません。会話エージェントが最近の会話と `State` から、雑談か実行依頼かを判断します。依頼なら、作業・対象・範囲・指定担当を読み取り、単独で通じる依頼文を `find_toolchain` に渡します。検索は上の埋め込み検索で、返った候補だけから `delegate` で選びます。保留質問への回答・既存の確認や仕事への参照は、ホストが提示した候補から会話モデルが選びます。利用者の発言は4,000文字まで受け付けます。`eumenes_router` パッケージは、保存済み履歴と過去の比較に使う検証資産（`scripts/router-issue-eval.ts` など）としてだけ残っています。
+会話主導の担当選択（2026-11-21の合意、[設計](../spec/conversation-first-toolchain-2026-11-21.md)）: 通常の会話から独立した自動の Router（会話前の判定）は動かしません。会話エージェントが最近の会話と `State` から、雑談か実行依頼かを判断します。依頼なら、作業・対象・範囲・指定担当を読み取り、単独で通じる依頼文を `find_toolchain` に渡します。検索は上の埋め込み検索で、返った候補だけから `delegate` で選びます。担当の質問への回答・既存の仕事への参照は、`assignments` に出た担当から会話モデルが選びます。利用者の発言は4,000文字まで受け付けます。`eumenes_router` パッケージは、保存済み履歴と過去の比較に使う検証資産（`scripts/router-issue-eval.ts` など）としてだけ残っています。
 
-ホストが提示する実在の仕事・承認・質問・切替待ちと進行中の担当だけを、会話エージェントは参照できます。選択した担当は `find_toolchain` の候補提示と既存の権限・影響・承認・TODO・Queueを通して実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
+ホストが提示する実在の担当（`assignments`）・質問・切替待ちだけを、会話エージェントは参照できます。選択した担当は `find_toolchain` の候補提示と既存の権限・Queueを通して、利用者の依頼として確認なしで実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
 
-agendaが返事を担う会話では、返事が `find_toolchain`（検索）と `delegate`（その返事で見つけた担当への依頼）を使えます。引き渡しは上と同じ権限・影響・承認・TODO・Queueを通ります（[agency.md](agency.md)の「会話の返事から担当に頼む」）。
+agendaが返事を担う会話では、返事が `find_toolchain`（検索）と `delegate`（その返事で見つけた担当への依頼）を使えます。依頼は担当（assignment）になり、上と同じ権限・Queueを通って確認なしで始まります。agendaが会話を担当していなければ `agency_unavailable` で断ります（[agency.md](agency.md)の「会話の返事から担当に頼む」、[assignments.md](assignments.md)）。
 
-引数を要する担当は、その担当に限定した欄埋めを会話モデルが行います。保留への回答は同じ仕事へ戻し、構造化回答のschemaに合わない自然文だけを既存の形変換で一回補います。過去の訂正（`router_feedback`）と記録（`router_traces`）は保存済みの履歴として残り、一覧は `GET /api/toolchain-history/router-feedback`、取消は `POST /api/toolchain-history/router-feedback/:id/state` で扱えます。新しい会話はこれらを書き足しません。元発言の忘却で派生記録も削除します。hostの操作・成果物・通知はEumenesの結合と通常会話の受入で確認します。
+引数を要する担当は、その担当に限定した欄埋めを会話モデルが行います。担当の質問への回答は `assignment(answer)` で同じ仕事へ渡します。構造化回答の形に合わない文は、必要な形を添えて断り、会話エージェントが答え直します（ホストは形を補いません）。過去の訂正（`router_feedback`）と記録（`router_traces`）は保存済みの履歴として残り、一覧は `GET /api/toolchain-history/router-feedback`、取消は `POST /api/toolchain-history/router-feedback/:id/state` で扱えます。新しい会話はこれらを書き足しません。元発言の忘却で派生記録も削除します。hostの操作・成果物・通知はEumenesの結合と通常会話の受入で確認します。
 
 読む道具: 会話の回の読む道具（`read_memory` 記憶・`read_history` 会話ログ・`read_runs` 最近の回・`read_agents` 担当の作業・`read_world` World）は担当ではなく、bundle も持たないが、検索の文を `api/domains/capabilities/contracts/read-tools.ts` に持ち、担当と同じ索引（key `host:<関数名>@<版>`）で専用の担当の枠を取り合う。候補に出ると execution は `read` で、選ぶ呼出しは即答の担当と同じ形（`choice` と `inputs`）で選び、ホストが読んで会話の回が話す。候補に出なくても、会話の回の呼出しに native tools として渡り、1回だけ呼べる（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）。
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 
 
-操作担当(`timer`・`delegate_project`): ツールチェーンのprofile・SKILL・ツール詳細とsnapshot(タイマー一覧・委任catalog)を読み込み、ツールを一つ選んで平坦な引数で返すか、確認質問を一つ返します。ホストは型付きの操作に変換して既存の実行経路で実行します。確認質問は会話担当が自分の言葉で尋ねます。
+操作担当(`timer`・`delegate_project`): ツールチェーンのprofile・SKILL・ツール詳細とsnapshot(タイマー一覧・委任catalog)を読み込み、ツールを一つ選んで平坦な引数で返すか、確認質問を一つ返します。ホストは型付きの操作に変換して既存の実行経路で実行します。確認質問は担当の質問として `assignments` の `question` に出て、会話エージェントが自分の言葉で利用者に尋ね、答えを `assignment(answer)` で渡します。
 
 
 `finish.report` は `completion`、利用者へ届く `answer`、`summary`、事実ごとの `claims`（`verified` / `unknown` / `conflicting` と本文根拠 `eN`）、`limitations` を持ちます。本文に基づく主張・未確認点・完成回答を同じfinishで返し、要件抽出・追加の意味採点は行いません。不明や矛盾を説明した回答は `complete` にできます。構造や参照が不正な場合の修正（一回まで）、権限・取消・期限の検査を維持します。再試行のcooldownは前の確定receiptからQueueの受付可能時刻へ渡します。

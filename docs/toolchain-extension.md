@@ -30,19 +30,19 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 実行の流れは次のとおり。
 
-- **会話**: 候補は「有効catalog ∩ host対応adapter ∩ 現在の可用性」。会話担当がtoolchainの関数を選ぶ → command担当がbindingのtoolsだけを見て一操作（invoke）か確認質問（clarify）を返す → agent-runtimeの`action`経路 → tool-runtime → registry → adapter → domain。
+- **会話**: 候補は「有効catalog ∩ host対応adapter ∩ 現在の可用性」。会話担当がtoolchainの関数を選ぶ → command担当がbindingのtoolsだけを見て一操作（invoke）か確認質問（clarify）を返す → agent-runtimeの`action`経路 → tool-runtime → registry → adapter → domain。即時回答型・session型を除き、会話担当の `delegate` は依頼項目（assignment）を作り、ホストが利用者の依頼として確認なしで起動する（[担当への依頼と結果の報告](assignments.md)）。
 - **UI**: ランチャーは `GET /api/toolchain-artifacts` の一件ずつ。共通host（`web/src/domains/toolchain-artifacts`）が登録artifactを開き、書込みは `POST /api/toolchain-actions` が受付・domain実行・receipt参照を一つのtransactionで保存する。
-- **質問**: clarifyは `command_interactions` に保存され、UI（`POST /api/toolchain-interactions/:id/answers`）または会話の次の発話で回答して同じ凍結revisionで再開する。
+- **質問**: clarifyは担当の質問として会話エージェントの状態 `assignments[].question` に出て、利用者の答えを返事の `assignment(answer)` で渡すと、同じ凍結revisionで再開する。質問の保存表 `command_interactions` と、画面から答える口（`/api/toolchain-interactions`）は2026-11-25に廃止した（表は行を残して書き込みを止めた）。登録済みrevisionに残る `answer`・`questionDefinition` の欄は、今は読まれない。
 
 ### 日常の複数操作を接続するtask型
 
 休止中（2026-10-21）。`task-execution.bundle.dormant.json` は登録されない。以下は休止中の実装の契約。
 
-`task-execution.bundle.dormant.json`（休止中）の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。会話エージェントの依頼（`delegate`の`execute`）で目的を受け、agent-runtimeが会話runとは独立した親実行を所有する。commandの翻訳を親の開始に追加しない。
+`task-execution.bundle.dormant.json`（休止中）の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。会話エージェントの依頼（`delegate`）で目的を受け、agent-runtimeが会話runとは独立した親実行を所有する。commandの翻訳を親の開始に追加しない。
 
 親は `find_toolchain` の候補（種類ごとの枠）からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
-会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`work`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_agents`・`read_world`（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
+会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`assignment`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_agents`・`read_world`（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
@@ -61,7 +61,7 @@ Agencyは既存の能力検索と実行契約を使う。話題や利用者の�
 - command / instantでは、登録adapterの`describe().operations`にある`effect: "read"`を自動実行できる。書込みのうち独立した新規成果物を作る操作だけに`autonomy: "create"`を明示する。既存物の変更・送信・公開・削除へ付けない。command担当へ渡す操作を絞り、実行直前にも同じ条件を検査する。
 - task / pipelineのownerは`describe().autonomy`へ`"read"`または`"create"`を宣言する。taskには実在する`start / view / control / cancel / forget`の公開操作が必要で、取消・忘却を欠く担当は自動実行しない。子の実行にも共通portの出所・操作権限・期限を適用する。pipelineは既存の共通実行を使い、非許可の部品を選択・実行できない。
 - host-nativeの既存能力は`ToolchainRuntimeMeta.autonomy`で同じ副作用を宣言する。未宣言の能力を、名前や`minImpact`の推測だけで自動実行可能にしない。会話を専有するsessionは既存handoffの確認へ進む。
-- 成果物は既存の`producedBy`、ResourceAdapterの`fromResultInTransaction`とURI解決に接続する。受付を完成として扱わない。確定した結果だけをTODO・会話の成果物一覧へ登録する。
+- 成果物は既存の`producedBy`、ResourceAdapterの`fromResultInTransaction`とURI解決に接続する。受付を完成として扱わない。確定した結果だけを作業報告メモ・会話の成果物一覧へ登録する。
 - 自律実行の`ExecutionSource`は`origin: "autonomous"`、`messageId: null`。保存済みのAgency ticketと権限記録が発行元であり、利用者発言やmanual/voice runを作って代用しない。古い読み取り専用の自律調査記録も一般の操作権限に昇格させない。
 
 初期設定は`agency.actions = { enabled: true, maxConcurrent: 1, dailyLimit: 3 }`。設定APIから確認・変更し、日次枠は会話scopeごとに日本時間の午前0時で区切る。同じticketの再照会は新しい枠を消費せず、結果回収は枠を使い切っても続く。設定・能力の変更、取消、忘却、期限切れで失効した結果は採用しない。音楽の生成と再生は別の操作であり、可聴出力は利用者のWeb画面だけで行う。
@@ -102,7 +102,7 @@ bundleには公開する役割、操作、受領結果とArtifactを記述する
 | 旧形式のツールチェーンを移す | [§6](#6-旧形式のツールチェーンを移行する) | §5に加え旧経路の削除 |
 | 新しい画面部品が要る | [§10 E](#10-e-designsystemopenuiartifactを追加する) | DesignSystem部品とOpenUI登録 |
 | 履歴調査の要件profile・dotsの担当 | [§9 A](#9-a-登録apiで追加する) | なし。登録API |
-| 外部の読取りAPIの結果を決まった文で返す（予告・TODOなし） | [§3.2](#32-即時回答型instantを追加する) | adapterの `instant`、bundle |
+| 外部の読取りAPIの結果を決まった文で返す（予告・依頼項目なし） | [§3.2](#32-即時回答型instantを追加する) | adapterの `instant`、bundle |
 | 既存の担当を決まった順に使う手順（3つ以上の担当） | [pipeline型](#決まった手順を実行するpipeline型) | なし。定義を公開APIか制作画面で登録 |
 | 単純なHTTP JSON API（結果を担当が整理して返す） | 未対応 | bundleの `bindings` はcommand・session bindingだけを受け付ける。HTTP APIはadapterで実装する |
 
@@ -210,9 +210,9 @@ bundleには公開する役割、操作、受領結果とArtifactを記述する
 
 ### 3.2 即時回答型（instant）を追加する
 
-会話エージェントの依頼一回で答えが決まる担当（例: 天気予報 `weather_forecast`）に使う。予告・TODO・サブエージェントを使わず、adapterが返した文をツールの結果として会話エージェントへ返し、会話エージェントがそれを根拠に話す。実在の例は [weather-forecast.bundle.json](../api/domains/capabilities/bundles/weather-forecast.bundle.json) と [weather-adapter.ts](../api/application/weather/weather-adapter.ts)。
+会話エージェントの依頼一回で答えが決まる担当（例: 天気予報 `weather_forecast`）に使う。予告・依頼項目・サブエージェントを使わず、adapterが返した文をツールの結果として会話エージェントへ返し、会話エージェントがそれを根拠に話す。実在の例は [weather-forecast.bundle.json](../api/domains/capabilities/bundles/weather-forecast.bundle.json) と [weather-adapter.ts](../api/application/weather/weather-adapter.ts)。
 
-1. bundleに `execution:"instant"` のbindingを書く。`tools` は一件、`fallbackToolchainId` はadapterが答えられないときにツールの結果で示す代わりの担当のid（自動では回さず、会話エージェントが予告付きで依頼するかを判断する）。`artifactRevisionId` は持たず、toolchainにも書かない（画面を持たない）。
+1. bundleに `execution:"instant"` のbindingを書く。`tools` は一件、`fallbackToolchainId` はadapterが答えられないときにツールの結果で示す代わりの担当のid（自動では回さず、会話エージェントが改めて依頼するかを判断する）。`artifactRevisionId` は持たず、toolchainにも書かない（画面を持たない）。
 2. toolの `schemaKey` は `capabilities/contracts` に追加したvalidator（例 `weatherPlace`）。担当の検索の結果にこのschemaが入力として載り、会話エージェントは依頼の`inputs`に書く。予告は付けない。
 3. 引数は利用者の言った言葉（地名・会社名）で受け、値の解決（地名→区域、名前→銘柄）はadapterが自分のデータで行う。`availableInTransaction` が候補に出すかを決める。`instant.run(operation, input, signal)` が `{ok:true, answer}` か `{ok:false, code}` を返す。ネットワークを使ってよい（transaction外）。外部取得はタイムアウト・サイズ上限・リダイレクト拒否を付ける。取消はsignalで受け、失敗として扱わない。
 4. 使う場面・使わない場面・回答文の形は、toolchainの `summary`・`useWhen`・`redirects`・profile・SKILLとadapterに書く。会話の共通SystemContextとdialogueには足さない。
@@ -300,7 +300,7 @@ bundleには公開する役割、操作、受領結果とArtifactを記述する
 | --- | --- | --- |
 | bundle | `check` がissue無し。fresh・upgrade両方で登録でき、旧revisionのhashが変わらない | `bun run toolchain:bundle -- check …`、`api/domains/capabilities/test/bundles.test.ts` |
 | adapter | 各操作の正常・拒否・replay・revision競合、conversation originの対象検査 | adapterの単体試験（例 `api/application/timers/timer-question.test.ts`） |
-| 会話 | 候補提示 → command → 保存receipt → 回答。clarifyで質問が保存され、回答で再開する | `api/application/timers/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts` |
+| 会話 | 候補提示 → `delegate` → 依頼項目 → command → 保存receipt → 作業報告。clarifyの質問は `assignments` に出て、`assignment(answer)` で再開する | `api/application/timers/timer-toolchain.test.ts`、`api/application/agency/assignment-kinds.test.ts` |
 | UI操作 | 受付と実行の原子性、同ID再送、時刻窓、source/action偽装の拒否 | `api/domains/tool-runtime/test/action-requests.test.ts` |
 | 画面 | 入口一件、操作、競合、通信断からの照合 | Web adapterの試験、`tests/browser/<domain>.spec.ts` |
 | 自然言語受入 | 凍結した目的・基準で、host状態から判定 | [自然言語UI受入](nl-acceptance.md) |

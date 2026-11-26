@@ -6,6 +6,7 @@ import { dialogueClient } from "../../client/dialogue";
 import { eventsClient } from "../../client/events";
 import type { Transport } from "../../client/transport";
 import { harness } from "./toolchain/toolchain.fixture";
+import { assignmentFixture } from "./toolchain/assignment.fixture";
 import { waitFor } from "../infrastructure/wait-for";
 import { run as runCommand } from "../../cli/commands/run";
 import type { CliArgs, CliIo } from "../../cli/commands/types";
@@ -128,17 +129,15 @@ test("CLI and Web read the same persisted utterances and full answers through th
 	}
 }, 20000);
 
-const NOTICE = "「タイマー」に頼みます。";
-
-test("a CLI creation request executes an existing toolchain without rendering its artifact", async () => {
-	const h = await harness({ timers: true });
+test("a CLI creation request is handed to the agent as an assignment and its report reaches the CLI without rendering an artifact", async () => {
+	const f = await assignmentFixture({ timers: true });
 	const lifetime = new AbortController();
 	const shown: string[] = [];
 	const errors: string[] = [];
-	const client = connect(h.app);
+	const client = connect(f.h.app);
 	const session = createChatSession({
 		client,
-		conversationId: "main",
+		conversationId: f.conversationId,
 		signal: lifetime.signal,
 		message: (message) => shown.push(message.text),
 		error: (text) => errors.push(text),
@@ -146,19 +145,24 @@ test("a CLI creation request executes an existing toolchain without rendering it
 	try {
 		await session.start();
 		expect(await session.send("3分タイマーを作って")).toBe("completed");
-		expect(h.timers!.list().items).toMatchObject([
+		// What `delegate` hands the agent for those words: the work is the agent's assignment, not a conversation turn.
+		const run = (await client.runs(f.conversationId))[0]!;
+		await f.assignRun(run.id, "timers.manage");
+		await f.settled();
+		await f.until(() => f.notes().length === 1);
+		expect(f.h.timers!.list().items).toMatchObject([
 			{ durationSeconds: 180, state: "active" },
 		]);
-		expect((await client.conversation("main")).messages[0]?.text).toBe(
-			"3分タイマーを作って",
-		);
-		// The router's hand-over is announced by the host (spec router-package-integration 2026-11-04).
-		expect((await client.runs("main"))[0]?.announcement).toBe(NOTICE);
-		expect(shown).toEqual(["3分タイマーを作って", NOTICE]);
+		expect(
+			(await client.conversation(f.conversationId)).messages[0]?.text,
+		).toBe("3分タイマーを作って");
+		await f.until(() => f.reports().length > 0);
+		await waitFor(() => shown.includes("できました。"));
+		expect(shown[0]).toBe("3分タイマーを作って");
 		expect(errors).toEqual([]);
 	} finally {
 		lifetime.abort();
 		session.stop();
-		await h.close();
+		await f.close();
 	}
 }, 20000);

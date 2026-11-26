@@ -7,7 +7,7 @@ import type {
 import type { MemoryDb } from "eumenes-memory/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ConversationService } from "../../conversation";
-import { bumpForgetSeq } from "../repository";
+import { bumpForgetSeq, isBlockApplied } from "../repository";
 import { seedEvidence } from "./seed-sources";
 import { hostMessageSource } from "./curation-shared";
 import { appendJournal, intentOf, readJournal } from "./journal";
@@ -55,15 +55,25 @@ export function createSharedHostPort(deps: {
 			db: MemoryDb,
 			hostIntent: HostForgetIntent,
 			forgetId?: string,
+			purgeHostMetadata?: (db: MemoryDb, itemIds: readonly string[]) => void,
 		): void {
 			if (!forgetId) return;
 			// This database came from the application's port; the cast exposes its concrete driver to existing purges.
 			const writer = db as Database;
 			const intent = intentOf(hostIntent);
-			const itemIds = [
-				...new Set([...intent.itemIds, ...(hostIntent["host.states"] ?? [])]),
-			];
+			const hostItems = hostIntent["host.states"] ?? [];
+			const itemIds = [...new Set([...intent.itemIds, ...hostItems])];
 			if (!itemIds.length && !intent.messageIds.length) return;
+			// The application mark covers memory.items. Recovery can write it before processing host.states.
+			if (
+				purgeHostMetadata &&
+				!hostItems.length &&
+				isBlockApplied(writer, forgetId)
+			) {
+				// A restored DB can still hold host metadata because the application recovers before the host exists.
+				if (itemIds.length) purgeHostMetadata(db, itemIds);
+				return;
+			}
 			deps.forgetter.purgeDerivedInTransaction(writer, {
 				forgetId,
 				conversationId: intent.conversationId,

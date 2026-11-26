@@ -4,6 +4,7 @@ import { createClient } from "../../client";
 import { resolveLarmToken } from "../../api/infrastructure/auth-config";
 import { createFixture } from "../../tests/browser/fixture";
 import { liveLarmSettings } from "../live-larm";
+import { boardArtifactOf, boardSourcePath } from "./host";
 import type { FixtureDef, Group } from "./types";
 
 const FIXTURE_TOKEN = "fixture-token-for-toolchain-browser";
@@ -41,6 +42,61 @@ async function seed(
 	}
 }
 
+/**
+ * Registers the fixture's cards through the task board's own registered action (the same
+ * `POST /api/toolchain-actions` the board screen sends); a write of the harness, never of the judge.
+ */
+async function seedCards(
+	hostUrl: string,
+	token: string | undefined,
+	seeds: FixtureDef["seedCards"],
+) {
+	if (!seeds.length) return;
+	const call = async (path: string, init?: RequestInit) => {
+		const response = await fetch(new URL(path, hostUrl), {
+			...init,
+			headers: {
+				"content-type": "application/json",
+				...(token ? { authorization: `Bearer ${token}` } : {}),
+			},
+			signal: AbortSignal.timeout(10_000),
+		});
+		if (!response.ok) throw new Error(`seed_cards_failed_${response.status}`);
+		return response.json() as Promise<Record<string, unknown>>;
+	};
+	const artifactRevisionId = boardArtifactOf(
+		await call("/api/toolchain-artifacts"),
+	);
+	if (!artifactRevisionId) throw new Error("seed_cards_board_unregistered");
+	const { scopeRef } = (await call(
+		`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}`,
+	)) as { scopeRef: string };
+	for (const card of seeds) {
+		const { revision } = (await call(boardSourcePath(artifactRevisionId))) as {
+			revision: number;
+		};
+		const created = Date.now();
+		const result = await call("/api/toolchain-actions", {
+			method: "POST",
+			body: JSON.stringify({
+				version: 1,
+				eventId: crypto.randomUUID(),
+				eventCreatedAt: new Date(created).toISOString(),
+				eventExpiresAt: new Date(created + 60_000).toISOString(),
+				artifactId: "nl-acceptance-seed",
+				artifactRevisionId,
+				source: "kanban",
+				sourceRevision: revision,
+				actionId: "add",
+				scopeRef,
+				input: { title: card.title, prompt: card.prompt },
+			}),
+		});
+		if (result.status !== "accepted")
+			throw new Error("seed_cards_not_accepted");
+	}
+}
+
 /** The pre-migration UI from an externally provided origin. The harness does not start it. */
 export async function useBaseline(options: {
 	baselineUrl: string;
@@ -51,6 +107,7 @@ export async function useBaseline(options: {
 	const hostUrl = options.apiUrl ?? options.baselineUrl;
 	const hostToken = (options.env ?? process.env).EUMENES_NL_BASELINE_TOKEN;
 	await seed(hostUrl, hostToken, options.fixture.seedTimers);
+	await seedCards(hostUrl, hostToken, options.fixture.seedCards);
 	return {
 		startUrl: options.baselineUrl,
 		hostUrl,
@@ -149,6 +206,7 @@ export async function startIsolated(options: {
 			message: "web_not_ready",
 		});
 		await seed(apiUrl, token, options.fixture.seedTimers);
+		await seedCards(apiUrl, token, options.fixture.seedCards);
 	} catch (error) {
 		await fx.stopAll();
 		throw error;

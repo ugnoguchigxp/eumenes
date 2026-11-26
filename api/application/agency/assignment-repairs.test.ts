@@ -238,6 +238,7 @@ test("the assignment tool tells the agent the shape a refused answer needs, so i
 		}),
 		messageId: "m2",
 		at: 1,
+		save: async () => true,
 	});
 	expect(out.content).toBe(
 		`refused: invalid_answer（回答の形: ${JSON.stringify(schema)}）`,

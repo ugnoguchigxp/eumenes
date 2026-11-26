@@ -6,7 +6,11 @@ import { getLogger } from "../../infrastructure/logger";
 import type { createAgencyActivity } from "./always-on-activity";
 import { mayStep } from "./always-on-cycle";
 import { feedAgenda, pumpAgendaHost } from "./always-on-feed";
-import { keepNote, logNoteDisplayFailure } from "./always-on-flow";
+import {
+	keepNote,
+	logChipLinkFailure,
+	logNoteDisplayFailure,
+} from "./always-on-flow";
 import type { createAgendaHearing } from "./always-on-heard";
 import { recallConversation } from "./always-on-recovery";
 import { keepPosition } from "./always-on-position";
@@ -129,12 +133,24 @@ export async function recoverAgendaRecords(
 	await deps.store.write((db) => {
 		deps.state!.quarantineLegacyInTransaction(db);
 		deps.state!.recoverForgottenInTransaction(db);
-		for (const r of deps.state!.recordsInTransaction(db))
-			if (!isAgendaSnapshot(r.snapshot) || r.settingsDigest !== hostDigest) {
-				// What the agency remembers goes; where reading the conversation stopped stays.
-				keepPosition(deps, r.conversationId, positionOf(r));
-				deps.state!.revokeInTransaction(db, r.conversationId);
-			}
+		for (const r of deps.state!.recordsInTransaction(db)) {
+			const agenda = isAgendaSnapshot(r.snapshot);
+			if (agenda && r.settingsDigest === hostDigest) continue;
+			// A change of the agency's settings is no reason to lose what the user asked toolchains for: their requests
+			// (items, tickets, running works) stay in the record under the new digest.
+			if (
+				agenda &&
+				deps.state!.carryAssignmentsInTransaction(
+					db,
+					r.conversationId,
+					hostDigest,
+				)
+			)
+				continue;
+			// What the agency remembers goes; where reading the conversation stopped stays.
+			keepPosition(deps, r.conversationId, positionOf(r));
+			deps.state!.revokeInTransaction(db, r.conversationId);
+		}
 	});
 }
 
@@ -171,6 +187,19 @@ export function drainConversationOutbox(ctx: {
 					hearing: ctx.hearing,
 					forget: (scope, refs) => ctx.forgetRefs(scope, refs),
 					exchanged: (scope) => ctx.records(scope),
+					linked: (scope, messageId, workRefs) =>
+						void ctx.track(
+							ctx.deps.store
+								.write((db) =>
+									ctx.deps.state?.linkFindingsInTransaction(
+										db,
+										scope.id,
+										messageId,
+										workRefs,
+									),
+								)
+								.catch((error) => logChipLinkFailure(scope.id, error)),
+						),
 					show: (scope, noteIds, runId) => {
 						for (const id of noteIds) {
 							const note =

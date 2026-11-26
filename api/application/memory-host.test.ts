@@ -7,10 +7,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { CONTRACT_VERSIONS } from "eumenes-memory";
+import { planForget } from "eumenes-memory/sqlite";
 import { readProfile, request, type HostConfig } from "eumenes-memory-host";
 import { createMemoryHostConnection } from "./memory-host";
 import { setupMemory, saveItem } from "../domains/memory/test/memory.fixture";
-import { PROFILE_SCOPE } from "../domains/memory/contracts";
+import { PRINCIPAL, PROFILE_SCOPE } from "../domains/memory/contracts";
 
 async function setup() {
 	const h = await setupMemory();
@@ -26,6 +28,91 @@ async function setup() {
 		},
 	};
 }
+
+test("host recovery does not repeat committed or reapplied application forgets", async () => {
+	const { h, owner, close } = await setup();
+	try {
+		const committed = await h.say("user", "Already forgotten");
+		const interrupted = await h.say("user", "Journaled before interruption");
+		const purge = (messageId: string) => ({
+			conversationId: "c1",
+			itemIds: [],
+			messageIds: [messageId],
+		});
+		expect((await h.memory.forget(purge(committed))).completed).toBe(true);
+		const purged: string[] = [];
+		h.memory.registerForgetPurge((_db, input) => {
+			purged.push(...input.messageIds);
+		});
+		await expect(
+			h.store.write((db) => {
+				h.memory.forgetInTransaction(db, purge(interrupted));
+				throw new Error("interrupted");
+			}),
+		).rejects.toThrow("interrupted");
+		// The transaction hook ran before rollback. The queued reconciliation then applies the durable entry.
+		expect(await h.memory.recover()).toMatchObject({ healthy: true });
+		expect(purged).toEqual([interrupted, interrupted]);
+		const fence = h.store.read(h.memory.forgetSeqInTransaction);
+
+		await owner.recover();
+		expect(owner.status().state).toBe("recovered");
+		expect(purged).toEqual([interrupted, interrupted]);
+		expect(h.store.read(h.memory.forgetSeqInTransaction)).toBe(fence);
+		expect(h.memory.blockedMessageIds([committed, interrupted])).toEqual(
+			new Set([committed, interrupted]),
+		);
+	} finally {
+		await close();
+	}
+});
+
+test("recovery passes a host-origin forget's State IDs to application cleanup", async () => {
+	const { h, owner, close } = await setup();
+	try {
+		const messageId = await h.say("user", "I walk in the morning");
+		const item = await saveItem(h.store, h.memory, {
+			conversationId: "c1",
+			messageId,
+			kind: "habit",
+			semanticKey: "morning-walk",
+			text: "Walk in the morning",
+			quote: "I walk in the morning",
+		});
+		const planned = h.store.read((db) =>
+			planForget(db, {
+				contractVersion: CONTRACT_VERSIONS.lifecycle,
+				access: {
+					principal: PRINCIPAL,
+					scopeKeys: [PROFILE_SCOPE],
+					purpose: "memory.forget",
+					policyRevision: h.memory.policyRevisionInTransaction(db),
+				},
+				targets: [
+					{ type: "state_item", scopeKey: PROFILE_SCOPE, itemId: item.id },
+				],
+				hostIntent: { "host.states": [item.id] },
+				clock: { atMs: Date.parse(h.time.now) },
+			}),
+		);
+		if (planned.status !== "planned") throw new Error("forget not planned");
+		h.memory.sharedHost.journal.append(planned.plan.entry);
+		const purged: string[] = [];
+		h.memory.registerForgetPurge((_db, input) => {
+			purged.push(...input.itemIds);
+		});
+		expect(await h.memory.recover()).toMatchObject({
+			healthy: true,
+			reapplied: 1,
+		});
+		expect(purged).toEqual([]);
+		await owner.recover();
+		expect(owner.status().state).toBe("recovered");
+		expect(purged).toEqual([item.id]);
+	} finally {
+		await close();
+	}
+});
 
 test("app memory host recovers first, gates requests until start, and reuses the app's writer and sources", async () => {
 	const { h, owner, close } = await setup();

@@ -1,7 +1,10 @@
 import type { Database } from "bun:sqlite";
 import { afterEach, expect, test } from "bun:test";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { closeRetiredTodosInTransaction } from "../service/todo-closure";
+import {
+	closeRetiredTodosInTransaction,
+	flushRetiredCancellations,
+} from "../service/todo-closure";
 import { openDialogueStore, removeDialogueStore } from "./store.fixture";
 
 const NOW = "2026-11-25T00:00:00.000Z";
@@ -298,4 +301,79 @@ test("an owner that throws still lets the other rows close, and its own writes r
 			db.query("SELECT status FROM command_interactions").get(),
 		),
 	).toEqual({ status: "cancelled" });
+});
+
+function agencyWork(
+	db: Database,
+	rootId: string,
+	executionId: string | null,
+	state: { revoked?: number; returned?: number } = {},
+) {
+	db.run(
+		`INSERT INTO dialogue_agency_work(root_id, conversation_id, epoch, ticket_id, intent_id, candidate_id, question,
+		 toolchain_revision_id, deadline, source_refs_json, execution_id, revoked, returned)
+		 VALUES (?, 'main', 1, ?, 'intent', 'candidate', 'question', ?, 0, '[]', ?, ?, ?)`,
+		[
+			rootId,
+			`ticket-${rootId}`,
+			REVISION,
+			executionId,
+			state.revoked ?? 0,
+			state.returned ?? 0,
+		],
+	);
+}
+
+test("an execution the agency still holds is not cancelled: only its TODO row closes; revoked and returned work is cancelled as before", async () => {
+	const store = open();
+	await store.write((db) => {
+		seedConversation(db);
+		todo(db, "w1", "task", "held-1");
+		todo(db, "w2", "pipeline", "held-2");
+		todo(db, "w3", "task", "revoked-3");
+		todo(db, "w4", "task", "returned-4");
+		todo(db, "w5", "task", "plain-5");
+		agencyWork(db, "r1", "held-1");
+		agencyWork(db, "r2", "held-2");
+		agencyWork(db, "r3", "revoked-3", { revoked: 1 });
+		agencyWork(db, "r4", "returned-4", { returned: 1 });
+		// Work that has no execution yet holds nothing.
+		agencyWork(db, "r5", null);
+	});
+	const cancels: string[] = [];
+	const result = await store.write((db) =>
+		closeRetiredTodosInTransaction(deps(cancels), db),
+	);
+	expect(result).toEqual({ closed: 5, cancelled: 3 });
+	expect(cancels.sort()).toEqual(["plain-5", "returned-4", "revoked-3"]);
+	expect(
+		store.read((db) =>
+			db
+				.query("SELECT outcome FROM dialogue_work WHERE id IN ('w1','w2')")
+				.all(),
+		),
+	).toEqual([{ outcome: "interrupted" }, { outcome: "interrupted" }]);
+});
+
+test("the closure flushes the jobs its owners cancelled, and a failing queue does not stop the start", () => {
+	const flushed: string[][] = [];
+	const filters: unknown[] = [];
+	const queue = {
+		list: (filter: unknown) => {
+			filters.push(filter);
+			return { items: [{ id: "job-1" }, { id: "job-2" }], nextCursor: null };
+		},
+		flushCancellations: (jobs: string[]) => void flushed.push(jobs),
+	} as unknown as Parameters<typeof flushRetiredCancellations>[0];
+	flushRetiredCancellations(queue);
+	expect(filters).toEqual([{ state: "cancel_requested" }]);
+	expect(flushed).toEqual([["job-1", "job-2"]]);
+	expect(() =>
+		flushRetiredCancellations({
+			list: () => {
+				throw new Error("queue_failed");
+			},
+			flushCancellations: () => {},
+		} as unknown as Parameters<typeof flushRetiredCancellations>[0]),
+	).not.toThrow();
 });

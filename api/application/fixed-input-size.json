@@ -7,8 +7,8 @@
 	},
 	"elements": {
 		"system.alwaysOn": {
-			"chars": 3651,
-			"tokens": 3028
+			"chars": 3662,
+			"tokens": 3029
 		},
 		"system.alwaysOn.Role": {
 			"chars": 1191,
@@ -23,16 +23,16 @@
 			"tokens": 150
 		},
 		"system.alwaysOn.Input": {
-			"chars": 689,
-			"tokens": 583
+			"chars": 700,
+			"tokens": 584
 		},
 		"system.alwaysOn.Facts": {
 			"chars": 1236,
 			"tokens": 1054
 		},
 		"system.alwaysOnGoal": {
-			"chars": 3992,
-			"tokens": 3240
+			"chars": 4003,
+			"tokens": 3241
 		},
 		"tools.read": {
 			"chars": 2456,
@@ -59,32 +59,20 @@
 			"tokens": 149
 		},
 		"tools.talkWork": {
-			"chars": 1146,
-			"tokens": 589
+			"chars": 984,
+			"tokens": 529
 		},
 		"tool.find_toolchain": {
 			"chars": 292,
 			"tokens": 161
 		},
 		"tool.delegate": {
-			"chars": 851,
-			"tokens": 428
+			"chars": 689,
+			"tokens": 367
 		},
 		"tools.workControls": {
-			"chars": 1420,
-			"tokens": 619
-		},
-		"tool.approve_confirmation": {
-			"chars": 296,
-			"tokens": 141
-		},
-		"tool.decline_confirmation": {
-			"chars": 392,
-			"tokens": 162
-		},
-		"tool.work": {
-			"chars": 488,
-			"tokens": 203
+			"chars": 241,
+			"tokens": 112
 		},
 		"tool.discard_for_pending_switch": {
 			"chars": 239,
@@ -147,12 +135,12 @@
 			"tokens": 670
 		},
 		"agency.checkSystem": {
-			"chars": 1186,
-			"tokens": 967
+			"chars": 1178,
+			"tokens": 950
 		},
 		"agency.askCheckSystem": {
-			"chars": 1286,
-			"tokens": 1001
+			"chars": 1278,
+			"tokens": 984
 		},
 		"steward.curateMemory.instructions": {
 			"chars": 3784,

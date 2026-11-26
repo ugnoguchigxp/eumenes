@@ -10,6 +10,7 @@
 | [settings.md](settings.md) | 設定アーティファクト(会話・AIと接続・音声と入力・表示・記録)とサービスの試用・自己診断 |
 | [cli-chat.md](cli-chat.md) | CLIの対話モードとAIによる再現・デバッグ。会話共有、JSONL、実行IDからの追跡、固定試験 |
 | [agency.md](agency.md) | 会話エージェント（always-on の agenda）の設定変更と host の作り直し、背景のパスの記録、対象の解決、agenda の思考の会話欄表示 |
+| [assignments.md](assignments.md) | 担当への依頼と結果の報告。`delegate` → 依頼項目 → 状態の `assignments` → `assignment` ツール → 作業報告メモ。確認なしの起動、規則、起動時の TODO の閉鎖、検証 |
 | [realtime.md](realtime.md) | SSE 通知と再接続の仕様、定期取得をしない方針 |
 | [larm.md](larm.md) | LARM の接続、claim、予算、session 構成 |
 | [logging.md](logging.md) | JSONL ログの保存先・相関 ID・障害調査の手順 |

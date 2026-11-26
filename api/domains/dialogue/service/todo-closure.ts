@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
+import type { QueueService } from "../../queue";
 import type { DialogueDeps } from "./context";
 
 const log = getLogger("dialogue");
@@ -15,7 +16,10 @@ type OpenTask = {
 /**
  * Closes the TODO rows and confirmations left open when the ledger was retired: the work is cancelled at its
  * owner, then every open row is closed. Nothing writes these tables any more, so only the first call finds rows.
- * `closed` counts the TODO rows closed and `cancelled` the tasks the owner cancelled.
+ * `closed` counts the TODO rows closed and `cancelled` the tasks the owner cancelled. An execution the agency still
+ * holds (`dialogue_agency_work` not revoked and not returned: old research and work wrote their TODO row with the same
+ * execution id) is not cancelled: only its TODO row is closed. After the commit, `flushRetiredCancellations` aborts
+ * what the owners cancelled.
  */
 export function closeRetiredTodosInTransaction(
 	deps: Pick<DialogueDeps, "toolchains" | "agents" | "clock">,
@@ -26,7 +30,9 @@ export function closeRetiredTodosInTransaction(
 	const tasks = db
 		.query(
 			`SELECT id, conversation_id, toolchain_revision_id, source_ref FROM dialogue_work
-			 WHERE archived_at IS NULL AND execution IN ('task','pipeline') AND source_ref IS NOT NULL`,
+			 WHERE archived_at IS NULL AND execution IN ('task','pipeline') AND source_ref IS NOT NULL
+			 AND source_ref NOT IN (SELECT execution_id FROM dialogue_agency_work
+			  WHERE execution_id IS NOT NULL AND revoked=0 AND returned=0)`,
 		)
 		.all() as OpenTask[];
 	for (const task of tasks) {
@@ -82,4 +88,23 @@ export function closeRetiredTodosInTransaction(
 		 WHERE status IN ('waiting_input','ready','invoking')`,
 	).run(now, now);
 	return { closed, cancelled };
+}
+
+/** After the closure committed: the owners marked their jobs cancelled, and this tells the queue's runner to abort them. */
+export function flushRetiredCancellations(
+	queue: Pick<QueueService, "list" | "flushCancellations">,
+) {
+	try {
+		const jobs = queue
+			.list({ state: "cancel_requested" }, null, 100)
+			.items.map((job) => job.id);
+		if (jobs.length) queue.flushCancellations(jobs);
+	} catch (error) {
+		// Best effort: the job is cancelled in the queue, the runner stops it at its next check.
+		log.warn(
+			"dialogue.retired_todo_flush_failed",
+			{ reason: toErrorCode(error, "flush_failed") },
+			error,
+		);
+	}
 }

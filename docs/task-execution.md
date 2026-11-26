@@ -1,6 +1,6 @@
 # 日常の複数操作担当
 
-状態: 休止中（2026-10-21）。bundleは `task-execution.bundle.dormant.json` に改名して登録対象から外し、担当の検索に出ない。実装・固定試験は残す。復元するとbundleを登録し直し、会話エージェントが依頼ツールで渡す。仕事の結果はTODOで扱う（[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §9）。
+状態: 休止中（2026-10-21）。bundleは `task-execution.bundle.dormant.json` に改名して登録対象から外し、担当の検索に出ない。実装・固定試験は残す。復元するとbundleを登録し直し、会話エージェントが依頼ツールで渡す。仕事の結果は作業報告メモで扱う（[担当への依頼と結果の報告](assignments.md)）。TODOは2026-11-25に廃止した。
 
 会話エージェントは、一つの結果から次の能力を使う必要がある依頼をこの担当へ依頼する。意味の判断と完了の判定はLLM、台帳・権限・予算・副作用の実行はhostが担当する。Pursuitへの自動転送や長期探索は含まない。
 
@@ -8,7 +8,7 @@
 
 登録（休止中）は `capabilities/bundles/task-execution.bundle.dormant.json`（skill@8 / package@8 / toolchain@9）と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。開始時の追加分類・planner・能力探索は行わない。
 
-親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作は会話エージェントの仕事の操作（`work`の確認・回答・訂正・取消）で、hostが`workRef`、`expectedRevision`、action（status / answer / amend / cancel）に写す。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
+親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作は会話エージェントの `assignment`（回答 `answer`・変更 `amend`・取消 `cancel`。照会はなく、状態は `assignments` に毎回出る）で、hostが`workRef`、`expectedRevision`、action（status / answer / amend / cancel）に写す。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
 
 操作は既存の会話入口から行う。
 
@@ -22,7 +22,7 @@
 
 共通のcommand入力には元runと親・子IDを渡す。所有domainが示す作成元と今回の実行結果を区別し、同種・同名の過去対象だけで新規依頼を重複扱いしない。親bindingの無効化は背景の回収だけでなく、各判断と子の認可でも検査する。
 
-承認は実行前の確認（依頼の`confirm`）への`approve`だけで、hostは確認の構造（未使用・期限内・確認文の配信）を検査する。過去の承認をhost側で自動的に再利用しない。
+依頼は利用者の依頼として確認なしで始める（2026-11-25に実行前の確認と承認の台帳を廃止した）。取り返しのつかない操作の手前の判断は、担当の質問として `assignments` に出て、利用者の答えを `assignment(answer)` で渡す。過去の答えをhost側で自動的に再利用しない。
 
 research、bound command、instant、生成系、旧commandは既存の実行機構を使う。instantの明示fallbackも同じ論理子として追跡する。非同期処理の受付後は所有domainの終了を待つ。生成系は実呼出しIDごとに保存し、同一会話run内の二回の生成が上書きされない。
 

@@ -50,7 +50,10 @@ import { byId, interruptUnfinished, listRuns } from "../repository";
 import { dropRunResults, forgetWork } from "../repository/work";
 import { forgetWorkResources } from "../repository/resources";
 import { createAgentSync } from "./agent-sync";
-import { closeRetiredTodosInTransaction } from "./todo-closure";
+import {
+	closeRetiredTodosInTransaction,
+	flushRetiredCancellations,
+} from "./todo-closure";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createCompactionSummaryHandler } from "./compaction-summary";
 import { createGenerationHandler } from "./generation-handler";
@@ -348,6 +351,7 @@ export function createDialogueService({
 			const retired = await store.write((db) =>
 				closeRetiredTodosInTransaction(deps, db),
 			);
+			if (retired.cancelled > 0) flushRetiredCancellations(deps.queue);
 			if (retired.closed > 0 || retired.cancelled > 0)
 				log.info("dialogue.retired_todos_closed", {
 					count: retired.closed,

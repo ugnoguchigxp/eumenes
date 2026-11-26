@@ -36,7 +36,6 @@ const legacy: Record<string, number> = {
 	voice_utterance_conflict: 409,
 	schedule_state_conflict: 409,
 	memory_unavailable: 409,
-	voice_preview_busy: 409,
 	voice_sequence_invalid: 400,
 	env_ref_not_allowed: 400,
 	payload_too_large: 413,

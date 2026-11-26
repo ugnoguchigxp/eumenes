@@ -562,3 +562,162 @@ test("a runner availability change wakes a waiting goal once without changing it
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test("a document check on evidence that is not a document fails with its reason and the goal decides again", async () => {
+	let judged = 0;
+	const semantic = createGoalSemanticVerification({
+		llm: () => ({
+			async complete() {
+				judged++;
+				throw new Error("no_document_to_judge");
+			},
+		}),
+		read: (_db, _row, ref) =>
+			ref === "web-document"
+				? {
+						id: ref,
+						title: "調査",
+						markdown: "一般的な調査の結論。",
+						sources: ["words"],
+					}
+				: null,
+		sourcesCurrent: () => true,
+	});
+	const unread = "照合できる保存済みの文書がありません";
+	const f = fixture(
+		(snapshot) =>
+			snapshot.evidence.some(({ summary }) => summary.includes(unread))
+				? {
+						kind: "ask",
+						missing: "条件を確かめる手段",
+						question: "背景色の設定を確かめる方法を指定できますか？",
+					}
+				: {
+						kind: "verify",
+						checks: [
+							{
+								criterionId: "root",
+								checkRef: snapshot.checks[0]!.ref,
+								evidenceRefs: ["observed-file"],
+							},
+						],
+					},
+		{
+			checks: (db, row) => semantic.checks(db, row),
+			verify: (db, row) => semantic.verify(db, row),
+			verificationCurrent: (db, row, checks) =>
+				semantic.verificationCurrent(db, row, checks),
+			staleVerificationEvidence: (db, row) =>
+				semantic.staleVerificationEvidence(db, row),
+		},
+	);
+	try {
+		const key = await f.register();
+		await f.store.write((db) => {
+			const updated = f.goals.transitionProgressInTransaction(
+				db,
+				access,
+				key,
+				f.state(key).progressVersion,
+				(current) => ({
+					phase: "ready",
+					state: {
+						...current.state,
+						evidence: [
+							{
+								ref: "web-document",
+								version: "1",
+								digest: "note",
+								summary: "調査メモ",
+								sources: ["words"],
+							},
+							{
+								ref: "observed-file",
+								version: "1",
+								digest: "file",
+								summary: "実装ファイルの読取",
+								sources: ["words"],
+							},
+						],
+					},
+				}),
+			)!;
+			f.progress.submitInTransaction(db, updated);
+		});
+		await f.until(() => f.state(key).phase === "needs_user");
+		const final = f.state(key);
+		expect(f.decisions()).toBe(2);
+		expect(judged).toBe(0);
+		expect(final.state.problem).not.toBe("goal_worker_unavailable");
+		expect(final.state.criteria[0]?.status).toBe("open");
+		expect(
+			final.state.evidence.some(
+				({ ref, summary }) =>
+					ref.startsWith("goal-document-proof:") &&
+					summary.includes(unread) &&
+					summary.includes('"passed":false'),
+			),
+		).toBe(true);
+	} finally {
+		await f.close();
+	}
+});
+
+test("a document check over the text limit fails without asking the model", async () => {
+	let judged = 0;
+	const semantic = createGoalSemanticVerification({
+		llm: () => ({
+			async complete() {
+				judged++;
+				throw new Error("oversized_documents_are_not_judged");
+			},
+		}),
+		read: (_db, _row, ref) => ({
+			id: ref,
+			title: "長い調査",
+			markdown: "あ".repeat(30_000),
+			sources: ["words"],
+		}),
+		sourcesCurrent: () => true,
+	});
+	const f = fixture(() => ({}));
+	try {
+		const key = await f.register();
+		const row = f.state(key);
+		const selected = {
+			...row,
+			state: {
+				...row.state,
+				evidence: ["a", "b"].map((ref) => ({
+					ref,
+					version: "1",
+					digest: ref,
+					summary: "長い調査",
+					sources: ["words"],
+				})),
+				next: {
+					kind: "verify" as const,
+					contextId: "long",
+					progressVersion: row.progressVersion,
+					reason: "文書で確認",
+					review: null,
+					criterionIds: ["root"],
+					checks: [
+						{
+							criterionId: "root",
+							checkRef: "goal-document-condition",
+							evidenceRefs: ["a", "b"],
+						},
+					],
+				},
+			},
+		};
+		const run = f.store.read((db) => semantic.verify(db, selected));
+		const results = await run!(new AbortController().signal);
+		expect(judged).toBe(0);
+		expect(results).toMatchObject([{ passed: false }]);
+		expect(results[0]!.evidence.summary).toContain("48,000字を超えています");
+	} finally {
+		await f.close();
+	}
+});

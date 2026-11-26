@@ -32,7 +32,12 @@ import { useToolchainArtifacts } from "../domains/toolchain-artifacts/launcher";
 import { createScreenOutput, type AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
-import { useCancel, useRuns, useSubmit } from "../domains/dialogue";
+import {
+	useAssignmentArtifacts,
+	useCancel,
+	useRuns,
+	useSubmit,
+} from "../domains/dialogue";
 import { useSpecialistWorkspace } from "./useSpecialistWorkspace";
 import { usePromptEdit } from "./usePromptEdit";
 import { useDocumentTheme } from "./useDocumentTheme";
@@ -76,6 +81,7 @@ export function useWorkspace({
 		if (!inboxCount) return;
 		addSavedImages(useRecognitionChatInbox.getState().take());
 	}, [inboxCount, addSavedImages]);
+	useAssignmentArtifacts(client, "main", openByAdapter);
 	const openClaudeCode = useCallback(() => {
 		void openById("terminals.workspace");
 	}, [openById]);

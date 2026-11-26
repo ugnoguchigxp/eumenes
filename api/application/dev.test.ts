@@ -106,11 +106,16 @@ test.each(["127.0.0.1", "localhost"])(
 		try {
 			const url = `http://${webHost}:${webPort}/api/status`;
 			let latest: Response | null = null;
-			// A server that never answers fails the assertion below, with its output.
+			// A server that never answers fails the assertion below, with its output. It listens first and
+			// says "starting" until recovery and start are done.
 			await waitFor(
 				async () => {
 					latest = await get(url);
-					return !!latest?.ok;
+					return (
+						!!latest?.ok &&
+						((await latest.clone().json()) as { phase?: string }).phase ===
+							"ready"
+					);
 				},
 				{ timeout: 10000, interval: 50 },
 			).catch(() => {});

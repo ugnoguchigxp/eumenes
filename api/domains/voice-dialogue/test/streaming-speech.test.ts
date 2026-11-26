@@ -310,11 +310,15 @@ test("clauses played before generation ends are recorded as heard once the answe
 
 test("correcting the source while generating aborts queued speech and discards a late TTS result", async () => {
 	const source = stream(),
+		retried = stream(),
 		late = gate<void>();
 	let speaking: AbortSignal | undefined;
+	let generations = 0;
 	const h = await setup(undefined, {
 		transcribe: async () => "最初の依頼。",
-		answerStream: source.answerStream,
+		// The stale generation is prepared again on the corrected words, by a call of its own.
+		answerStream: (...args) =>
+			(++generations === 1 ? source : retried).answerStream!(...args),
 		speak: async (_text, signal) => {
 			speaking = signal;
 			await late.promise;
@@ -336,7 +340,12 @@ test("correcting the source while generating aborts queued speech and discards a
 	await settle();
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
-	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
+	// Nothing of the stale generation is adopted: the run answers only from the corrected words.
+	await until(() => retried.started);
+	retried.push("訂正後の返答。");
+	retried.finish();
+	await until(() => !!h.dialogue.answerText(h.voice.get(id)!.runId!));
+	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBe("訂正後の返答。");
 });
 
 for (const adopted of [true, false])

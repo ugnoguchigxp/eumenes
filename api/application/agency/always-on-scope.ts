@@ -32,6 +32,9 @@ import { takePosition } from "./always-on-position";
 import type { AgencyThought } from "../../domains/dialogue/contracts/agency-status";
 import type { Unheard } from "./always-on-heard";
 
+/** How long a line handed to a Live session is waited on for the words that say it. */
+export const ROUTED_WAIT_MS = 10 * 60_000;
+
 /** Notes kept per conversation: the newest ones (the older are still in the work ledger). */
 export const NOTES_KEPT = 30;
 
@@ -132,6 +135,11 @@ export type AgendaScope = {
 	shows: Map<string, string[]>;
 	/** The input of each line handed to a Live session as a proposal (the session asks for it when it speaks). */
 	proposals: Map<string, InputContext>;
+	/**
+	 * The work behind each line handed to a Live session (by the line's id), until the session's own words carry it: the
+	 * transcript of what it says is the message that shows the line's resource chips. Not saved.
+	 */
+	routed: Map<string, { at: number; findings: readonly string[] }>;
 	/** Words of the agent a screen may still be reading aloud: said (to the agent) when the reading ends. */
 	unheard: Unheard[];
 	/** What the agent thought lately, for the chat column (display only: not saved, cleared by a forget). */
@@ -486,6 +494,7 @@ export function createAgendaScope(input: {
 		calls: new Map(),
 		taken: new Map(),
 		proposals: new Map(),
+		routed: new Map(),
 		given: new Map(),
 		shows: new Map(),
 		unheard: [],

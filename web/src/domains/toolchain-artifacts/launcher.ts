@@ -86,7 +86,11 @@ export function useToolchainArtifacts(
 			const entries = await cache
 				.fetchQuery(toolchainArtifactsQuery(client))
 				.catch(() => []);
-			const entry = entries.find((e) => e.adapterRef === adapterRef);
+			// A screen may read several adapters: any of them names it.
+			const entry = entries.find(
+				(e) =>
+					e.adapterRef === adapterRef || !!e.adapterRefs?.includes(adapterRef),
+			);
 			if (!entry) return false;
 			openEntry(entry, targetRef);
 			return true;
