@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { ServiceError } from "eumenes-canvas/src/core/service";
 import type { Database } from "bun:sqlite";
 import type { QueueService } from "../../domains/queue";
 import type { ConversationService } from "../../domains/conversation";
@@ -76,16 +75,27 @@ export function createCanvasJobs(
 				: !canvasSourcesValid(db, conversation, claim.payload)
 					? { status: "stale", reason: "canvas_source_changed" }
 					: { status: "ready", input: claim.payload },
-		async execute(input, { signal, jobId }) {
+		async execute(input, { signal, jobId, generation }) {
 			signal.throwIfAborted();
+			const canAdopt = () =>
+				!signal.aborted &&
+				store.read((db) => {
+					const row = queue.getInTransaction(db, jobId);
+					return (
+						row?.state === "running" &&
+						row.generation === generation &&
+						(row.deadlineAtMs === null || Date.now() < row.deadlineAtMs) &&
+						canvasSourcesValid(db, conversation, input)
+					);
+				});
+			if (!canAdopt()) throw new Error("canvas_source_changed");
+			await runtime.start(signal);
+			signal.throwIfAborted();
+			if (!canAdopt()) throw new Error("canvas_source_changed");
 			const service = runtime.service;
 			const session = createHash("sha256")
 				.update(input.conversationId)
 				.digest("base64url");
-			const canAdopt = () =>
-				!signal.aborted &&
-				store.read((db) => canvasSourcesValid(db, conversation, input));
-			if (!canAdopt()) throw new Error("canvas_source_changed");
 			const run = await service
 				.startRun(
 					canvasOwner,
@@ -98,7 +108,7 @@ export function createCanvasJobs(
 					canAdopt,
 				)
 				.catch((error) => {
-					if (error instanceof ServiceError && error.extra.code === "conflict")
+					if (runtime.isServiceError(error) && error.extra.code === "conflict")
 						throw new Error("canvas_revision_conflict");
 					throw new Error("canvas_start_failed");
 				});

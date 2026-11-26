@@ -1,7 +1,14 @@
 import type { Database } from "bun:sqlite";
 import { canonicalJson } from "../../../infrastructure/digest";
 import { submitInput, type ComputePort, type JobView } from "../contracts";
-import { owned, patch, row, savedEnvironment, view } from "../repository";
+import {
+	commandRow,
+	owned,
+	patch,
+	row,
+	savedEnvironment,
+	view,
+} from "../repository";
 import type { Step } from "./handlers";
 export function createCommands(deps: {
 	port: () => ComputePort | null;
@@ -29,15 +36,7 @@ export function createCommands(deps: {
 			omitUndefined: true,
 			keyOrder: "codeUnit",
 		});
-		const previous = db
-			.query("SELECT * FROM compute_commands WHERE request_id=?")
-			.get(requestId) as {
-			owner: string;
-			conversation_id: string;
-			operation: string;
-			input_json: string;
-			result_json: string;
-		} | null;
+		const previous = commandRow(db, requestId);
 		if (previous) {
 			if (
 				previous.owner !== owner ||

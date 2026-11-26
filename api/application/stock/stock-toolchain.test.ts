@@ -32,13 +32,13 @@ async function stockHarness(
 		},
 		...extra,
 	});
-	await h.toolchain.stock!.maintain();
 	return { h, service, candidates };
 }
 
 test("a cold stock request is answered after the router's decision and one fill call: no assignment, no notice", async () => {
 	const { h, service, candidates } = await stockHarness();
 	try {
+		expect(service.urls).toEqual([]);
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -60,6 +60,9 @@ test("a cold stock request is answered after the router's decision and one fill 
 		const messages = h.conversation.get("main").messages;
 		expect(messages).toHaveLength(2);
 		expect(messages.at(-1)!.text).toBe(softbankSentence);
+		expect(
+			service.urls.filter((url) => url.endsWith("Edinetcode.zip")),
+		).toHaveLength(1);
 		expect(service.charts()).toEqual([
 			"https://query1.finance.yahoo.com/v8/finance/chart/9434.T?range=1d&interval=1d",
 		]);

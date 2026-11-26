@@ -287,6 +287,8 @@ export const domains = {
 			"api/application/canvas/canvas-adoption.test.ts",
 			"api/application/canvas/canvas-workbench.test.ts",
 			"api/application/canvas/canvas-registration.test.ts",
+			"api/application/canvas/canvas-runtime.test.ts",
+			"api/application/canvas/canvas-toolchain.test.ts",
 		],
 		depends: { api: [], web: [], test: [] },
 	},

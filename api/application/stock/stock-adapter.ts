@@ -2,8 +2,8 @@ import { stockQuote } from "../../domains/capabilities";
 import type { DomainAdapter, InstantResult } from "../../domains/tool-runtime";
 import { readBounded } from "../../infrastructure/bounded-read";
 import { getLogger } from "../../infrastructure/logger";
-import { parseCompanies, unzipCsv, type ListedCompany } from "./stock-edinet";
-import { parseChart, quoteSentence } from "./stock-quote";
+import { waitForShared } from "../../infrastructure/wait-for-shared";
+import type { ListedCompany } from "./stock-edinet";
 import {
 	directCode,
 	parseSearch,
@@ -134,6 +134,7 @@ export function createStockAdapter(
 					timeoutMs: CODE_LIST_TIMEOUT_MS,
 					limit: CODE_LIST_LIMIT_BYTES,
 				});
+				const { parseCompanies, unzipCsv } = await import("./stock-edinet");
 				companies = parseCompanies(unzipCsv(zip));
 				loadedAt = now();
 				log.info("stock.codelist_loaded", { count: companies.length });
@@ -152,12 +153,9 @@ export function createStockAdapter(
 	}
 	/** Read the list when it is missing or a day old (a failed read waits a minute before the next). */
 	async function maintain() {
+		if (loading) return loading;
 		const at = now();
-		if (
-			!loading &&
-			at - loadedAt >= CODE_LIST_TTL_MS &&
-			at - triedAt >= CODE_LIST_RETRY_MS
-		)
+		if (at - loadedAt >= CODE_LIST_TTL_MS && at - triedAt >= CODE_LIST_RETRY_MS)
 			await refresh();
 	}
 
@@ -199,6 +197,8 @@ export function createStockAdapter(
 			`${CHART_URL}/${encodeURIComponent(resolved.symbol)}?range=1d&interval=1d`,
 			{ timeoutMs: CHART_TIMEOUT_MS, limit: CHART_LIMIT_BYTES, signal },
 		);
+		const { parseChart, quoteSentence } = await import("./stock-quote");
+		signal.throwIfAborted();
 		const parsed = parseChart(json(bytes, "stock_chart_invalid"));
 		const name = resolved.name ?? parsed.name;
 		if (!name) throw new FetchFailure("stock_chart_invalid");
@@ -220,12 +220,15 @@ export function createStockAdapter(
 		targetInput: () => ({}),
 		instant: {
 			// No argument is filled from a list: the query is the user's own words.
-			async run(operationName, input, signal): Promise<InstantResult> {
+			async run(operationName, input, signal, context): Promise<InstantResult> {
 				if (operationName !== QUOTE)
 					return { ok: false, code: "unsupported_operation" };
 				const parsed = stockQuote.safeParse(input);
 				if (!parsed.success) return { ok: false, code: "invalid_input" };
+				signal.throwIfAborted();
 				const started = now();
+				await waitForShared(maintain(), signal);
+				context?.assertCurrent?.();
 				try {
 					const resolved = await resolve(parsed.data.query, signal);
 					if (!resolved) throw new FetchFailure("stock_not_found");

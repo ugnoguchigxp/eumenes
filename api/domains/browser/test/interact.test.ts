@@ -299,15 +299,19 @@ test("expiry and revoked source end the saved run without adopting output", asyn
 	await f.wait(v.runId, "expired");
 	expect(f.status(v.runId).answer).toBeNull();
 });
-test("restart sweeps transient-context runs to failure and never resumes operations", async () => {
+test("restart ends transient-context runs before maintenance removes orphan files", async () => {
 	const f = await fixture({ startQueue: false });
 	const v = await f.start();
 	await f.service.close();
-	await f.service.sweep();
+	f.files.temp.set("orphan.tmp", new Uint8Array(1));
+	await f.service.recover();
 	expect(f.status(v.runId).state).toBe("failed");
+	expect(f.files.temp.has("orphan.tmp")).toBe(true);
 	f.queue.start();
 	await new Promise((r) => setTimeout(r, 20));
 	expect(f.driver.calls).toHaveLength(0);
+	await f.service.sweep();
+	expect(f.files.temp.has("orphan.tmp")).toBe(false);
 });
 
 test("a changed capture target asks again before any bytes are saved", async () => {

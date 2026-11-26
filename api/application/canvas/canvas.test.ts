@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CanvasService } from "eumenes-canvas/src/core/service";
+import { CanvasService, ServiceError } from "eumenes-canvas/src/core/service";
 import { PromptMaker } from "eumenes-canvas/src/core/prompt-maker";
 import { Store } from "eumenes-canvas/src/core/store";
 import { PreviewTokens } from "eumenes-canvas/src/server/preview";
@@ -15,11 +15,8 @@ import { openStore } from "../../infrastructure/sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-	canvasPreviewOrigin,
-	makerChannel,
-	type CanvasRuntime,
-} from "./runtime";
+import { canvasPreviewOrigin, type CanvasRuntime } from "./runtime";
+import { makerChannel } from "./maker-channel";
 import { createCanvasJobs } from "./jobs";
 import { registerCanvasRoutes } from "./routes";
 
@@ -87,6 +84,8 @@ test("the authenticated Canvas workbench can produce, preview, save and restore 
 		previewOrigin: preview,
 		service,
 		issue: tokens.issue.bind(tokens),
+		isServiceError: (error): error is ServiceError =>
+			error instanceof ServiceError,
 		ready: () => true,
 		setCandidateAccess: service.setCandidateAccess.bind(service),
 		async start() {},

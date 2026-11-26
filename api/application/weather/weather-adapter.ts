@@ -2,8 +2,8 @@ import { weatherPlace } from "../../domains/capabilities";
 import type { DomainAdapter, InstantResult } from "../../domains/tool-runtime";
 import { getLogger } from "../../infrastructure/logger";
 import { readBounded } from "../../infrastructure/bounded-read";
-import { parseAreas, type WeatherAreas } from "./weather-areas";
-import { forecastSentence } from "./weather-forecast";
+import { waitForShared } from "../../infrastructure/wait-for-shared";
+import type { WeatherAreas } from "./weather-areas";
 
 export const WEATHER_ADAPTER_REF = "adapter:weather@1";
 const FORECAST = "weather.forecast";
@@ -91,8 +91,8 @@ async function load(
 /**
  * The weather toolchain's adapter (spec weather-instant-toolchain-design 2026-10-18 §7). It keeps the list of
  * areas in memory, finds the forecast area of the place the call names, and answers with the fixed sentence
- * made from the forecast service's answer. Without the list it is unavailable, so the toolchain is not offered;
- * a place the list does not know is a failure, which hands the request to web search.
+ * made from the forecast service's answer. A selected call loads the list. A failed first load temporarily
+ * removes the candidate during the retry interval.
  */
 export function createWeatherAdapter(
 	options: { fetch?: typeof fetch; now?: () => number } = {},
@@ -108,6 +108,7 @@ export function createWeatherAdapter(
 		loading ??= (async () => {
 			triedAt = now();
 			try {
+				const { parseAreas } = await import("./weather-areas");
 				areas = parseAreas(
 					await load(fetcher, AREAS_URL, {
 						timeoutMs: AREAS_TIMEOUT_MS,
@@ -136,12 +137,9 @@ export function createWeatherAdapter(
 	}
 	/** Read the list when it is missing or a day old (a failed read waits a minute before the next). */
 	async function maintain() {
+		if (loading) return loading;
 		const at = now();
-		if (
-			!loading &&
-			at - loadedAt >= AREAS_TTL_MS &&
-			at - triedAt >= AREAS_RETRY_MS
-		)
+		if (at - loadedAt >= AREAS_TTL_MS && at - triedAt >= AREAS_RETRY_MS)
 			await refresh();
 	}
 
@@ -152,19 +150,23 @@ export function createWeatherAdapter(
 		ref: WEATHER_ADAPTER_REF,
 		describe: describeWeatherAdapter,
 		maintain,
-		availableInTransaction: () => !!areas,
+		availableInTransaction: () =>
+			!!areas || !!loading || now() - triedAt >= AREAS_RETRY_MS,
 		snapshotInTransaction: () => ({}),
 		invokeInTransaction: unsupported,
 		readInTransaction: () => null,
 		sourceInTransaction: () => null,
 		targetInput: () => ({}),
 		instant: {
-			async run(operationName, input, signal): Promise<InstantResult> {
+			async run(operationName, input, signal, context): Promise<InstantResult> {
 				if (operationName !== FORECAST)
 					return { ok: false, code: "unsupported_operation" };
 				const parsed = weatherPlace.safeParse(input);
-				if (!parsed.success || !areas)
-					return { ok: false, code: "invalid_input" };
+				if (!parsed.success) return { ok: false, code: "invalid_input" };
+				signal.throwIfAborted();
+				await waitForShared(maintain(), signal);
+				if (!areas) return { ok: false, code: "weather_areas_unavailable" };
+				context?.assertCurrent?.();
 				const place = areas.resolve(parsed.data.place, parsed.data.prefecture);
 				if (!place) {
 					log.info("weather.place_unknown", {
@@ -185,6 +187,8 @@ export function createWeatherAdapter(
 					} catch {
 						throw new FetchFailure("weather_forecast_invalid");
 					}
+					const { forecastSentence } = await import("./weather-forecast");
+					signal.throwIfAborted();
 					return {
 						ok: true,
 						answer: forecastSentence(body, parsed.data.day, place),

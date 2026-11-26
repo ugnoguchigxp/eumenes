@@ -1,33 +1,26 @@
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import {
+import type {
 	CanvasService,
-	MAX_FIX_ATTEMPTS,
-	type CandidateAccess,
+	CandidateAccess,
+	ServiceError,
 } from "eumenes-canvas/src/core/service";
-import { Store } from "eumenes-canvas/src/core/store";
-import { PlaywrightObserver } from "eumenes-canvas/src/core/observer";
-import { PromptMaker } from "eumenes-canvas/src/core/prompt-maker";
-import { PromptEvaluator } from "eumenes-canvas/src/core/prompt-evaluator";
-import { PlaywrightProber } from "eumenes-canvas/src/core/probes";
-import { HostReviewer } from "eumenes-canvas/src/core/host-reviewer";
-import type { InferenceChannel } from "eumenes-canvas/src/core/inference";
-import {
-	PreviewTokens,
-	previewHandler,
-} from "eumenes-canvas/src/server/preview";
+import type { PreviewTokens } from "eumenes-canvas/src/server/preview";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation";
 import type { InferencePort } from "../../domains/inference";
-import { agentSystemMessage } from "../../domains/inference";
+import { getLogger } from "../../infrastructure/logger";
+import { waitForShared } from "../../infrastructure/wait-for-shared";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 
-const pkg = dirname(
-	createRequire(import.meta.url).resolve("eumenes-canvas/package.json"),
-);
-export const canvasFile = (path: string) =>
-	readFileSync(join(pkg, path), "utf8");
+const log = getLogger("canvas");
+let pkg: string | undefined;
+export function canvasFile(path: string) {
+	pkg ??= dirname(
+		createRequire(import.meta.url).resolve("eumenes-canvas/package.json"),
+	);
+	return readFileSync(join(pkg, path), "utf8");
+}
 export const canvasOwner = CONVERSATION_DEFAULT_PRINCIPAL;
 
 export function canvasPreviewOrigin(
@@ -50,197 +43,111 @@ export function canvasPreviewOrigin(
 	return `http://${host.hostname === "localhost" ? "127.0.0.1" : "localhost"}:${port}`;
 }
 
-export function makerChannel(
-	store: SqliteStore,
-	inference: Pick<
-		InferencePort,
-		"captureUserControlInTransaction" | "executeControl"
-	>,
-): InferenceChannel {
-	return {
-		async complete(request, validate, signal) {
-			const capture = inference.captureUserControlInTransaction;
-			const execute = inference.executeControl;
-			if (!capture || !execute) throw new Error("canvas_inference_unavailable");
-			signal.throwIfAborted();
-			const id = await store.write((db) => {
-				signal.throwIfAborted();
-				return capture(db, {
-					subject: `canvas-${request.purpose}:${randomUUID()}`,
-					route: "subagent",
-					deadline: Date.now() + 90_000,
-					maxOutputTokens: 8192,
-				});
-			});
-			const control = {
-				instructions: request.system,
-				outputSchema: request.outputSchema,
-			};
-			const reply = await execute(
-				id,
-				[
-					agentSystemMessage(control),
-					{ role: "user", content: request.prompt },
-				],
-				signal,
-				control,
-			).catch(() => {
-				signal.throwIfAborted();
-				throw new Error("canvas_inference_failed");
-			});
-			signal.throwIfAborted();
-			try {
-				if (typeof reply.value === "string") {
-					if (
-						request.maxOutputChars &&
-						reply.value.length > request.maxOutputChars
-					)
-						throw new Error("canvas_invalid_model_output");
-					const checked = validate(JSON.parse(reply.value));
-					if (checked.ok) return checked.value;
-				}
-			} catch {
-				// Model output can contain source text. Report only the invalid-output code.
-			}
-			throw new Error("canvas_invalid_model_output");
-		},
-	};
-}
-
-const harnessAssets = {
-	"/harness.html": ["src/host/harness.html", "text/html"],
-	"/harness.js": ["src/host/harness.js", "text/javascript"],
-	"/harness.css": ["src/host/harness.css", "text/css"],
-	"/preview-client.js": ["src/host/preview-client.js", "text/javascript"],
-	"/shared/messages.js": ["src/shared/messages.js", "text/javascript"],
-} as const;
-
-function scopePreview(host: string, origin: string, tokens: PreviewTokens) {
-	const fetch = previewHandler({ hostOrigin: host, tokens });
-	return (req: Request) =>
-		new URL(req.url).origin === origin
-			? fetch(req)
-			: new Response(null, { status: 421 });
-}
-
-export function createCanvasRuntime(options: {
+export type CanvasRuntimeOptions = {
 	hostOrigin: string;
 	previewOrigin: string;
 	dataDir: string;
 	store: SqliteStore;
-	inference: InferencePort;
-}) {
-	const tokens = new PreviewTokens();
-	const observationTokens = new PreviewTokens();
-	let service: CanvasService | undefined;
+	inference: Pick<
+		InferencePort,
+		"captureUserControlInTransaction" | "executeControl"
+	>;
+};
+
+export type CanvasInstance = {
+	service: CanvasService;
+	issue: PreviewTokens["issue"];
+	isServiceError(error: unknown): error is ServiceError;
+	close(): Promise<void>;
+};
+
+type CanvasLoader = (
+	options: CanvasRuntimeOptions,
+	access: CandidateAccess,
+	signal: AbortSignal,
+) => Promise<CanvasInstance>;
+
+const loadCanvas: CanvasLoader = async (options, access, signal) => {
+	const { launchCanvas } = await import("./runtime-server");
+	signal.throwIfAborted();
+	return launchCanvas(options, access);
+};
+
+export function createCanvasRuntime(
+	options: CanvasRuntimeOptions,
+	load: CanvasLoader = loadCanvas,
+) {
+	let instance: CanvasInstance | undefined;
 	let candidateAccess: CandidateAccess | undefined;
-	const listeners: Array<{
-		stop(closeActiveConnections?: boolean): Promise<void>;
-	}> = [];
-	const stop = async () => {
-		const closing = listeners.splice(0).map((listener) => listener.stop(true));
-		await Promise.all([service?.close(), ...closing]);
+	let opening: Promise<void> | undefined;
+	let closing: Promise<void> | undefined;
+	const shutdown = new AbortController();
+	const current = () => {
+		shutdown.signal.throwIfAborted();
+		if (!instance) throw new Error("canvas_unavailable");
+		return instance;
 	};
+	async function open() {
+		const started = performance.now();
+		try {
+			shutdown.signal.throwIfAborted();
+			instance = await load(
+				options,
+				(run) => candidateAccess?.(run) ?? false,
+				shutdown.signal,
+			);
+			if (!shutdown.signal.aborted)
+				log.info("canvas.ready", {
+					durationMs: Math.round(performance.now() - started),
+				});
+		} catch (error) {
+			if (!shutdown.signal.aborted)
+				log.warn("canvas.initialization_failed", {
+					reason:
+						(error as { code?: unknown } | null)?.code === "EADDRINUSE"
+							? "port_in_use"
+							: "canvas_unavailable",
+				});
+			throw new Error("canvas_unavailable");
+		} finally {
+			opening = undefined;
+		}
+	}
 	return {
 		previewOrigin: options.previewOrigin,
 		hostOrigin: options.hostOrigin,
 		get service() {
-			if (!service) throw new Error("canvas_unavailable");
-			return service;
+			return current().service;
 		},
-		issue: tokens.issue.bind(tokens),
-		ready: () => service !== undefined,
+		issue: (body: Parameters<PreviewTokens["issue"]>[0]) =>
+			current().issue(body),
+		isServiceError: (error: unknown): error is ServiceError =>
+			instance?.isServiceError(error) ?? false,
+		ready: () => !!instance && !shutdown.signal.aborted,
 		setCandidateAccess(access: CandidateAccess) {
 			candidateAccess = access;
-			service?.setCandidateAccess(access);
 		},
-		async start() {
-			const origin = new URL(options.previewOrigin);
-			try {
-				const fetch = scopePreview(options.hostOrigin, origin.origin, tokens);
-				const port = Number(origin.port);
-				listeners.push(Bun.serve({ hostname: "127.0.0.1", port, fetch }));
-				if (origin.hostname === "localhost")
-					listeners.push(Bun.serve({ hostname: "::1", port, fetch }));
-				let observedHost = "";
-				let observedPreview = "";
-				const harness = Bun.serve({
-					hostname: "::1",
-					port: 0,
-					fetch(req) {
-						const url = new URL(req.url);
-						if (url.origin !== observedHost || req.method !== "GET")
-							return new Response(null, { status: 404 });
-						if (url.pathname === "/api/config")
-							return Response.json({
-								previewOrigin: observedPreview,
-								hostOrigin: observedHost,
-							});
-						const key = url.pathname as keyof typeof harnessAssets;
-						if (!Object.hasOwn(harnessAssets, key))
-							return new Response(null, { status: 404 });
-						const [file, contentType] = harnessAssets[key];
-						return new Response(canvasFile(file), {
-							headers: {
-								"content-type": contentType,
-								"content-security-policy": `default-src 'self'; frame-src ${observedPreview}; frame-ancestors 'none'`,
-								"cache-control": "no-store",
-							},
-						});
-					},
-				});
-				listeners.push(harness);
-				observedHost = `http://localhost:${harness.port}`;
-				const observation = Bun.serve({
-					hostname: "127.0.0.1",
-					port: 0,
-					fetch(req) {
-						return scopePreview(
-							observedHost,
-							observedPreview,
-							observationTokens,
-						)(req);
-					},
-				});
-				listeners.push(observation);
-				observedPreview = `http://127.0.0.1:${observation.port}`;
-				mkdirSync(options.dataDir, { recursive: true, mode: 0o700 });
-				service = new CanvasService({
-					candidateAccess: (run) => candidateAccess?.(run) ?? false,
-					modelCallLimit: (MAX_FIX_ATTEMPTS + 1) * 2,
-					store: new Store(options.dataDir),
-					model: new PromptMaker(
-						makerChannel(options.store, options.inference),
-					),
-					observer: new PlaywrightObserver(
-						observedHost,
-						(body) => observationTokens.issue(body),
-						[],
-						false,
-					),
-					contract: canvasFile("docs/artwork-contract-v1.md"),
-					review: {
-						mode: "judge",
-						maxReviews: MAX_FIX_ATTEMPTS + 1,
-						reviewer: new HostReviewer(
-							new PlaywrightProber(
-								observedHost,
-								(body) => observationTokens.issue(body),
-								[],
-								false,
-							),
-							new PromptEvaluator(
-								makerChannel(options.store, options.inference),
-							),
-						),
-					},
-				});
-			} catch (error) {
-				await stop();
-				throw error;
-			}
+		async start(signal?: AbortSignal) {
+			signal?.throwIfAborted();
+			shutdown.signal.throwIfAborted();
+			if (instance) return;
+			opening ??= Promise.resolve().then(open);
+			await waitForShared(
+				opening,
+				signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal,
+			);
 		},
-		close: stop,
+		close() {
+			if (closing) return closing;
+			closing = Promise.resolve().then(async () => {
+				await opening?.catch(() => {});
+				const opened = instance;
+				instance = undefined;
+				await opened?.close();
+			});
+			shutdown.abort(new Error("canvas_unavailable"));
+			return closing;
+		},
 	};
 }
 

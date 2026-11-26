@@ -436,49 +436,6 @@ export function createRegistryActions(
 	};
 }
 
-/** Periodic retention of UI action acceptances (30 days). */
-export function toolchainMaintenance(
-	s: {
-		toolchain: {
-			actionRequests: { maintenance(): Promise<unknown> };
-			weather?: { maintain(): Promise<unknown> };
-			stock?: { maintain(): Promise<unknown> };
-		};
-	},
-	log: {
-		warn(event: string, fields: { reason: string }, error?: unknown): void;
-	},
-) {
-	const run = (name: string, target: { maintenance(): Promise<unknown> }) =>
-		target
-			.maintenance()
-			.catch((error) =>
-				log.warn(
-					`${name}.maintenance_failed`,
-					{ reason: "maintenance_failed" },
-					error,
-				),
-			);
-	return [
-		run("toolchain_actions", s.toolchain.actionRequests),
-		// The list of forecast areas: read at startup (the first pass) and again once a day.
-		...(s.toolchain.weather
-			? [
-					run("toolchain_weather", {
-						maintenance: () => s.toolchain.weather!.maintain(),
-					}),
-				]
-			: []),
-		// The EDINET list of listed companies: read at startup (the first pass) and again once a day.
-		...(s.toolchain.stock
-			? [
-					run("toolchain_stock", {
-						maintenance: () => s.toolchain.stock!.maintain(),
-					}),
-				]
-			: []),
-	];
-}
 import {
 	USAGE_ADAPTER_REF,
 	describeUsageAdapter,

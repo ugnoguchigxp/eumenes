@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import {
-	RETENTION_MS,
 	unavailableReason,
 	type ConnectionEndReason,
 	type ConnectionView,
@@ -11,13 +10,12 @@ import {
 	activeConnection,
 	connectionRow,
 	executablePath,
+	expireApprovals,
 	insertConnection,
 	interruptReplays,
 	lastConnection,
 	loseTabs,
 	patchConnection,
-	pruneTabs,
-	purgeEnded,
 } from "../repository";
 import type { Ctx } from "./context";
 import { settleLostConnection } from "./lifecycle";
@@ -142,8 +140,7 @@ export function createConnection(ctx: Ctx) {
 			for (const s of stale) loseTabs(db, s.id, ctx.now());
 			settleLostConnection(ctx, db);
 			interruptReplays(db, ctx.now());
-			pruneTabs(db, ctx.now() - RETENTION_MS);
-			purgeEnded(db, ctx.now() - RETENTION_MS);
+			expireApprovals(db, ctx.now());
 		})
 		.catch((e) => log.error("browser.recover_failed", {}, e));
 

@@ -34,13 +34,13 @@ async function weatherHarness(
 		},
 		...extra,
 	});
-	await h.toolchain.weather!.maintain();
 	return { h, service, candidates };
 }
 
 test("a cold weather request is answered after the router's decision and one fill call: no assignment, no notice", async () => {
 	const { h, service, candidates } = await weatherHarness();
 	try {
+		expect(service.urls).toEqual([]);
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -62,6 +62,9 @@ test("a cold weather request is answered after the router's decision and one fil
 		const messages = h.conversation.get("main").messages;
 		expect(messages).toHaveLength(2);
 		expect(messages.at(-1)!.text).toBe(tomorrowKamakura);
+		expect(
+			service.urls.filter((url) => url.endsWith("/area.json")),
+		).toHaveLength(1);
 		expect(service.urls.at(-1)).toBe(
 			"https://weather.tsukumijima.net/api/forecast/city/140010",
 		);
@@ -164,7 +167,6 @@ test("instant inputs outside the schema are refused: the host says it could not 
 			askWeather({ place: "鎌倉", day: "tomorrow" })(messages),
 	});
 	try {
-		await g.toolchain.weather!.maintain();
 		const run = await g.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -175,9 +177,7 @@ test("instant inputs outside the schema are refused: the host says it could not 
 		// The router's choice is not made again (spec router-package-integration 2026-11-04): the hand-over failed, and the
 		// reply says the request could not be done.
 		expect(g.dialogue.answerText(run.id)).toBe(UNAVAILABLE_TEXT);
-		expect(
-			service.urls.filter((u) => u.includes("/api/forecast/")),
-		).toHaveLength(0);
+		expect(service.urls).toEqual([]);
 	} finally {
 		await g.close();
 	}

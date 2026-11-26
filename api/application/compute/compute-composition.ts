@@ -17,14 +17,21 @@ export function buildCompute(
 	},
 ) {
 	const { store, queue, settings } = deps.core;
+	let connection:
+		| { baseUrl: string; client: ReturnType<typeof createComputeClient> }
+		| undefined;
 	return createCompute({
 		store,
 		queue,
 		port: () => {
 			const baseUrl = settings.get().larm.baseUrl;
-			return baseUrl && config.larmToken
-				? createComputeClient({ baseUrl, token: config.larmToken })
-				: null;
+			if (!baseUrl || !config.larmToken) return null;
+			if (connection?.baseUrl !== baseUrl)
+				connection = {
+					baseUrl,
+					client: createComputeClient({ baseUrl, token: config.larmToken }),
+				};
+			return connection.client;
 		},
 		validInTransaction: (db, row) =>
 			!row.authorization_json ||

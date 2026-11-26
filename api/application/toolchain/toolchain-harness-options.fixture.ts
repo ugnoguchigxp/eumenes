@@ -40,6 +40,9 @@ export type HarnessOptions = {
 		messages: import("../../domains/inference/contracts").Messages,
 	) => unknown;
 	computePort?: ComputePort;
+	canvas?: (
+		config: import("../canvas/runtime").CanvasRuntimeOptions,
+	) => import("../canvas/runtime").CanvasRuntime;
 	videoPort?: VideoClient;
 	dots?: boolean;
 	discoveryTarget?: (query: string) => string;

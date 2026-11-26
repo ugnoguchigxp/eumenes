@@ -37,7 +37,13 @@ export function registerCompute(
 		if (!input.ok) return input.response;
 		try {
 			return c.json(
-				await service.submit(owner, "main", input.data, key.data),
+				await service.submit(
+					owner,
+					"main",
+					input.data,
+					key.data,
+					c.req.raw.signal,
+				),
 				202,
 			);
 		} catch (e) {

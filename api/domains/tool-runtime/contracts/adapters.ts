@@ -208,6 +208,12 @@ export interface SessionWorkAdapter {
 export type InstantResult =
 	{ ok: true; answer: string } | { ok: false; code: string };
 
+export type InstantContext = {
+	conversationId: string;
+	/** Recheck the caller's authority after async setup, before reading or updating its catalog. */
+	assertCurrent?(): void;
+};
+
 /**
  * What an adapter offers an instant binding (spec weather-instant-toolchain-design 2026-10-18):
  * the first round of the conversation calls the toolchain's function with arguments, and the
@@ -221,11 +227,15 @@ export interface InstantAdapter {
 		input: unknown,
 		signal: AbortSignal,
 		/** The conversation the call answers in (adapters that keep per-conversation state use it). */
-		context?: { conversationId: string },
+		context?: InstantContext,
 	): Promise<InstantResult>;
 }
 
 export interface DomainAdapter {
+	/** Work to do outside the writer before a selected command's snapshot and inference claim. */
+	commandPreparationInTransaction?(
+		tx: Database,
+	): ((signal: AbortSignal) => Promise<void>) | undefined;
 	/** Optional read preparation outside the writer; invoke rechecks the live turn before adopting it. */
 	prepareSpecialistRead?(
 		input: SpecialistInvocation,

@@ -12,6 +12,7 @@ import type {
 	SelectionDecision,
 	SelectionOutcome,
 } from "../../toolchain-history";
+import type { InstantContext, InstantResult } from "../../tool-runtime";
 
 export type QueryVector = { space: VectorSpace; vector: number[] };
 
@@ -166,12 +167,12 @@ export interface ToolchainRoutingPort {
  * the arguments, and the toolchain the request goes to when the adapter cannot answer.
  */
 export type InstantRun = {
-	/** The answer sentence, or a safe code for why the adapter has none. Rejects only when aborted. */
+	/** The answer sentence or a safe failure code. Rejects when the call is no longer authorized. */
 	run(
 		args: Record<string, unknown>,
 		signal: AbortSignal,
-		context?: { conversationId: string },
-	): Promise<{ ok: true; answer: string } | { ok: false; code: string }>;
+		context?: InstantContext,
+	): Promise<InstantResult>;
 	/** The (available) toolchain the binding names for a failed answer; null when it is not available now. */
 	fallback: {
 		toolchainId: string;

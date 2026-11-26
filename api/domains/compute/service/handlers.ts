@@ -112,13 +112,22 @@ export function registerHandlers(deps: HandlerDeps) {
 		async execute(input, { signal }) {
 			try {
 				const port = deps.port();
-				if (!port || port.binding !== input.binding)
+				const bounded = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
+				bounded.throwIfAborted();
+				if (port?.binding === input.binding && port.prepare)
+					await port.prepare(bounded);
+				bounded.throwIfAborted();
+				if (
+					!port ||
+					deps.port()?.binding !== input.binding ||
+					port.binding !== input.binding
+				)
 					return {
 						error: { code: "compute_connection_changed", status: 0, delay: 0 },
 					};
-				const bounded = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
 				if (input.operation === "submit" || input.operation === "reconcile") {
 					const allowed = await deps.store.write((db) => {
+						bounded.throwIfAborted();
 						const r = row(db, input.id);
 						if (!r || r.step !== input.step || (r.cancel_requested && !r.sent))
 							return false;

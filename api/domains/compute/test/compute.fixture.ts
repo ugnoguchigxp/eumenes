@@ -40,7 +40,7 @@ export const remote = (
 	...extra,
 });
 export const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-export async function fixture() {
+export async function fixture({ warm = true } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "compute-")),
 		path = join(dir, "db");
 	const store = openStore(path, [...queueMigrations, ...migrations]);
@@ -115,7 +115,7 @@ export async function fixture() {
 		onFinished: (_db, j) => notices.push(j),
 		validInTransaction: () => valid,
 	});
-	await service.refresh();
+	if (warm) await service.refresh();
 	queue.start();
 	return {
 		service,
@@ -131,6 +131,7 @@ export async function fixture() {
 		},
 		async close() {
 			await queue.close(100);
+			await service.close();
 			await store.close();
 			rmSync(dir, { recursive: true, force: true });
 		},

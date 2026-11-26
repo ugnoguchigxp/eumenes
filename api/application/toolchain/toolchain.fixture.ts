@@ -63,6 +63,8 @@ import { taskLegacyPorts } from "./task-legacy-execution";
 import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import { appModules } from "../app-modules";
+import { createCanvasAdapter } from "../canvas/adapter";
+import { createCanvasJobs } from "../canvas/jobs";
 import type { LarmPort } from "../../domains/larm";
 import { fixtureRouting } from "./toolchain-search.fixture";
 import { researchAcquisition } from "./research-acquisition.fixture";
@@ -524,7 +526,6 @@ export async function harness(options: HarnessOptions = {}) {
 					),
 			})
 		: undefined;
-	await compute?.refresh();
 	const video = options.videoPort
 		? createVideo({ store, queue, port: () => options.videoPort! })
 		: undefined;
@@ -582,6 +583,18 @@ export async function harness(options: HarnessOptions = {}) {
 				return message?.role === "user" ? message.text : null;
 			},
 		};
+	const origin = process.env.EUMENES_ORIGIN ?? "http://localhost";
+	const canvasRuntime = options.canvas?.({
+		hostOrigin: origin,
+		previewOrigin: "http://127.0.0.1:8790",
+		dataDir: join(dir, "canvas"),
+		store,
+		inference,
+	});
+	const canvas = canvasRuntime && {
+		runtime: canvasRuntime,
+		jobs: createCanvasJobs(queue, canvasRuntime, store, conversation),
+	};
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		webResearch: options.webResearch,
 		...(options.webNote ? { webNote: options.webNote } : {}),
@@ -594,6 +607,8 @@ export async function harness(options: HarnessOptions = {}) {
 		dots: !!dotsWork,
 		dotsWork: dotsWork?.work,
 		dotsConfiguration: dotsWork?.dots.config,
+		canvasAdapter:
+			canvas && createCanvasAdapter(canvas.runtime, canvas.jobs, conversation),
 		embed: options.embed,
 		timers,
 		schedules: options.schedules ? { scheduler } : undefined,
@@ -804,8 +819,9 @@ export async function harness(options: HarnessOptions = {}) {
 	if (shell) reportShellRuns(shell, dialogue);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
-		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
+		origin,
 		modules: appModules({
+			canvas,
 			video,
 			scratch: options.scratch,
 			markdown,
@@ -876,6 +892,7 @@ export async function harness(options: HarnessOptions = {}) {
 		timers,
 		scheduler,
 		queue,
+		canvas,
 		request,
 		parentContexts,
 		/**
@@ -927,6 +944,8 @@ export async function harness(options: HarnessOptions = {}) {
 			await toolchain.agents.close();
 			await scheduler.close();
 			await queue.close(100);
+			await compute?.close();
+			await canvas?.runtime.close();
 			await web.close();
 			await dialogue.close();
 			await voice.close();

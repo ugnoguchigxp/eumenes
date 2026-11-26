@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { measureStage } from "../../../infrastructure/performance";
 import type { ToolchainCard } from "../../capabilities";
@@ -118,16 +119,26 @@ export async function instant(
 			},
 		]);
 	// Every authority is checked before the adapter runs, not only after.
+	const authorize = (db: Database) => {
+		signal.throwIfAborted();
+		const run = current(db);
+		toolchains!.resolveInTransaction(db, card.revisionId);
+		return run;
+	};
 	let conversationId = "";
 	const prepared = store.read((db) => {
-		conversationId = current(db).conversationId;
-		toolchains!.resolveInTransaction(db, card.revisionId);
+		conversationId = authorize(db).conversationId;
 		return toolchains!.instantInTransaction?.(db, card.revisionId);
 	});
 	if (!prepared)
 		return { result: { answered: false, code: "toolchain_unavailable" } };
 	const started = Date.now();
-	const answered = await prepared.run(parsed.value, signal, { conversationId });
+	const answered = await prepared.run(parsed.value, signal, {
+		conversationId,
+		assertCurrent: () => {
+			store.read(authorize);
+		},
+	});
 	signal.throwIfAborted();
 	const answer =
 		answered.ok &&

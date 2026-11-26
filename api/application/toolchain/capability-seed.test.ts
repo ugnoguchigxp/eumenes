@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -386,14 +392,18 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 			loadConfig({
 				EUMENES_DB: join(dir, "db"),
 				EUMENES_ATTITUDE_DATASET: join(dir, "dataset"),
+				EUMENES_CANVAS_PREVIEW_PORT: "8790",
 			}),
 		);
+		const lifecycles = createLifecycles(services, { name: "http", close() {} });
 		try {
 			const caps = services.toolchain.capabilities!;
 			const ids = services.store.read((db) =>
 				caps.toolchainsInTransaction(db).map((d) => d.id),
 			);
 			expect(ids).toContain("timers.manage");
+			expect(ids).toContain("canvas.app");
+			expect(ids).toContain("canvas.find");
 			expect(ids).not.toContain("web.search");
 			expect(ids).not.toContain("collaboration.task");
 			const artifacts = services.store.read((db) =>
@@ -423,12 +433,21 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 					services.toolchain.actionRequests!.artifact(entry.artifactRevisionId)
 						.artifactRevisionId,
 				).toBe(entry.artifactRevisionId);
-		} finally {
 			expect(
-				await createLifecycleRunner(
-					createLifecycles(services, { name: "http", close() {} }),
-				).closeAll(15_000),
+				entries.some(
+					(entry) => entry.artifactRevisionId === "artifact:canvas.workspace@1",
+				),
 			).toBe(true);
+			expect(services.canvas?.runtime.ready()).toBe(false);
+			expect(existsSync(join(dir, "canvas"))).toBe(false);
+			const canvas = lifecycles.find((item) => item.name === "canvas");
+			expect(canvas?.recover).toBeUndefined();
+			expect(canvas?.start).toBeUndefined();
+			expect(typeof canvas?.close).toBe("function");
+		} finally {
+			expect(await createLifecycleRunner(lifecycles).closeAll(15_000)).toBe(
+				true,
+			);
 		}
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

@@ -3,7 +3,6 @@ import { intervalLifecycle, type Lifecycle } from "./lifecycle";
 import { recoverSteward } from "./world/steward-assembly";
 import type { Services } from "./server-services";
 import { createSpecialistSessionsLifecycle } from "./toolchain/specialist-sessions";
-import { toolchainMaintenance } from "./toolchain/toolchain-adapters";
 
 const log = getLogger("server");
 
@@ -75,8 +74,15 @@ function createIntervalWorkers(s: Services) {
 						error,
 					),
 				),
-			s.compute.refresh(),
-			...toolchainMaintenance(s, log),
+			s.toolchain.actionRequests
+				.maintenance()
+				.catch((error) =>
+					log.warn(
+						"toolchain_actions.maintenance_failed",
+						{ reason: "maintenance_failed" },
+						error,
+					),
+				),
 		]),
 	);
 	// Bounded deletes (queue 500, occurrences 500, schedules 100) keep the writer free.
@@ -210,7 +216,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			recover: () => s.store.write((db) => recoverSteward(s.steward, db)),
 		},
 		{ name: "web_research_recovery", recover: () => s.webResearch.recover() },
-		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{ name: "workflow_recovery", recover: () => s.workflow.recover() },
 		{
@@ -244,7 +249,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "browser_recovery",
 			recover: async () => {
 				await s.browser.service.ready;
-				await s.browser.service.sweep();
+				await s.browser.interact?.recover();
 			},
 		},
 		{ name: "delegated_recovery", recover: () => s.delegated.tasks.recover() },
@@ -261,20 +266,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			start: () => {
 				vectorRefresh.start?.();
 				void refreshVectors();
-			},
-		},
-		{
-			// The forecast areas of the weather toolchain; the task maintenance pass reads them again once a day.
-			name: "weather_areas_start",
-			start: () => {
-				void s.toolchain.weather?.maintain();
-			},
-		},
-		{
-			// The EDINET list of listed companies of the stock toolchain; the task maintenance pass reads it again once a day.
-			name: "stock_codelist_start",
-			start: () => {
-				void s.toolchain.stock?.maintain();
 			},
 		},
 		// This boot's shared files start empty; the last boot's are removed in the background.
@@ -333,10 +324,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "monitoring", close: () => s.monitoring.close() },
 		createSpecialistSessionsLifecycle(s.dialogue),
 		{ name: "web_research", close: () => s.webResearch.close() },
+		{ name: "compute", close: () => s.compute.close() },
 		{ name: "queue", close: () => s.queue.close(10_000) },
 		{
 			name: "canvas",
-			recover: async () => s.canvas?.runtime.start(),
 			close: () => s.canvas?.runtime.close(),
 		},
 		// The MCP child stops before the queue that drives it (reverse order: closed first).

@@ -57,13 +57,15 @@ test("older owned jobs remain addressable outside the bounded model snapshot and
 test("offline compute with no history remains listed and opens its empty artifact without enabling submissions", async () => {
 	const { harness } = await import("../toolchain/toolchain.fixture");
 	const f = await fixture();
+	let discoveries = 0;
 	f.port.discover = async () => {
+		discoveries++;
 		throw new Error("offline");
 	};
 	const h = await harness({ computePort: f.port });
 	try {
 		expect(h.store.read((db) => h.compute!.availableInTransaction(db))).toBe(
-			false,
+			true,
 		);
 		const listing = await h.request("/api/toolchain-artifacts");
 		expect(listing.status).toBe(200);
@@ -82,6 +84,7 @@ test("offline compute with no history remains listed and opens its empty artifac
 			environment: null,
 			jobs: [],
 		});
+		expect(discoveries).toBe(0);
 		await expect(
 			h.compute!.submit(
 				owner,
@@ -90,6 +93,10 @@ test("offline compute with no history remains listed and opens its empty artifac
 				crypto.randomUUID(),
 			),
 		).rejects.toThrow("compute_service_unavailable");
+		expect(discoveries).toBe(1);
+		expect(h.store.read((db) => h.compute!.availableInTransaction(db))).toBe(
+			false,
+		);
 	} finally {
 		await h.close();
 		await f.close();

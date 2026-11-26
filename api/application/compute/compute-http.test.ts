@@ -7,10 +7,15 @@ import {
 	createQueue,
 	migrations as queueMigrations,
 } from "../../domains/queue";
-import { createCompute, migrations } from "../../domains/compute";
+import {
+	createCompute,
+	migrations,
+	registerCompute,
+} from "../../domains/compute";
 import { createComputeClient } from "../../domains/larm";
 import { waitFor } from "../../infrastructure/wait-for";
 import { environment } from "../../domains/compute/test/compute.fixture";
+import { createApp } from "../app";
 
 test("real client and queue use the advertised URL and persist the request before HTTP", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "compute-http-")),
@@ -23,6 +28,7 @@ test("real client and queue use the advertised URL and persist the request befor
 		"base64",
 	);
 	const posts: string[] = [];
+	let discoveries = 0;
 	const client = createComputeClient({
 		baseUrl: "http://compute.test",
 		token: "fixture-secret",
@@ -31,7 +37,8 @@ test("real client and queue use the advertised URL and persist the request befor
 			expect(new Headers(init?.headers).get("authorization")).toBe(
 				"Bearer fixture-secret",
 			);
-			if (path === "/v3/agent-profiles")
+			if (path === "/v3/agent-profiles") {
+				discoveries++;
 				return Response.json({
 					services: [
 						{
@@ -42,6 +49,7 @@ test("real client and queue use the advertised URL and persist the request befor
 						},
 					],
 				});
+			}
 			if (path.endsWith("/environment"))
 				return Response.json({
 					...environment,
@@ -107,25 +115,45 @@ test("real client and queue use the advertised URL and persist the request befor
 		port: () => client,
 		pollMs: 5,
 	});
+	const app = createApp({
+		token: "compute-http-fixture",
+		origin: "http://localhost",
+		modules: [{ mount: (router) => registerCompute(router, service, "owner") }],
+	});
 	try {
-		await service.refresh();
 		queue.start();
-		const accepted = await service.submit(
-			"owner",
-			"main",
-			{ code: "result=sum(inputs['values'])", inputs: { values: [1, 2, 3] } },
-			crypto.randomUUID(),
-		);
+		const path = "/api/compute/jobs";
+		const headers = { Authorization: "Bearer compute-http-fixture" };
+		expect(await (await app.request(path, { headers })).json()).toEqual({
+			jobs: [],
+		});
+		expect(discoveries).toBe(0);
+		const response = await app.request(path, {
+			method: "POST",
+			headers: {
+				...headers,
+				"Content-Type": "application/json",
+				"Idempotency-Key": crypto.randomUUID(),
+			},
+			body: JSON.stringify({
+				code: "result=sum(inputs['values'])",
+				inputs: { values: [1, 2, 3] },
+			}),
+		});
+		expect(response.status).toBe(202);
+		const accepted = await response.json();
 		await waitFor(
 			() => service.get("owner", accepted.jobId).state === "completed",
 		);
 		expect(posts).toHaveLength(1);
+		expect(discoveries).toBe(1);
 		expect(service.get("owner", accepted.jobId).result?.value).toBe(6);
 		expect(
 			service.artifact("owner", accepted.jobId, artifactId).content,
 		).toEqual(png);
 	} finally {
 		await queue.close(100);
+		await service.close();
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}

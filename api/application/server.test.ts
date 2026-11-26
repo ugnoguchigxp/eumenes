@@ -38,7 +38,21 @@ test("a separate process that imports server.ts neither starts nor touches the d
 		[
 			process.execPath,
 			"-e",
-			'await import("./api/application/server.ts"); console.log("imported");',
+			`
+				Bun.plugin({
+					name: "reject-eager-toolchain-load",
+					setup(build) {
+						build.onLoad(
+							{
+								filter: /(?:eumenes-canvas\\/src\\/|canvas\\/runtime-server\\.ts$|larm\\/service\\/compute-transport\\.ts$|weather\\/weather-(?:areas|forecast)\\.ts$|stock\\/stock-(?:edinet|quote)\\.ts$)/,
+							},
+							() => { throw new Error("eager_toolchain_import"); },
+						);
+					},
+				});
+				await import("./api/application/server.ts");
+				console.log("imported");
+			`,
 		],
 		{
 			cwd: resolve(import.meta.dir, "../.."),
@@ -86,6 +100,10 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		recoveries.indexOf("agency_recovery"),
 	);
 	expect(recoveries.at(-1)).toBe("memory_host_listener");
+	expect(recoveries).not.toContain("compute_discovery");
+	const starts = items.filter((item) => item.start).map((item) => item.name);
+	expect(starts).not.toContain("weather_areas_start");
+	expect(starts).not.toContain("stock_codelist_start");
 
 	expect(recoveries.indexOf("agency_recovery")).toBeGreaterThan(
 		recoveries.indexOf("memory_recovery"),
@@ -147,6 +165,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"browser_sweep",
 		"canvas",
 		"queue",
+		"compute",
 		"web_research",
 		"specialist_sessions",
 		"monitoring",

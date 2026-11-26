@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
 	CanvasService,
+	ServiceError,
 	type ServiceOptions,
 } from "eumenes-canvas/src/core/service";
 import { Store } from "eumenes-canvas/src/core/store";
@@ -22,7 +23,11 @@ import { createApp } from "../app";
 import { createCanvasAdapter } from "./adapter";
 import { createCanvasJobs } from "./jobs";
 import { registerCanvasRoutes } from "./routes";
-import type { CanvasRuntime } from "./runtime";
+import {
+	canvasOwner,
+	type CanvasRuntime,
+	type CanvasRuntimeOptions,
+} from "./runtime";
 
 export const canvasFixtureBody = {
 	title: "操作する四角形",
@@ -41,21 +46,15 @@ export const canvasFixtureOutput = {
 	},
 };
 
-export function canvasFixture(
-	options: Partial<Pick<ServiceOptions, "model" | "observer" | "review">> & {
-		persistent?: boolean;
-	} = {},
+type FixtureServiceOptions = Partial<
+	Pick<ServiceOptions, "model" | "observer" | "review">
+>;
+
+export function canvasFixtureInstance(
+	dataDir: string | null,
+	options: FixtureServiceOptions = {},
 ) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-canvas-regression-"));
-	const db = openStore(join(dir, "fixture.db"), [
-		...queueMigrations,
-		...conversationMigrations,
-	]);
-	const queue = createQueue(db, { pollMs: 5 });
-	const conversation = createConversationService(db);
-	const canvasStore = new Store(
-		options.persistent ? join(dir, "canvas") : null,
-	);
+	const canvasStore = new Store(dataDir);
 	const inputs: unknown[] = [];
 	const service = new CanvasService({
 		store: canvasStore,
@@ -84,15 +83,71 @@ export function canvasFixture(
 		review: options.review,
 	});
 	const tokens = new PreviewTokens();
-	const runtime: CanvasRuntime = {
+	let closing: Promise<void> | undefined;
+	return {
+		service,
+		canvasStore,
+		inputs,
+		tokens,
+		issue: tokens.issue.bind(tokens),
+		isServiceError: (error: unknown): error is ServiceError =>
+			error instanceof ServiceError,
+		close: () => (closing ??= service.close()),
+		async save(message: string, artworkId?: string, expectedRevision = 0) {
+			const run = await service.startRun(canvasOwner, "seed-" + message, {
+				message,
+				artworkId,
+			});
+			await service.drain();
+			const candidate = service.getRun(
+				canvasOwner,
+				run.id,
+			).presentedCandidateId!;
+			return (
+				await service.save(canvasOwner, candidate, {
+					expectedRevision,
+					idempotencyKey: "fixture_" + randomUUID(),
+				})
+			).result as { artworkId: string; revision: number; digest: string };
+		},
+	};
+}
+
+export function canvasFixture(
+	options: FixtureServiceOptions & {
+		persistent?: boolean;
+		runtime?: (
+			config: CanvasRuntimeOptions,
+			instance: ReturnType<typeof canvasFixtureInstance>,
+		) => CanvasRuntime;
+	} = {},
+) {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-canvas-regression-"));
+	const db = openStore(join(dir, "fixture.db"), [
+		...queueMigrations,
+		...conversationMigrations,
+	]);
+	const queue = createQueue(db, { pollMs: 5 });
+	const conversation = createConversationService(db);
+	const config = {
 		hostOrigin: "http://127.0.0.1:5173",
 		previewOrigin: "http://localhost:8790",
-		service,
-		issue: tokens.issue.bind(tokens),
+		dataDir: join(dir, "canvas"),
+		store: db,
+		inference: {},
+	};
+	const instance = canvasFixtureInstance(
+		options.persistent ? config.dataDir : null,
+		options,
+	);
+	const runtime: CanvasRuntime = options.runtime?.(config, instance) ?? {
+		...config,
+		...instance,
 		ready: () => true,
-		setCandidateAccess: service.setCandidateAccess.bind(service),
+		setCandidateAccess: instance.service.setCandidateAccess.bind(
+			instance.service,
+		),
 		async start() {},
-		close: () => service.close(),
 	};
 	const jobs = createCanvasJobs(queue, runtime, db, conversation);
 	const adapter = createCanvasAdapter(runtime, jobs, conversation);
@@ -101,6 +156,11 @@ export function canvasFixture(
 		origin: runtime.hostOrigin,
 		modules: [
 			{ mount: (router) => registerCanvasRoutes(router, runtime, jobs) },
+			{
+				mount: (router) => {
+					router.get("/api/fixture-ready", (c) => c.json({ ok: true }));
+				},
+			},
 		],
 	});
 	const source = (
@@ -165,48 +225,24 @@ export function canvasFixture(
 			},
 			body: body === undefined ? undefined : JSON.stringify(body),
 		});
-	async function save(
-		message: string,
-		artworkId?: string,
-		expectedRevision = 0,
-	) {
-		const run = await service.startRun("local:owner", "seed-" + message, {
-			message,
-			artworkId,
-		});
-		await service.drain();
-		const candidate = service.getRun(
-			"local:owner",
-			run.id,
-		).presentedCandidateId!;
-		return (
-			await service.save("local:owner", candidate, {
-				expectedRevision,
-				idempotencyKey: "fixture_" + randomUUID(),
-			})
-		).result as { artworkId: string; revision: number; digest: string };
-	}
 	return {
+		...instance,
 		dir,
 		db,
 		queue,
 		conversation,
-		service,
-		canvasStore,
 		runtime,
 		jobs,
 		adapter,
 		app,
-		tokens,
-		inputs,
 		source,
 		invoke,
 		request,
 		until,
-		save,
 		async close() {
 			await queue.close(1000);
-			await service.close();
+			await runtime.close();
+			if (options.runtime) await instance.close();
 			await db.close();
 			rmSync(dir, { recursive: true, force: true });
 		},

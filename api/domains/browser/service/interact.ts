@@ -21,7 +21,25 @@ export function createBrowserInteract(deps: InteractDeps) {
 		forget,
 	} = state;
 	const enqueue = registerInteractQueue(state);
+	const runs = (db: Database) =>
+		db.query("SELECT * FROM browser_interact_runs").all() as InteractMeta[];
+	function settleLostRuns(db: Database, rows: InteractMeta[]) {
+		const at = now();
+		for (const meta of rows) {
+			const run = getRun(db, meta.owner, meta.run_id)!;
+			if (isTerminalRunStatus(run.status)) continue;
+			const expired = Date.parse(run.deadlineAt!) <= at;
+			if (expired || !memory.has(meta.run_id))
+				authority.end(
+					db,
+					meta.run_id,
+					expired ? "expired" : "failed",
+					expired ? "deadline" : "browser_interact_context_lost",
+				);
+		}
+	}
 	return {
+		recover: () => store.write((db) => settleLostRuns(db, runs(db))),
 		afterCommit() {
 			scheduleFlush();
 		},
@@ -75,23 +93,9 @@ export function createBrowserInteract(deps: InteractDeps) {
 		},
 		async sweep() {
 			await store.write((db) => {
-				const rows = db
-					.query("SELECT * FROM browser_interact_runs")
-					.all() as InteractMeta[];
+				const rows = runs(db);
+				settleLostRuns(db, rows);
 				for (const meta of rows) {
-					const run = getRun(db, meta.owner, meta.run_id)!;
-					if (
-						!isTerminalRunStatus(run.status) &&
-						(!memory.has(meta.run_id) || Date.parse(run.deadlineAt!) <= now())
-					)
-						authority.end(
-							db,
-							meta.run_id,
-							Date.parse(run.deadlineAt!) <= now() ? "expired" : "failed",
-							Date.parse(run.deadlineAt!) <= now()
-								? "deadline"
-								: "browser_interact_context_lost",
-						);
 					if (meta.expires_at <= now())
 						forget(db, meta.owner, meta.conversation_id, meta.run_id);
 				}

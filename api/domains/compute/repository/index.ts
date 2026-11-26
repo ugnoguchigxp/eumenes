@@ -156,18 +156,62 @@ export const environmentRow = (db: Database) =>
 	db
 		.query("SELECT * FROM compute_environment WHERE id=1")
 		.get() as EnvironmentRow | null;
-export function savedEnvironment(db: Database, binding: string | undefined) {
+export function commandRow(db: Database, requestId: string) {
+	return db
+		.query(
+			"SELECT owner, conversation_id, operation, input_json, result_json FROM compute_commands WHERE request_id=?",
+		)
+		.get(requestId) as {
+		owner: string;
+		conversation_id: string;
+		operation: string;
+		input_json: string;
+		result_json: string;
+	} | null;
+}
+
+export function freshEnvironmentRow(
+	db: Database,
+	binding: string | undefined,
+	validForMs = 120_000,
+) {
 	const r = environmentRow(db);
 	return r &&
 		r.binding === binding &&
-		!r.error_code &&
-		r.environment_json &&
-		r.service_url &&
-		Date.now() - r.checked_at < 120_000
+		Date.now() - r.checked_at < (r.error_code ? 60_000 : validForMs)
+		? r
+		: null;
+}
+
+export function savedEnvironment(db: Database, binding: string | undefined) {
+	const r = freshEnvironmentRow(db, binding);
+	return r && !r.error_code && r.environment_json && r.service_url
 		? {
 				url: r.service_url,
 				description: r.description ?? "",
 				environment: JSON.parse(r.environment_json) as Environment,
 			}
 		: null;
+}
+
+export function saveEnvironment(
+	db: Database,
+	binding: string,
+	found: {
+		url: string;
+		description: string;
+		environment: Environment;
+	} | null,
+	error: string | null,
+) {
+	db.query(
+		"INSERT INTO compute_environment VALUES(1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET binding=excluded.binding,service_url=excluded.service_url,description=excluded.description,environment_json=excluded.environment_json,checked_at=excluded.checked_at,error_code=excluded.error_code",
+	).run(
+		binding,
+		found?.url ?? null,
+		found?.description ?? null,
+		found ? JSON.stringify(found.environment) : null,
+		Date.now(),
+		error,
+	);
 }

@@ -284,7 +284,7 @@ test("invalidated parent cannot adopt completion and is stopped", async () => {
 	);
 	expect(f.notices).toEqual([]);
 });
-test("reopening the database resumes polling by saved jobId without a new submit", async () => {
+test("reopening the database resumes polling by saved jobId without discovery or a new submit", async () => {
 	const f = await setup();
 	f.state.job = remote("running");
 	const a = await f.service.submit(
@@ -298,6 +298,19 @@ test("reopening the database resumes polling by saved jobId without a new submit
 	await f.store.close();
 	const store = openStore(f.path, [...queueMigrations, ...migrations]),
 		queue = createQueue(store, { pollMs: 5 });
+	await store.write((db) =>
+		db.query("UPDATE compute_environment SET checked_at=0").run(),
+	);
+	let discoveries = 0;
+	let preparations = 0;
+	const discover = f.port.discover;
+	f.port.discover = (signal) => {
+		discoveries++;
+		return discover(signal);
+	};
+	f.port.prepare = async () => {
+		preparations++;
+	};
 	const service = createCompute({
 		store,
 		queue,
@@ -316,12 +329,17 @@ test("reopening the database resumes polling by saved jobId without a new submit
 		},
 	});
 	await queue.recover();
+	expect(discoveries).toBe(0);
+	expect(preparations).toBe(0);
 	queue.start();
 	try {
 		await until(() => service.get("owner", a.jobId).state === "completed");
 		expect(f.calls.filter((c) => c.op === "submit")).toHaveLength(1);
+		expect(discoveries).toBe(0);
+		expect(preparations).toBeGreaterThan(0);
 	} finally {
 		await queue.close(100);
+		await service.close();
 		await store.close();
 	}
 });

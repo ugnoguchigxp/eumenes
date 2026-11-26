@@ -15,6 +15,8 @@ IDは担当へ渡したsnapshotのものを使う。Pythonは `inputs` を読み
 
 ## 接続
 
+保存済みの接続設定があると、環境の確認前でも会話の候補に出ます。担当を呼ぶか計算の投入APIを使ったときに、初めて環境を確認します。確認から1分経過した後の依頼では再確認し、投入時は2分以内の確認結果を検査します。失敗後は同じ接続先で1分間の再試行間隔を取ります。 [初回利用の設計](../spec/toolchain-on-demand-startup-design-2026-11-26.md)
+
 保存済みLARM Control設定と既存のbackend Control Bearerを使用する。catalogのルートとprofile別servicesからcapability `compute.python.execute`、protocol `larm.compute.v1` を探す。サービス名やモデル名は固定しない。広告のurl・相対endpointとdescriptionを読み、environment取得まで成功したときに新規実行を提供する。相対endpointがあれば保存済みControlへ解決し、urlもある場合はパスの一致を確認する。相対endpointがない絶対urlは同一originに限る。保存済みControlと異なるoriginやredirectへ資格情報を送らない。
 
 相対endpointがなく、保存済みControlと広告urlのoriginが違う場合は利用不可となる。広告URLのホストを固定IPへ書き換えず、catalogが広告する相対endpointを使用する。別originへの資格情報送信は行わない。保存済みジョブは計算サービスの可用性と分けて保持する。「計算」の画面は未接続・履歴0件でも開ける。接続状態と空の履歴を表示し、新規計算は環境の確認が済むまで拒否する。

@@ -60,6 +60,7 @@ export type Environment = {
 /** External transport is injected by application; compute owns its state and SQL. */
 export interface ComputePort {
 	binding: string;
+	prepare?(signal: AbortSignal): Promise<void>;
 	discover(
 		signal: AbortSignal,
 	): Promise<{ url: string; description: string; environment: Environment }>;

@@ -3,7 +3,6 @@ import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ServiceError } from "eumenes-canvas/src/core/service";
 import { canvasFile, canvasOwner, type CanvasRuntime } from "./runtime";
 import type { CanvasJobs } from "./jobs";
 import { answerError } from "../app";
@@ -85,7 +84,7 @@ export function registerCanvasRoutes(
 	app.onError((error, c) => {
 		if (error instanceof z.ZodError || error instanceof SyntaxError)
 			return c.json({ error: "入力の形式を確認してください" }, 400);
-		if (error instanceof ServiceError)
+		if (runtime.isServiceError(error))
 			return new Response(
 				JSON.stringify({ error: error.message, ...error.extra }),
 				{
@@ -100,10 +99,14 @@ export function registerCanvasRoutes(
 	});
 	app.use(`${root}/*`, bodyLimit({ maxSize: 256 * 1024 }));
 	app.use(`${root}/*`, async (c, next) => {
-		if (!runtime.ready())
-			return c.json({ error: "Canvasアプリが起動していません" }, 503);
 		if (c.req.method !== "GET" && c.req.header("Origin") !== runtime.hostOrigin)
 			return c.json({ error: "操作元が一致しません" }, 403);
+		try {
+			await runtime.start(c.req.raw.signal);
+			c.req.raw.signal.throwIfAborted();
+		} catch {
+			return c.json({ error: "Canvasアプリが起動していません" }, 503);
+		}
 		await next();
 	});
 	app.get(`${root}/workbench/index.html`, (c) => {

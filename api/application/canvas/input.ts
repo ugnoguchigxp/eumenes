@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { canAcceptConversation } from "eumenes-canvas/src/core/service";
 import type { Database } from "bun:sqlite";
 import type { ConversationService } from "../../domains/conversation";
 import {
@@ -19,7 +18,9 @@ export const canvasJobInput = z.strictObject({
 	conversation: z
 		.array(z.strictObject({ role: z.enum(["user", "assistant"]), text }))
 		.max(20)
-		.refine(canAcceptConversation)
+		// The job payload includes the initial request separately from these turns.
+		// Preserve the v1/v2 limit from Canvas's MAX_TURN_INFERENCES during queue recovery.
+		.refine((turns) => turns.filter((turn) => turn.role === "user").length < 6)
 		.optional(),
 	artworkId: z
 		.string()

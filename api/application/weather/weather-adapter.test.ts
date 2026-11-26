@@ -20,14 +20,58 @@ async function loaded(over: Parameters<typeof weatherFetch>[0] = {}) {
 	return { adapter, service };
 }
 
-test("without the list of areas the toolchain is not available", async () => {
+test("a failed first load keeps the weather candidate unavailable during retry backoff", async () => {
 	const service = weatherFetch({
 		areas: () => new Response("", { status: 503 }),
 	});
 	const adapter = createWeatherAdapter({ fetch: service.fetch });
-	await adapter.maintain();
+	expect(adapter.availableInTransaction({} as never)).toBe(true);
+	expect(service.urls).toEqual([]);
+	expect(await run(adapter)).toEqual({
+		ok: false,
+		code: "weather_areas_unavailable",
+	});
 	expect(adapter.availableInTransaction({} as never)).toBe(false);
-	expect(await run(adapter)).toEqual({ ok: false, code: "invalid_input" });
+	expect(await run(adapter)).toEqual({
+		ok: false,
+		code: "weather_areas_unavailable",
+	});
+	expect(service.urls).toHaveLength(1);
+});
+
+test("concurrent cold calls share the area load and cancelling one caller leaves the other running", async () => {
+	const gate = Promise.withResolvers<void>();
+	const entered = Promise.withResolvers<void>();
+	const service = weatherFetch();
+	const adapter = createWeatherAdapter({
+		fetch: (async (url, init) => {
+			if (String(url).endsWith("/area.json")) {
+				entered.resolve();
+				await gate.promise;
+			}
+			return service.fetch(url, init);
+		}) as typeof fetch,
+	});
+	const controller = new AbortController();
+	const cancelled = run(adapter, kamakura, controller.signal);
+	try {
+		await entered.promise;
+		expect(adapter.availableInTransaction({} as never)).toBe(true);
+		const active = run(adapter);
+		controller.abort(new Error("cancelled"));
+		await expect(cancelled).rejects.toThrow("cancelled");
+		expect(service.urls).toEqual([]);
+		gate.resolve();
+		expect(await active).toEqual({ ok: true, answer: tomorrowKamakura });
+		expect(
+			service.urls.filter((url) => url.endsWith("/area.json")),
+		).toHaveLength(1);
+		expect(
+			service.urls.filter((url) => url.includes("/api/forecast/")),
+		).toHaveLength(1);
+	} finally {
+		gate.resolve();
+	}
 });
 
 test("a call is answered with the fixed sentence from the forecast of the place's area", async () => {

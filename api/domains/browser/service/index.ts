@@ -29,6 +29,7 @@ import {
 	expireApprovals,
 	listTasks,
 	pendingApprovals,
+	pruneTabs,
 	purgeEnded,
 	taskRow,
 	taskByRequest,
@@ -370,7 +371,9 @@ export function createBrowser(deps: {
 					captures: captures.expireDue(db),
 				};
 				expireApprovals(db, ctx.now());
-				purgeEnded(db, ctx.now() - RETENTION_MS);
+				const before = ctx.now() - RETENTION_MS;
+				pruneTabs(db, before);
+				purgeEnded(db, before);
 				return ended;
 			});
 			ended(result);

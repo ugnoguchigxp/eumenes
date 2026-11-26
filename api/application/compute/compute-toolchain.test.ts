@@ -9,6 +9,12 @@ import { waitFor } from "../../infrastructure/wait-for";
 
 test("an assignment of the task toolchain selects the registered Python tool, persists the action receipt and reports the result", async () => {
 	const f = await fixture();
+	const discover = f.port.discover;
+	let discoveries = 0;
+	f.port.discover = async (signal) => {
+		discoveries++;
+		return discover(signal);
+	};
 	let calls = 0;
 	const a = await assignmentFixture({
 		everyday: true,
@@ -53,14 +59,18 @@ test("an assignment of the task toolchain selects the registered Python tool, pe
 	});
 	const { h } = a;
 	try {
+		expect((await h.request("/api/toolchain-artifacts")).status).toBe(200);
+		expect(discoveries).toBe(0);
 		const { result } = await a.assign("1+1をPythonで計算して", TASK_TOOLCHAIN);
 		expect(result).toMatchObject({ status: "accepted" });
 		await a.settled();
 		expect(a.executions()[0]?.status).toBe("completed");
 		expect(calls).toBe(3);
+		expect(discoveries).toBe(1);
 		// The finished task's result is what the agent reports.
 		expect(a.reported()).toContain("Pythonで計算した結果は2です。");
 		expect(h.commandContexts[0]).toContain("python_submit");
+		expect(h.commandContexts[0]).toContain("fixture-revision");
 		expect(h.commandContexts[0]).not.toContain("fixture-secret");
 		const actions = h.store.read((db) =>
 			db.query("SELECT tool_revision_id FROM tool_action_invocations").all(),
@@ -134,6 +144,7 @@ test("recovering an unknown acceptance sends a new completion notice without dup
 	f.state.submitError = new TypeError("fixture disconnect");
 	const h = await harness({ computePort: f.port });
 	try {
+		await h.compute!.refresh();
 		// A job of the conversation's own origin is announced by the host; an assignment's job is reported by its execution.
 		await h.store.write((db) => {
 			h.compute!.commandInTransaction(

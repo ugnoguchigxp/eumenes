@@ -120,6 +120,8 @@ export function createComputeAdapter(service: ComputeService): DomainAdapter {
 		ref: COMPUTE_ADAPTER_REF,
 		describe: describeComputeAdapter,
 		availableInTransaction: (db) => service.availableInTransaction(db),
+		commandPreparationInTransaction: (db) =>
+			service.needsDiscoveryInTransaction(db) ? service.refresh : undefined,
 		artifactAvailableInTransaction: () => true,
 		snapshotInTransaction: (db, context) =>
 			commandSnapshot(service, db, owner, context?.conversationId),

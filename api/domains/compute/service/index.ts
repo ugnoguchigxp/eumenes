@@ -2,8 +2,14 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { createCommands } from "./commands";
 import type { QueueService } from "../../queue";
-import { activeStates, type ComputePort, type JobView } from "../contracts";
 import {
+	activeStates,
+	submitInput,
+	type ComputePort,
+	type JobView,
+} from "../contracts";
+import {
+	commandRow,
 	list,
 	owned,
 	patch,
@@ -12,7 +18,8 @@ import {
 	view,
 	type JobRow,
 } from "../repository";
-import { failure, registerHandlers, type Step } from "./handlers";
+import { registerHandlers, type Step } from "./handlers";
+import { createEnvironmentDiscovery } from "./environment";
 
 export function createCompute(deps: {
 	store: SqliteStore;
@@ -76,63 +83,40 @@ export function createCompute(deps: {
 		enqueue,
 		cancelInTransaction,
 	});
-	let refreshing: Promise<void> | null = null;
-	async function refresh() {
-		if (refreshing) return refreshing;
-		refreshing = (async () => {
-			const port = deps.port();
-			if (!port) return;
-			let found: Awaited<ReturnType<ComputePort["discover"]>> | null = null;
-			let error: string | null = null;
-			try {
-				found = await port.discover(AbortSignal.timeout(15000));
-			} catch (e) {
-				error = failure(e).code;
-			}
-			if (deps.port()?.binding !== port.binding) return;
-			await store.write((db) =>
-				db
-					.query(
-						"INSERT INTO compute_environment VALUES(1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET binding=excluded.binding,service_url=excluded.service_url,description=excluded.description,environment_json=excluded.environment_json,checked_at=excluded.checked_at,error_code=excluded.error_code",
-					)
-					.run(
-						port.binding,
-						found?.url ?? null,
-						found?.description ?? null,
-						found ? JSON.stringify(found.environment) : null,
-						Date.now(),
-						error,
-					),
-			);
-		})().finally(() => {
-			refreshing = null;
-		});
-		return refreshing;
-	}
+	const discovery = createEnvironmentDiscovery(store, deps.port);
 	return {
-		refresh,
+		refresh: discovery.refresh,
+		close: discovery.close,
+		needsDiscoveryInTransaction: discovery.needsDiscoveryInTransaction,
 		commandInTransaction,
 		cancelInTransaction,
-		submit: (
+		async submit(
 			owner: string,
 			conversationId: string,
 			input: unknown,
 			requestId: string,
-		) =>
-			store.write(
-				(db) =>
-					commandInTransaction(
-						db,
-						owner,
-						conversationId,
-						"screen",
-						"python_submit",
-						input,
-						requestId,
-					).value,
-			),
+			signal?: AbortSignal,
+		) {
+			const parsed = submitInput.safeParse(input);
+			if (!parsed.success) throw new Error("invalid_request");
+			signal?.throwIfAborted();
+			if (!store.read((db) => commandRow(db, requestId)))
+				await discovery.refresh(signal);
+			return store.write((db) => {
+				signal?.throwIfAborted();
+				return commandInTransaction(
+					db,
+					owner,
+					conversationId,
+					"screen",
+					"python_submit",
+					parsed.data,
+					requestId,
+				).value;
+			});
+		},
 		availableInTransaction: (db: Database) =>
-			!!savedEnvironment(db, deps.port()?.binding) ||
+			discovery.canSelectInTransaction(db) ||
 			!!db.query("SELECT 1 FROM compute_jobs LIMIT 1").get(),
 		snapshotInTransaction(
 			db: Database,
@@ -151,12 +135,8 @@ export function createCompute(deps: {
 			};
 		},
 		readInTransaction(db: Database, owner: string, requestId: string) {
-			const command = db
-				.query(
-					"SELECT result_json FROM compute_commands WHERE owner=? AND request_id=?",
-				)
-				.get(owner, requestId) as { result_json: string } | null;
-			return command
+			const command = commandRow(db, requestId);
+			return command?.owner === owner
 				? (JSON.parse(command.result_json) as {
 						action: string;
 						jobId: string;

@@ -1,14 +1,26 @@
+import type { Database } from "bun:sqlite";
 import { taskAutonomy } from "./task-autonomy";
 import { isStandardExecutionSource } from "../../domains/tool-runtime";
 import type { ToolchainRoutingPort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
 import type {
+	ChildExecution,
 	ChildResult,
 	ToolchainExecutionPort,
 } from "../../domains/tool-runtime";
 import type { TaskChildContext } from "./task-execution-catalog";
 import type { TaskExecutionHost } from "./task-execution-port";
 import { result, total } from "./task-execution-values";
+
+type CommandInput = ReturnType<
+	DialogueService["executionCommands"]["prepareInTransaction"]
+>;
+type DeferredCommand = {
+	kind: "deferred_command";
+	bindingRevisionId: string;
+	prepare(signal: AbortSignal): Promise<void>;
+};
+
 export function taskExecutionDispatch(
 	host: TaskExecutionHost,
 	context: TaskChildContext,
@@ -16,42 +28,69 @@ export function taskExecutionDispatch(
 ): Pick<ToolchainExecutionPort, "prepareInTransaction" | "execute"> {
 	const { store, capabilities, agents, routing, dialogue, inference } = host;
 	const { resolve, live, research, bound } = context;
-	const port: Pick<
-		ToolchainExecutionPort,
-		"prepareInTransaction" | "execute" | "readReferenceInTransaction"
-	> = {
-		readReferenceInTransaction: readReference,
+	function withReferenceData(db: Database, child: ChildExecution) {
+		const input = {
+			...child,
+			referenceData: child.refs.map((ref) => ({
+				ref: ref.ref,
+				text: readReference(db, child.source, ref, 0, 2000),
+			})),
+		};
+		if (new TextEncoder().encode(JSON.stringify(input)).length > 24_576)
+			throw new Error("execution_input_capacity");
+		return input;
+	}
+	const commandInput = (db: Database, child: ChildExecution) =>
+		dialogue.executionCommands.prepareInTransaction(
+			db,
+			child,
+			child.source.origin === "autonomous"
+				? taskAutonomy(host, context)(db, child.chainRevisionId).operations
+				: undefined,
+		);
+	async function prepareDeferredCommand(
+		prepared: DeferredCommand,
+		child: ChildExecution,
+		signal: AbortSignal,
+	) {
+		const check = (db: Database) => {
+			signal.throwIfAborted();
+			live(db, child);
+			const current = capabilities.toolchainBindingInTransaction(
+				db,
+				child.chainRevisionId,
+			);
+			if (current?.binding.revisionId !== prepared.bindingRevisionId)
+				throw new Error("toolchain_unavailable");
+		};
+		store.read(check);
+		await prepared.prepare(signal);
+		return store.write((db) => {
+			check(db);
+			return commandInput(db, withReferenceData(db, child));
+		});
+	}
+	return {
 		prepareInTransaction(db, child) {
 			if (!isStandardExecutionSource(child.source))
 				throw new Error("execution_source_invalid");
 			live(db, child);
 			if (child.source.origin === "workflow")
 				return host.workflowSteps!.prepare(db, child);
-			child = {
-				...child,
-				referenceData: child.refs.map((ref) => ({
-					ref: ref.ref,
-					text: port.readReferenceInTransaction(db, child.source, ref, 0, 2000),
-				})),
-			};
-			if (new TextEncoder().encode(JSON.stringify(child)).length > 24_576)
-				throw new Error("execution_input_capacity");
+			child = withReferenceData(db, child);
 			const resolved = resolve(db, child);
-			const kind = resolved.runtime.execution;
-			if (kind === "command")
-				return {
-					kind,
-					input: dialogue.executionCommands.prepareInTransaction(
-						db,
-						child,
-						child.source.origin === "autonomous"
-							? host.registry &&
-									host.routing &&
-									taskAutonomy(host, context)(db, child.chainRevisionId)
-										.operations
-							: undefined,
-					),
-				} as const;
+			const { execution: kind, binding } = resolved.runtime;
+			if (kind === "command") {
+				const adapter = binding && host.registry.get(binding.adapterRef);
+				const prepare = adapter?.commandPreparationInTransaction?.(db);
+				if (binding && prepare)
+					return {
+						kind: "deferred_command",
+						bindingRevisionId: binding.bindingRevisionId,
+						prepare,
+					} satisfies DeferredCommand;
+				return { kind, input: commandInput(db, child) } as const;
+			}
 			if (kind === "instant") {
 				const parsed = routing
 					.cardInTransaction(db, child.chainRevisionId)
@@ -121,26 +160,21 @@ export function taskExecutionDispatch(
 				signal.throwIfAborted();
 				return host.workflowSteps!.execute(raw, signal);
 			}
-			const prepared = raw as ReturnType<typeof port.prepareInTransaction> &
-				(
-					| {
-							kind: "command";
-							input: ReturnType<
-								DialogueService["executionCommands"]["prepareInTransaction"]
-							>;
-					  }
-					| {
-							kind: "instant";
-							arguments: Record<string, unknown>;
-							run: ReturnType<
-								NonNullable<ToolchainRoutingPort["instantInTransaction"]>
-							>;
-					  }
-					| { kind: "research" | "media" | "session"; result: ChildResult }
-				);
+			const prepared = raw as
+				| { kind: "command"; input: CommandInput }
+				| DeferredCommand
+				| {
+						kind: "instant";
+						arguments: Record<string, unknown>;
+						run: ReturnType<
+							NonNullable<ToolchainRoutingPort["instantInTransaction"]>
+						>;
+				  }
+				| { kind: "research" | "media" | "session"; result: ChildResult };
 			if (prepared.kind === "instant") {
 				const answer = await prepared.run?.run(prepared.arguments, signal, {
 					conversationId: child.source.conversationId,
+					assertCurrent: () => store.read((db) => live(db, child)),
 				});
 				if (answer?.ok)
 					return result(
@@ -182,9 +216,15 @@ export function taskExecutionDispatch(
 					return research(db, child);
 				});
 			}
-			if (prepared.kind !== "command") return prepared.result;
+			if (prepared.kind !== "command" && prepared.kind !== "deferred_command")
+				return prepared.result;
+			const input =
+				prepared.kind === "deferred_command"
+					? await prepareDeferredCommand(prepared, child, signal)
+					: prepared.input;
+			signal.throwIfAborted();
 			const translated = await dialogue.executionCommands.execute(
-				prepared.input,
+				input,
 				child,
 				signal,
 			);
@@ -209,7 +249,7 @@ export function taskExecutionDispatch(
 					return host.legacy.invokeInTransaction(
 						db,
 						child,
-						prepared.input,
+						input,
 						translated.command,
 					);
 				}
@@ -271,9 +311,5 @@ export function taskExecutionDispatch(
 				return bound(db, child, ref);
 			});
 		},
-	};
-	return {
-		prepareInTransaction: port.prepareInTransaction,
-		execute: port.execute,
 	};
 }

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
-import { ServiceError } from "eumenes-canvas/src/core/service";
 import { sha256Hex } from "../../infrastructure/digest";
 import type { ConversationService } from "../../domains/conversation";
 import type { AdapterResult, DomainAdapter } from "../../domains/tool-runtime";
@@ -70,11 +69,12 @@ export function createCanvasAdapter(
 		};
 	};
 	const resolveTarget = (scope: string, ref: string) => {
+		const { catalog } = runtime.service;
 		try {
-			return runtime.service.catalog.resolve(canvasOwner, scope, ref);
+			return catalog.resolve(canvasOwner, scope, ref);
 		} catch (error) {
 			throw new Error(
-				error instanceof ServiceError && error.extra.code === "conflict"
+				runtime.isServiceError(error) && error.extra.code === "conflict"
 					? "canvas_revision_conflict"
 					: "canvas_target_expired",
 			);
@@ -83,14 +83,15 @@ export function createCanvasAdapter(
 	return {
 		ref: canvasAdapterRef,
 		describe: describeCanvasAdapter,
-		availableInTransaction: runtime.ready,
+		// The host constructs this adapter only for a configured Canvas runtime.
+		availableInTransaction: () => true,
+		commandPreparationInTransaction: () =>
+			runtime.ready() ? undefined : runtime.start,
 		snapshotInTransaction: (_db, context) =>
-			runtime.ready()
-				? runtime.service.catalog.snapshot(
-						canvasOwner,
-						context?.conversationId ?? "",
-					)
-				: { artworks: [], hasMore: false, nextCursor: null },
+			runtime.service.catalog.snapshot(
+				canvasOwner,
+				context?.conversationId ?? "",
+			),
 		invokeInTransaction(db, req) {
 			const { origin } = req;
 			if (
@@ -142,18 +143,23 @@ export function createCanvasAdapter(
 		},
 		instant: {
 			async run(name, input, signal, context) {
-				if (
-					name !== "canvas.find" ||
-					!context?.conversationId ||
-					!runtime.ready()
-				)
+				if (name !== "canvas.find" || !context?.conversationId)
 					return { ok: false, code: "canvas_unavailable" };
+				const parsed = canvasFind.safeParse(input);
+				if (!parsed.success) return { ok: false, code: "canvas_search_failed" };
+				try {
+					await runtime.start(signal);
+				} catch {
+					signal.throwIfAborted();
+					return { ok: false, code: "canvas_unavailable" };
+				}
 				signal.throwIfAborted();
+				context.assertCurrent?.();
 				try {
 					const page = runtime.service.catalog.page(
 						canvasOwner,
 						context.conversationId,
-						canvasFind.parse(input),
+						parsed.data,
 					);
 					return {
 						ok: true,
@@ -176,9 +182,7 @@ export function createCanvasAdapter(
 			return row ? receipt(row, id, true) : null;
 		},
 		sourceInTransaction(_db, query, target) {
-			return query === canvasWorkspaceQuery &&
-				target === undefined &&
-				runtime.ready()
+			return query === canvasWorkspaceQuery && target === undefined
 				? { revision: 1, data: { kind: "canvas-workspace" } }
 				: null;
 		},
