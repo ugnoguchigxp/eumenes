@@ -65,12 +65,35 @@ export function researchWaiting(c: AgendaScope) {
 }
 
 /**
+ * Whether the agent owes this conversation something it took on: an assignment or research waiting or running, or a
+ * report not told yet. Such a conversation steps even when it is not the one on screen, so work asked there starts
+ * and its result is told there (a conversation the agent only talks in steps while it is the active one).
+ */
+export function keepsPromise(c: AgendaScope) {
+	return (
+		c.tickets.length > 0 ||
+		c.agent
+			.view()
+			.items.some(
+				(i) =>
+					(i.kind === "research" &&
+						(i.status === "open" || i.status === "doing")) ||
+					(i.kind === "talk" && i.promised && i.status === "open"),
+			)
+	);
+}
+
+/**
  * Whether a step of the scope has something to do now: the active conversation, and either nobody typing or being
  * answered, or research that waits and was not tried yet while they are (one step for each set of waiting research:
  * what that step could not start waits for the pause).
  */
 export function mayStep(host: CycleHost, c: AgendaScope) {
-	if (!host.on() || host.convs.get(c.id) !== c || c.id !== host.active())
+	if (
+		!host.on() ||
+		host.convs.get(c.id) !== c ||
+		(c.id !== host.active() && !keepsPromise(c))
+	)
 		return false;
 	if (host.deps.store.read((db) => host.deps.backgroundPaused?.(db, c.id)))
 		return false;
