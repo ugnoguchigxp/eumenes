@@ -27,7 +27,7 @@ bun spec/verification/agency-always-on-plan-2026-11-08/contract-probes.mjs /abso
 
 調査時HEAD: `c632b5632390a8051a30fc1669f3e113087fdfc4`（dirty）。意味判断の品質、実LARMの容量・並列性、実配送・音声・再起動はこの確認では検証していない。取り込み元・Eumenesの製品コードは編集していない。
 
-計画の本体: [always-on取り込み実装計画](../../agency-always-on-integration-plan-2026-11-08.md)。
+計画の本体: [always-on取り込み実装計画](../../.todo/agency-always-on-integration-plan-2026-11-08.md)。
 
 ## 文書の確認
 

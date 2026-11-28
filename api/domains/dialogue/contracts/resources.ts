@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 
 /**
- * The conversation's resource ledger (spec/resource-uri-implementation-plan-2026-10-25.md §4.2): every resource
+ * The conversation's resource ledger (spec/.todo/resource-uri-implementation-plan-2026-10-25.md §4.2): every resource
  * the conversation has met, numbered `a<n>` for the model. The URI is the identity; the model never sees it.
  */
 /** `attached`: the user's input as a shared file (an attachment, a long paste). */

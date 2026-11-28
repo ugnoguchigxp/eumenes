@@ -6,7 +6,7 @@
 
 [作業規則](../AGENTS.md)を守る。依頼の解釈・担当選択・不足情報の判断はLLMに任せ、発話の語句・企業名・地域による振り分けを追加しない。コードで書くのは、登録済みの操作をdomainへ接続する型付きadapterだけにする。
 
-CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4操作、永続ジョブ、取消、成果物表示の契約は [Python計算](compute.md) と [CPU統合設計](../spec/compute-cpu-integration-design-2026-10-21.md)。外部サービスは保存済みControlと同一originの広告から発見し、環境取得に成功したときに新規実行を公開する。
+CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4操作、永続ジョブ、取消、成果物表示の契約は [Python計算](compute.md) と [CPU統合設計](../spec/.todo/compute-cpu-integration-design-2026-10-21.md)。外部サービスは保存済みControlと同一originの広告から発見し、環境取得に成功したときに新規実行を公開する。
 
 CLI（`cli.run@1`、画面 `cli.workspace@1`）も登録adapterとbundleで追加した。PTYと端末接続はClaude Code画面と共通。[CLI](shell.md)を参照。
 
@@ -42,13 +42,13 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 親は `find_toolchain` の候補（種類ごとの枠）からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
-会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`assignment`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_agents`・`read_world`（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
+会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`assignment`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_agents`・`read_world`（[設計](../spec/.todo/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
 ### 依頼ごとに計画するpipeline型
 
-`pipeline-execution.bundle.json` の `pipeline.execute` は、`execution:"pipeline"`・`contractVersion:"p0-3"`・`adapter:pipelines@2` で登録する。定義と検査の正本は `vendor/pipeline/` の配布ライブラリ。元依頼を保持した `request / steps / output` をLLMが作り、1〜8手順を既存agent-runtimeで実行する。[取込み仕様](../spec/pipeline-p0-3-integration-2026-11-05.md)を参照する。
+`pipeline-execution.bundle.json` の `pipeline.execute` は、`execution:"pipeline"`・`contractVersion:"p0-3"`・`adapter:pipelines@2` で登録する。定義と検査の正本は `vendor/pipeline/` の配布ライブラリ。元依頼を保持した `request / steps / output` をLLMが作り、1〜8手順を既存agent-runtimeで実行する。[取込み仕様](../spec/.archived/pipeline-p0-3-integration-2026-11-05.md)を参照する。
 
 - 部品の公開ID・revision・引数契約を渡し、参照と最終配送を明示する。session・read・task・pipelineの再帰は部品に含めない。
 - `ready` の検査済み定義だけを実行する。`needs_input` は既存の質問、`unsupported` は未達の結果にする。構造修復は一回まで。
@@ -56,7 +56,7 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 ### Agencyの自律行動へ公開する（2026-11-07）
 
-Agencyは既存の能力検索と実行契約を使う。話題や利用者の語句による分岐は追加しない。`find_toolchain`の返却にはrevision、実行可否と理由、instantの実引数schemaが含まれ、`delegate`の選択後に共通実行へ接続する。[設計と検証](../spec/agency-general-action-design-2026-11-07.md)を参照する。
+Agencyは既存の能力検索と実行契約を使う。話題や利用者の語句による分岐は追加しない。`find_toolchain`の返却にはrevision、実行可否と理由、instantの実引数schemaが含まれ、`delegate`の選択後に共通実行へ接続する。[設計と検証](../spec/.todo/agency-general-action-design-2026-11-07.md)を参照する。
 
 - command / instantでは、登録adapterの`describe().operations`にある`effect: "read"`を自動実行できる。書込みのうち独立した新規成果物を作る操作だけに`autonomy: "create"`を明示する。既存物の変更・送信・公開・削除へ付けない。command担当へ渡す操作を絞り、実行直前にも同じ条件を検査する。
 - task / pipelineのownerは`describe().autonomy`へ`"read"`または`"create"`を宣言する。taskには実在する`start / view / control / cancel / forget`の公開操作が必要で、取消・忘却を欠く担当は自動実行しない。子の実行にも共通portの出所・操作権限・期限を適用する。pipelineは既存の共通実行を使い、非許可の部品を選択・実行できない。
@@ -90,7 +90,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
 既存のEumenesエージェントの操作だけでは対象領域の実行契約を満たせず、専用ランタイムを再利用できる場合は、登録済みadapterからそのランタイムへ実行を委ねられる。Canvasアプリでは、作品の制作指示、出力契約、ブラウザ観測と修正をCanvasの制作コアが担う。Eumenesの会話担当は既存の能力検索で担当を選び、利用者の依頼とホストが確認した参照を渡す。
 
-bundleには公開する役割、操作、受領結果とArtifactを記述する。実行先と権限はホストの登録adapterで制限し、bundleやモデルの出力で接続先・実行コマンド・権限を指定できないようにする。依頼の受付と成果物の完成を区別し、失効した結果を採用しない。生成物を別の実行環境で表示・操作する場合は、その環境の認証と隔離の契約を設計書に記録する。 [Canvasアプリの取り込み設計](../spec/canvas-app-integration-2026-11-12.md)
+bundleには公開する役割、操作、受領結果とArtifactを記述する。実行先と権限はホストの登録adapterで制限し、bundleやモデルの出力で接続先・実行コマンド・権限を指定できないようにする。依頼の受付と成果物の完成を区別し、失効した結果を採用しない。生成物を別の実行環境で表示・操作する場合は、その環境の認証と隔離の契約を設計書に記録する。 [Canvasアプリの取り込み設計](../spec/.todo/canvas-app-integration-2026-11-12.md)
 
 ## 2. 追加の種類を選ぶ
 
@@ -117,7 +117,7 @@ bundleには公開する役割、操作、受領結果とArtifactを記述する
    bun run toolchain:bundle -- pins package:timers.manage@1 tool:timer.start@1
    ```
 3. **definitionsを書く**: 新しいprofile・skill・package・toolchainを書く。本文はJSON文字列で持ち、既存revisionの本文は変えない。toolchainの必須項目は `functionName`（`^[a-z][a-z0-9_]{2,40}$`、全体で一意）、`summary`、`useWhen`（1件以上）、`examples`（3件以上・各200字以内。候補検索の索引と評価に使う）、`redirects`、`dependencies` と `packageRevisionId`（同じpackage一つ）、`bindingRevisionId`、`artifactRevisionId`。任意の `minImpact`（`none`・`create`・`modify_existing`・`irreversible`）は、その担当の仕事が既存のものに与える影響の下限で、会話エージェントの申告より大きければこちらを使う。`modify_existing`・`irreversible`の仕事は、会話エージェントが実行前の確認（依頼の`confirm`）を出してからでないと実行されない（[ContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §6.7）。未宣言なら申告を使う。表示はartifact登録が担うので、旧形式の `artifact` 項目は不要（書いても使われない。新しく書かない）。
-   任意の `general`（値は `true` だけ）は、話題を問わず一般的な手段（Web・ブラウザ・シェル・汎用のエージェント）で依頼をこなす汎用の担当に付ける。担当の検索は、専用の担当の上位3件とは別の枠で、1位の候補との差が 0.05 以内の汎用の担当を2件まで候補に足し、会話エージェントは合う専用の担当がないときだけ使う（[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §2〜§4）。パイプライン（bindingの `execution:"pipeline"`）も同じ形で2件までの枠を持つ。
+   任意の `general`（値は `true` だけ）は、話題を問わず一般的な手段（Web・ブラウザ・シェル・汎用のエージェント）で依頼をこなす汎用の担当に付ける。担当の検索は、専用の担当の上位3件とは別の枠で、1位の候補との差が 0.05 以内の汎用の担当を2件まで候補に足し、会話エージェントは合う専用の担当がないときだけ使う（[担当の検索と選び方の設計](../spec/.todo/toolchain-search-choice-design-2026-10-30.md) §2〜§4）。パイプライン（bindingの `execution:"pipeline"`）も同じ形で2件までの枠を持つ。
 
    任意の `selectable`（値は `false` だけ、toolchainのみ）は、その revision を選択から外す。Routerのcards、検索（`find_toolchain`・Agencyの能力検索）の候補、パイプラインの部品、ベクトル更新に出なくなる。revision は登録されたまま、名前（revision）を指した実行は従来どおり動く。選択を停止するときは新しい revision に設定する。
    `summary`・`useWhen`・`examples` は担当の検索の索引になる。種類ごとに書くものを分ける。専用の担当は何を扱うか（対象・物・結果）を書き、ほかの担当の持ち分の依頼を書かない。パイプラインは依頼の全体の流れを書き、各ステップ単独の依頼に似た文を書かない。汎用の担当はどうやるか（手段・場所）を書き、専用の担当がある話題（天気・株価など）の例を書かない。例文は、効果の確かめに使う過去の発言の写しにしない。
@@ -130,7 +130,7 @@ bundleには公開する役割、操作、受領結果とArtifactを記述する
    | `tools[]` | `toolRevisionId`（packageのtoolの部分集合）、`operationId`（adapterの登録操作名）、`inputSchemaRef`（toolの`schemaKey`なら`builtin:<schemaKey>`と一致。adapter側の操作schemaとも一致） |
    | `outputSchemaRef`・`resultProjectionRef` | domainの結果schemaと会話回答用projection |
    | `artifactRevisionId` | 表示に使うartifact。toolchainの値と一致させる |
-   | `timeLimits`（任意・sessionだけ） | 長い思考や長い生成に時間のかかる担当の時間。`runMs`（専門担当に渡ってからrunが終わるまで）・`turnMs`（専門担当の1ターン）・`inferenceMs`（推論1回）。各10秒〜60分で `inferenceMs ≤ turnMs ≤ runMs`。書かなければ既定（run 180秒・1ターン120秒・推論はLARM 120秒／クラウド60秒）。値はbundleにだけ書く（[設計](../spec/toolchain-time-limits-design-2026-10-18.md)） |
+   | `timeLimits`（任意・sessionだけ） | 長い思考や長い生成に時間のかかる担当の時間。`runMs`（専門担当に渡ってからrunが終わるまで）・`turnMs`（専門担当の1ターン）・`inferenceMs`（推論1回）。各10秒〜60分で `inferenceMs ≤ turnMs ≤ runMs`。書かなければ既定（run 180秒・1ターン120秒・推論はLARM 120秒／クラウド60秒）。値はbundleにだけ書く（[設計](../spec/.todo/toolchain-time-limits-design-2026-10-18.md)） |
    | `questions`（任意） | command担当が確認質問に使える回答schema。`builtin:answerText`（自由文）は常に使えるので書かない。対象選択の質問は `choiceField` に候補で埋めるfieldを書き、候補はadapterの `choicesInTransaction` がhostのデータから出す（モデルは候補を作らない） |
 
 5. **artifactを書く**:

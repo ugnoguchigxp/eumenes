@@ -1,10 +1,5 @@
 import { expect, test } from "bun:test";
-import {
-	createGoalStore,
-	goalMigrations,
-	withGoalReplyTools,
-	type GoalHost,
-} from "eumenes-agency/agenda/runtime";
+import { createGoalStore, goalMigrations } from "eumenes-agency/agenda/runtime";
 import {
 	createGoalsService,
 	migrations as goalsMigrations,
@@ -13,7 +8,7 @@ import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
 import { setupMemory } from "../../domains/memory/test/memory.fixture";
 import { createGoalReplyWork } from "./goal-permission";
 import { goalQuestionMessageId } from "./goal-question-delivery";
-import { createGoalReportDelivery } from "./goal-report-delivery";
+import { createGoalWork } from "./goal-work";
 import { createGoalWorkspaceRegistry } from "./goal-workspaces";
 
 const access = { principal: PRINCIPAL, scopeKeys: [PROFILE_SCOPE] };
@@ -30,15 +25,26 @@ async function fixture() {
 	);
 	let now = Date.parse(h.time.now);
 	const blocked = h.memory.isBlockedInTransaction;
-	const delivery = () =>
-		createGoalReportDelivery({
+	const replyOf = (conversationId: string) =>
+		createGoalReplyWork({
 			store: h.store,
 			goals,
 			conversation: h.conversation,
-			referenceInputs: h.memory.referenceInputs,
+			workspaces: createGoalWorkspaceRegistry(undefined),
 			blocked,
-			now: () => now,
-		});
+			scopeKey: PROFILE_SCOPE,
+			access,
+			binding: () => null,
+			progress: { submitInTransaction() {}, wake() {} },
+		})(conversationId);
+	const work = createGoalWork({
+		store: h.store,
+		goals,
+		conversation: h.conversation,
+		blocked,
+		reply: replyOf,
+		now: () => now,
+	});
 	const source = await h.say("user", title, "origin");
 	const ask = (
 		slot: number,
@@ -92,7 +98,7 @@ async function fixture() {
 	return {
 		...h,
 		goals,
-		delivery,
+		work,
 		ask,
 		source,
 		now: () => now,
@@ -102,119 +108,68 @@ async function fixture() {
 	};
 }
 
-test("a legacy goal question reaches only its originating conversation once and the same question can be answered", async () => {
+test("a goal question is the agency's to ask in its own conversation, once the goals' quiet ends, and is answered through it", async () => {
 	const f = await fixture();
-	const delivery = f.delivery();
 	try {
 		const { row, ref, id } = await f.ask(1);
-		const sourceWithoutUser = await f.say("assistant", "参照先なし", "other");
-		const noDestination = await f.ask(2, sourceWithoutUser);
-		const pause = (speechUntilMs: number | null, allUntilMs: number | null) =>
-			f.store.write((db) =>
-				f.goals.setGoalScopeControlInTransaction(db, access, PROFILE_SCOPE, {
-					speechUntilMs,
-					allUntilMs,
-				}),
-			);
-		await pause(f.now() + 1_000, f.now() + 2_000);
-		await delivery.recover();
-		expect(f.conversation.message(id)).toBeNull();
-		f.advance(1_000);
-		await delivery.recover();
-		expect(f.conversation.message(id)).toBeNull();
-		f.advance(1_000);
-		await Promise.all([delivery.recover(), delivery.recover()]);
-		await f.delivery().recover();
-		expect(f.conversation.get("origin").messages).toEqual([
-			expect.objectContaining({ id: f.source, role: "user" }),
-			expect.objectContaining({
-				id,
-				role: "assistant",
-				text: expect.stringContaining(questionText),
+		const views = () => f.store.read((db) => f.work.viewsInTransaction(db));
+		await f.store.write((db) =>
+			f.goals.setGoalScopeControlInTransaction(db, access, PROFILE_SCOPE, {
+				speechUntilMs: f.now() + 1_000,
+				allUntilMs: null,
 			}),
-		]);
-		expect(f.conversation.message(noDestination.id)).toBeNull();
-		const answer = { text: "指定した対象を使ってください。", id: "" };
-		answer.id = await f.say("user", answer.text, "origin");
-		const legacy = {
-			list: () => f.goals.list(access),
-			infoChanged() {},
-		} as GoalHost;
-		const work = createGoalReplyWork({
-			store: f.store,
-			goals: f.goals,
-			conversation: f.conversation,
-			workspaces: createGoalWorkspaceRegistry(undefined),
-			blocked: f.memory.isBlockedInTransaction,
-			scopeKey: PROFILE_SCOPE,
-			access,
-			binding: () => null,
-			progress: { submitInTransaction() {}, wake() {} },
-		})("origin", legacy);
-		const tools = withGoalReplyTools(
-			{ tools: [], call: async () => ({ content: "" }) },
-			legacy,
-			() => answer,
-			PROFILE_SCOPE,
-			work,
 		);
-		const call = async (name: string, args: object) =>
-			JSON.parse(
-				(
-					await tools.call(
-						{ id: name, name, arguments: JSON.stringify(args) },
-						new AbortController().signal,
-					)
-				).content,
-			);
-		const listed = await call("list_goals", {});
-		expect(listed.slots[0].progress.questions).toMatchObject([
-			{ ref, question: questionText },
-		]);
-		const update = {
-			action: "answer_question",
-			slot: 1,
-			goalId: row.goalId,
-			revision: row.goalRevision,
-			design: null,
-			desiredState: null,
-			priority: null,
-			quote: answer.text,
-			questionRef: ref,
-		};
-		expect(await call("update_goal", update)).toMatchObject({
-			status: "updated",
-		});
-		expect(await call("update_goal", update)).toMatchObject({
-			status: "updated",
-		});
-		const saved = f.store.read((db) =>
-			f.goals.activeProgressInTransaction(db, access, row),
+		expect(views()).toMatchObject([{ question: null }]);
+		// The agency is woken when the goals' quiet ends.
+		expect(f.store.read((db) => f.work.heldUntilInTransaction(db))).toBe(
+			f.now() + 1_000,
 		);
-		expect(saved).toMatchObject({
-			phase: "ready",
-			state: { questions: [{ ref, answeredBy: answer.id }] },
-		});
-		await delivery.recover();
+		f.advance(1_000);
+		expect(f.store.read((db) => f.work.heldUntilInTransaction(db))).toBeNull();
+		expect(views()).toMatchObject([
+			{
+				goalId: row.goalId,
+				conversationId: "origin",
+				question: { ref, prompt: questionText },
+			},
+		]);
+		const answer = await f.say(
+			"user",
+			"指定した対象を使ってください。",
+			"origin",
+		);
 		expect(
-			f.conversation
-				.get("origin")
-				.messages.filter((message) => message.id === id),
-		).toHaveLength(1);
+			await f.work.control({
+				conversationId: "origin",
+				view: views()[0]!,
+				action: "answer",
+				text: "指定した対象を使ってください。",
+				messageId: answer,
+				signal: new AbortController().signal,
+			}),
+		).toBe("answered: 登録目標に回答を渡した");
+		expect(
+			f.store.read((db) =>
+				f.goals.activeProgressInTransaction(db, access, row),
+			),
+		).toMatchObject({
+			state: { questions: [{ ref, answeredBy: answer }] },
+		});
+		expect(views()).toMatchObject([{ question: null }]);
+		// Nothing was written to the conversation for the question.
+		expect(f.conversation.message(id)).toBeNull();
 	} finally {
-		await delivery.close();
 		await f.close();
 	}
 });
 
-test("an old or forgotten pending question does not appear in the conversation", async () => {
+test("a revised, withdrawn or forgotten goal is not shown", async () => {
 	const f = await fixture();
-	const delivery = f.delivery();
 	try {
 		const revised = await f.ask(1, f.source, "explicit");
 		const withdrawn = await f.ask(2);
 		const forgetSource = await f.say("user", title, "forget");
-		const forgotten = await f.ask(3, forgetSource);
+		await f.ask(3, forgetSource);
 		await f.store.write((db) => {
 			const target = (slot: number, key: typeof revised.row) => ({
 				slot,
@@ -235,72 +190,19 @@ test("an old or forgotten pending question does not appear in the conversation",
 			});
 			f.conversation.retractInTransaction(db, { messageId: forgetSource });
 		});
-		await delivery.recover();
-		for (const { id } of [revised, withdrawn, forgotten])
-			expect(f.conversation.message(id)).toBeNull();
+		const shown = f.store.read((db) => f.work.viewsInTransaction(db));
+		expect(
+			shown.filter(
+				({ goalId, revision }) =>
+					(goalId === revised.row.goalId &&
+						revision === revised.row.goalRevision) ||
+					goalId === withdrawn.row.goalId,
+			),
+		).toEqual([]);
+		expect(
+			shown.some(({ sourceMessageId }) => sourceMessageId === forgetSource),
+		).toBe(false);
 	} finally {
-		await delivery.close();
-		await f.close();
-	}
-});
-
-test("a reconsidered question waits for the configuration decision and is delivered only if still needed", async () => {
-	const f = await fixture();
-	const delivery = f.delivery();
-	try {
-		for (const [index, resolved] of [true, false].entries()) {
-			const { row, ref, id } = await f.ask(index + 1);
-			const configured = await f.store.write((db) =>
-				f.goals.reconcileReadPoliciesInTransaction(db, access, row, {
-					digest: "changed-registration",
-					summary: "新しい参照先を照合済み",
-					policies: [],
-				}),
-			);
-			if (configured.status !== "applied")
-				throw new Error("fixture_goal_configuration");
-			await delivery.recover();
-			expect(f.conversation.message(id)).toBeNull();
-			await f.store.write((db) => {
-				const selected = f.goals.applyDecisionInTransaction(
-					db,
-					access,
-					row,
-					{
-						kind: "wait",
-						contextId: "after-configuration",
-						progressVersion: configured.progress.progressVersion,
-						criterionIds: ["root"],
-						reason: "まだ必要な資料を待つ",
-						review: null,
-						watchRef: "document",
-						resolvedQuestionRefs: resolved ? [ref] : [],
-					},
-					{
-						contextId: "after-configuration",
-						configurationRef: configured.progress.state.configuration!.ref,
-						nowMs: f.now(),
-						current: () => true,
-						watch: {
-							ref: "document",
-							condition: "資料到着",
-							dueAtMs: null,
-							producer: "markdown",
-						},
-					},
-				);
-				expect(selected.status).toBe("applied");
-			});
-			await delivery.recover();
-			await delivery.recover();
-			expect(
-				f.conversation
-					.get("origin")
-					.messages.filter((message) => message.id === id),
-			).toHaveLength(resolved ? 0 : 1);
-		}
-	} finally {
-		await delivery.close();
 		await f.close();
 	}
 });

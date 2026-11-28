@@ -211,9 +211,10 @@ export function createGoalReplyWork(ports: WorkPorts) {
 				}).progress
 			: row;
 	}
+	/** A conversation's goal operations; `legacy` is the mock goals' host, absent where only real goals are named. */
 	function workReply(
 		conversationId: string,
-		legacy: GoalHost,
+		legacy?: GoalHost,
 	): GoalReplyWorkPort {
 		return {
 			list: () => list(legacy),
@@ -431,7 +432,7 @@ export function createGoalReplyWork(ports: WorkPorts) {
 					if (next) ports.progress.submitInTransaction(db, next);
 					return { status: "updated", action: input.action, goalId };
 				});
-				if (wakeLegacy) legacy.infoChanged();
+				if (wakeLegacy) legacy?.infoChanged();
 				ports.progress.wake();
 				return saved;
 			},

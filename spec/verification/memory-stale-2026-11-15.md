@@ -26,7 +26,7 @@ LLMの応答自体は成功している。回答確定時の `recordAgencyInput`
 
 ## 修正
 
-[修正方針](../agency-note-input-retention-2026-11-15.md)を実装前に記録した。既存の根拠管理の欠落を補い、回答の採用条件、忘却・取消時の破棄、LLMによる意味判断は変更していない。
+[修正方針](../.archived/agency-note-input-retention-2026-11-15.md)を実装前に記録した。既存の根拠管理の欠落を補い、回答の採用条件、忘却・取消時の破棄、LLMによる意味判断は変更していない。
 
 - `api/application/agency/always-on-memory.ts`: 調査開始時に検査・保存済みの `ticket.inputs` をメモへ引き継ぐ。
 - `api/application/agency/input.ts`: メモが保持する元の根拠に既存の有効性検査を適用する。親メモが一覧から消えても、元の根拠が有効なら採用できる。

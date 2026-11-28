@@ -19,6 +19,8 @@ export function recoverAgendaScope(
 	const alive = deps.store.read((db) =>
 		c.tickets.filter(
 			(t) =>
+				// A goal's ticket has no work of its own: it lasts while the agent's item does.
+				(t.goal && pendingItems.has(t.itemId)) ||
 				(t.pendingAdmission && pendingItems.has(t.itemId)) ||
 				deps.state!.workActiveInTransaction(db, workRoot(c, t.id)),
 		),

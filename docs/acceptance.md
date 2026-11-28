@@ -16,7 +16,7 @@
 | 再読み上げ | 通常Brave画面・実LARMで日本語VOICEVOX4区間、英語KittenTTS3区間の実Web Audio開始・終了を確認。次開始は終了後44〜65ms、重複0。再試聴後ユーザーから可聴性の確認を得た。日英を女性声（春日部つむぎ / Rosie）に変更、合成・採用成功。実マイク3往復は別途 | 2026-10-12 |
 | 日英の声の対応 | 女性・中性→Rosie、男性→Jasper、英語速度1.0へ固定。公開6名すべてで合成・採用成功、英語の追加設定欄は撤去 | 2026-10-12 |
 | 設定の保存・資格情報 | 環境変数名の許可リストと外部ホストの https 必須を追加（backend 試験で確認） | 2026-10-09 |
-| 実 LARM の疎通 | 稼働中の本番APIで、合成音声のTTS→同じ音声のASRが成功（HTTP全体でTTS 563ms・ASR 282ms、クラウド切替なし）。ブラウザ操作と実機器は含まない。記録は [larm-provider-readiness](../spec/larm-provider-readiness-design-2026-10-25.md) の「本番反映と稼働確認」 | 2026-10-26 |
+| 実 LARM の疎通 | 稼働中の本番APIで、合成音声のTTS→同じ音声のASRが成功（HTTP全体でTTS 563ms・ASR 282ms、クラウド切替なし）。ブラウザ操作と実機器は含まない。記録は [larm-provider-readiness](../spec/.archived/larm-provider-readiness-design-2026-10-25.md) の「本番反映と稼働確認」 | 2026-10-26 |
 | アバター canvas 解放の browser 試験 | 負荷時に稀に5秒を超えて失敗する（ソフトウェア GL がメインスレッドを占有）。解放処理自体の不具合は確認されず、待機を20秒に延長 | 2026-10-09 |
 
 2026-10-07、macOS 26.6.2、Bun 1.4.2、Playwright 1.61.1 Chromium。Playwright の合成マイクと LARM fixture で、音声開始、ASR 確定、履歴に基づく回答、TTS 再生、再生中の次発話、二重発話 ID の抑止を確認。実 LARM は SAAA の保存済み接続先を読み取り専用で確認し、ローカルで生成した合成日本語 WAV を使った ASR・LLM・TTS の個別操作が成功。ASR 文字列には期待語「こんにちは」が含まれた。ASR 1268ms、LLM 8209ms、TTS 3757ms（この1回の測定値）。実マイク、ヘッドホン、実 ASR・LLM・TTS とブラウザをつないだ3往復は未受入。

@@ -42,6 +42,8 @@ export type AgencyCallIdentity = {
 	conversationId?: string;
 	/** Exact messages fixed before the core's input dependency validation. */
 	messages?: Messages;
+	/** The model session an independent call continues (a thought plan's run): recorded as its agent. */
+	sessionId?: string;
 };
 
 export type AgencyLlmPortDeps = {
@@ -166,7 +168,9 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 								outputSchema,
 								agentSession: {
 									conversationId: conversationId ?? null,
-									agentId: `agency:${conversationId ?? identity.decisionId}`,
+									agentId: identity.sessionId
+										? `thought:${identity.sessionId}`
+										: `agency:${conversationId ?? identity.decisionId}`,
 								},
 							}
 						: prefix && conversationId

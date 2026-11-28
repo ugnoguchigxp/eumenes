@@ -17,7 +17,7 @@ import { captureGoalSources } from "./goal-input-sources";
 import { createGoalNoteAdopter } from "./goal-note-adoption";
 import { createGoalProgress } from "./goal-progress";
 import { createGoalSemanticVerification } from "./goal-semantic-verification";
-import { createGoalReportDelivery } from "./goal-report-delivery";
+import { createGoalWork } from "./goal-work";
 import { referencedInput } from "./input";
 
 const access = { principal: PRINCIPAL, scopeKeys: [PROFILE_SCOPE] };
@@ -76,18 +76,18 @@ async function fixture() {
 	return { ...h, ledger, goals, records, register, source };
 }
 
-test("a report carries current Memory provenance and survives its own goal completion revision", async () => {
+test("a met goal shows its report to the agency once, after its own completion revision, and goes with what it rests on", async () => {
 	const f = await fixture();
-	let now = time;
 	const input = f.memory.referenceInputs;
-	const delivery = createGoalReportDelivery({
+	const work = createGoalWork({
 		store: f.store,
 		goals: f.goals,
 		conversation: f.conversation,
-		referenceInputs: input,
 		blocked: (db, id) => f.memory.isBlockedInTransaction(db, id),
-		records: f.records,
-		now: () => now,
+		reply: () => {
+			throw new Error("fixture_goal_reply_unused");
+		},
+		now: () => time,
 	});
 	try {
 		const key = await f.register(1, "c1");
@@ -101,9 +101,7 @@ test("a report carries current Memory provenance and survives its own goal compl
 				["goal:" + key.goalId],
 			).sources,
 		]);
-		expect(sources.some((ref) => ref.startsWith("agency-record:"))).toBe(true);
-		expect(sources.some((ref) => ref.startsWith("memory-input:"))).toBe(true);
-		const id = await f.store.write((db) => {
+		await f.store.write((db) => {
 			const selected = f.goals.applyDecisionInTransaction(
 				db,
 				access,
@@ -141,56 +139,31 @@ test("a report carries current Memory provenance and survives its own goal compl
 					},
 				],
 			})!;
-			f.goals.setGoalScopeControlInTransaction(db, access, PROFILE_SCOPE, {
-				allUntilMs: null,
-				speechUntilMs: time + 60_000,
-			});
 			const done = f.goals.completeInTransaction(db, access, key, {
 				expectedVersion: checked.progressVersion,
 				current: () => true,
 				text: "Completed with evidence.",
 			});
 			if (done.status !== "applied") throw new Error("fixture_goal_complete");
-			return done.resultRef;
 		});
-		await delivery.recover();
-		expect(
-			f.store.read((db) => f.goals.pendingGoalReportsInTransaction(db)),
-		).toHaveLength(1);
-		now += 60_000;
-		const message = "agency-goal-report:" + id;
-		delivery.start();
-		await f.store.write((db) =>
-			db.run("CREATE TABLE unrelated_commits(sequence INTEGER)"),
-		);
-		// Unrelated commits throughout the due period must not postpone the reserved timer.
-		for (let n = 0; n < 16; n++) {
-			now += 100;
-			await f.store.write((db) =>
-				db.query("INSERT INTO unrelated_commits VALUES (?)").run(n),
-			);
-			await Bun.sleep(100);
-		}
-		expect(
-			f.store.read(
-				(db) => f.conversation.sourceInTransaction(db, message).state,
-			),
-		).toBe("available");
-		await delivery.recover();
-		expect(
-			f.store.read(
-				(db) => f.conversation.sourceInTransaction(db, message).state,
-			),
-		).toBe("available");
-		const provenance = f.store.read((db) =>
-			input.readMessageInTransaction(db, message),
-		)!;
-		expect(provenance.sources).toContain("memory:" + item.id);
-		expect(
-			f.store.read(
-				(db) => f.goals.goalReportsInTransaction(db, access)[0]?.state,
-			),
-		).toBe("delivered");
+		const views = () => f.store.read((db) => work.viewsInTransaction(db));
+		expect(views()).toMatchObject([
+			{
+				goalId: key.goalId,
+				revision: key.goalRevision,
+				conversationId: "c1",
+				question: null,
+				report: {
+					text: "Completed with evidence.",
+					checked: ["Observed"],
+					sources: expect.arrayContaining([expect.stringContaining("memory")]),
+				},
+			},
+		]);
+		// Nothing is written to the conversation: the agent tells the report as its assignment's.
+		expect(f.conversation.get("c1").messages.map(({ role }) => role)).toEqual([
+			"user",
+		]);
 		f.memory.registerForgetPurge((db, purge) => {
 			f.goals.forgetGoalInputsInTransaction(db, access, {
 				goalIds: [],
@@ -204,62 +177,81 @@ test("a report carries current Memory provenance and survives its own goal compl
 			itemIds: [item.id],
 			messageIds: [],
 		});
-		expect(
-			f.store.read((db) => input.isCurrentInTransaction(db, provenance)),
-		).toBe(false);
-		expect(
-			f.store.read((db) => f.goals.goalReportsInTransaction(db, access)),
-		).toEqual([]);
-		await delivery.recover();
+		await work.recover();
+		expect(views()).toEqual([]);
 		expect(
 			f.store.read((db) => f.goals.pendingGoalReportsInTransaction(db)),
 		).toEqual([]);
 	} finally {
-		await delivery.close();
 		await f.close();
 	}
 });
 
-test("an unaddressed report remains in the ledger without scheduling empty delivery writes", async () => {
+test("a report the agency adopted is not shown again", async () => {
 	const f = await fixture();
-	let writes = 0;
-	const delivery = createGoalReportDelivery({
-		store: {
-			...f.store,
-			write(operation) {
-				writes++;
-				return f.store.write(operation);
-			},
-		},
-		goals: {
-			...f.goals,
-			pendingGoalReportsInTransaction: () => [
-				{
-					version: 1,
-					id: "old-report",
-					goalId: "old-goal",
-					principal: access.principal,
-					goalRevision: 1,
-					completedRevision: 2,
-					ledgerScope: PROFILE_SCOPE,
-					deliveryConversationId: null,
-					text: "台帳から閲覧できます。",
-					criteria: [],
-					evidence: [],
-					evidenceDigest: "proof",
-				},
-			],
-		},
+	const work = createGoalWork({
+		store: f.store,
+		goals: f.goals,
 		conversation: f.conversation,
-		referenceInputs: f.memory.referenceInputs,
-		blocked: f.memory.isBlockedInTransaction,
+		blocked: () => false,
+		reply: () => {
+			throw new Error("fixture_goal_reply_unused");
+		},
 	});
 	try {
-		delivery.start();
-		await Bun.sleep(1_100);
-		expect(writes).toBe(0);
+		const key = await f.register(1, "c1");
+		await f.store.write((db) => {
+			const selected = f.goals.applyDecisionInTransaction(
+				db,
+				access,
+				key,
+				{
+					kind: "verify",
+					contextId: "context",
+					progressVersion: 1,
+					criterionIds: ["root"],
+					reason: "present",
+					review: null,
+					checks: [
+						{ criterionId: "root", checkRef: "check", evidenceRefs: [] },
+					],
+				},
+				{ nowMs: time, contextId: "context", current: () => true },
+			);
+			if (selected.status !== "applied") throw new Error("fixture");
+			const checked = f.goals.recordGoalChecksInTransaction(db, access, key, {
+				expectedVersion: selected.progress.progressVersion,
+				current: () => true,
+				checks: [
+					{
+						criterionId: "root",
+						checkRef: "check",
+						passed: true,
+						evidence: {
+							ref: "proof",
+							version: "v1",
+							digest: "proof",
+							summary: "Observed",
+							sources: [],
+						},
+					},
+				],
+			})!;
+			f.goals.completeInTransaction(db, access, key, {
+				expectedVersion: checked.progressVersion,
+				current: () => true,
+				text: "Done.",
+			});
+		});
+		const [view] = f.store.read((db) => work.viewsInTransaction(db));
+		await f.store.write((db) => work.reportedInTransaction(db, view!));
+		expect(f.store.read((db) => work.viewsInTransaction(db))).toEqual([]);
+		expect(
+			f.store.read(
+				(db) => f.goals.goalReportsInTransaction(db, access)[0]?.state,
+			),
+		).toBe("delivered");
 	} finally {
-		await delivery.close();
 		await f.close();
 	}
 });

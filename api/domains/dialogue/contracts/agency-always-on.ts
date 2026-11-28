@@ -72,6 +72,11 @@ export type AgendaResearchTicket = {
 	references?: ExecutionReference[];
 	/** An assignment's other `delegate` fields, as they were given. */
 	details?: AssignmentDetails;
+	/**
+	 * A registered goal the agent reports on as its assignment: no work is started for it (the goal runs on its
+	 * own); its progress, question and report are read from the goal.
+	 */
+	goal?: { goalId: string; revision: number };
 };
 
 /**
@@ -159,6 +164,12 @@ const snapshotSchema = z.strictObject({
 			assignment: z.literal(true).optional(),
 			references: z.array(executionReference).optional(),
 			details: assignmentDetails.optional(),
+			goal: z
+				.strictObject({
+					goalId: z.string().min(1),
+					revision: z.number().int().positive(),
+				})
+				.optional(),
 		}),
 	),
 	researchRefusals: z

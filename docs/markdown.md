@@ -40,7 +40,7 @@ Artifactの「ファイル一覧」と「編集」を切り替えて使う。一
 
 ## 接続契約と機能発見
 
-確定仕様は [LARMからの引継ぎ](../spec/reference/larm-document-library-handoff-2026-11-07.md)、実装設計は [対応設計](../spec/markdown-library-api-design-2026-11-07.md)。引継時点の拡張実装revisionは `f860294ba28d7e45990732fe343fbe230f1a973f`、本番未配備。
+確定仕様は [LARMからの引継ぎ](../spec/reference/larm-document-library-handoff-2026-11-07.md)、実装設計は [対応設計](../spec/.archived/markdown-library-api-design-2026-11-07.md)。引継時点の拡張実装revisionは `f860294ba28d7e45990732fe343fbe230f1a973f`、本番未配備。
 
 2026-11-09にLARMの拡張配備を確認した。検証専用データでEumenesからの単件・一括管理、配下の移動・コピー・削除、実画面の移動と削除確認を受け入れた。Eumenes再起動後には、ドラッグ移動と、編集中の文書への一覧フォーカスも実画面で確認した。[本番受入記録](../spec/verification/markdown-library-live-2026-11-09/README.md)
 

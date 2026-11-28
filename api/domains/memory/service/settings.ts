@@ -8,7 +8,7 @@ import { readInputBudget, readSettings, writeSettings } from "../repository";
 import type { ContextWindowStore } from "./context-window";
 import type { createLedger } from "./ledger";
 
-/** The host settings: the on/off switch and the input budget (spec/memory-recall-implementation-2026-11-23.md section 5). */
+/** The host settings: the on/off switch and the input budget (spec/.archived/memory-recall-implementation-2026-11-23.md section 5). */
 export function createMemorySettings(deps: {
 	health: { healthy: boolean };
 	windows: ContextWindowStore;

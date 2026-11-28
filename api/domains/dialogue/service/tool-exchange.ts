@@ -11,7 +11,7 @@ import { jstNowLine } from "./input-text";
 
 /**
  * The tools whose calls and normalized results stay in the working conversation epoch until compaction
- * (`spec/conversation-cache-compaction-and-history-design-2026-11-22.md`, §3).
+ * (`spec/.todo/conversation-cache-compaction-and-history-design-2026-11-22.md`, §3).
  */
 const AGENDA_TOOLS = new Set<string>([
 	START_PREPARATION,

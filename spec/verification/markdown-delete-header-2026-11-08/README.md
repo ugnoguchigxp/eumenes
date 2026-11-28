@@ -1,6 +1,6 @@
 # Markdownヘッダーの削除アイコン
 
-2026-11-08。利用者指定「追加、取込と同列に削除ボタン」に対応。[表示設計](../../markdown-file-browser-ui-design-2026-11-07.md)、[利用方法](../../../docs/markdown.md)。
+2026-11-08。利用者指定「追加、取込と同列に削除ボタン」に対応。[表示設計](../../.archived/markdown-file-browser-ui-design-2026-11-07.md)、[利用方法](../../../docs/markdown.md)。
 
 既存DeleteButtonのiconOnlyとLibraryActionDialogを再利用し、ヘッダーに集約した。一覧では既存チェック選択を共有し、編集では現在文書の保存済みmetadataを使う。単件は文書ETag、複数選択はlibrary ETagを使い、後者が無ければ要求を作らない。namespace/path/一覧ETagの変更と作業用文書の表示で古い選択を消す。確認を開いた対象は固定し、未保存入力の保護、明示破棄、キャンセル、結果不明の確認を維持した。
 

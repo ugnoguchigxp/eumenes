@@ -94,7 +94,7 @@ const jstDayStart = (ms: number) =>
 	new Date(Date.parse(`${jstDay(ms)}T00:00:00+09:00`)).toISOString();
 
 /**
- * The steward's activity in a conversation (spec/memory-activity-indicator-design-2026-10-25.md): what runs now,
+ * The steward's activity in a conversation (spec/.archived/memory-activity-indicator-design-2026-10-25.md): what runs now,
  * what failed last, and the diagnostic text of those failures (IDs and fixed codes only).
  */
 export function createActivity(

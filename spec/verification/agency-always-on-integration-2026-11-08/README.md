@@ -60,4 +60,4 @@ manifest・採用patch・checksum・lockfile・導入済み配布物を照合し
 2. **P6: 標準verifyの全体合格。** inventoryに入る保存コピー、制作担当fixtureの契約不一致、担当外の整形を各所有箇所で解消した後に再実行する。今回の期待値を弱めて合格させない。
 3. **P7: 稼働反映・実モデル・実機器。** 保存済み設定での実性能・能動性・費用・Live容量、利用者Webでの自然な準備共有、静穏希望への応答、実機器3往復を確認する。稼働サーバー操作・設定切替・実プロバイダー呼出しは未実施。音声MVPの完成は宣言しない。
 
-[実装計画](../../agency-always-on-integration-plan-2026-11-08.md) / [契約と検証の対応](contract-matrix.md) / [機械可読結果](results.json) / [着手前hash](baseline-source-hashes.json) / [対象差分のhash](owned-source-hashes.json)
+[実装計画](../../.todo/agency-always-on-integration-plan-2026-11-08.md) / [契約と検証の対応](contract-matrix.md) / [機械可読結果](results.json) / [着手前hash](baseline-source-hashes.json) / [対象差分のhash](owned-source-hashes.json)

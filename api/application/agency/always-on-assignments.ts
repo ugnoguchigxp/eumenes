@@ -2,7 +2,9 @@ import { z } from "zod";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
 import { workRoot } from "./always-on-flow";
+import type { AgendaResearchTicket } from "../../domains/dialogue";
 import type { AgendaScope } from "./always-on-scope";
+import { GOAL_ASSIGNEE } from "./goal-assignments";
 import type { AgencyHostDeps } from "./host-types";
 
 /** The reply's tool for the work the user asked toolchains for (the agent's `assignments`). */
@@ -61,6 +63,13 @@ export async function controlAssignment(input: {
 	if (!item) return { content: "refused: assignment_not_found" };
 	if (item.status !== "open" && item.status !== "doing")
 		return { content: "refused: assignment_ended" };
+	if (item.delegatedTo === GOAL_ASSIGNEE)
+		return controlGoal({
+			...input,
+			parsed,
+			item,
+			ticket: c.tickets.find((t) => t.itemId === item.id && t.goal),
+		});
 	const ticket = c.tickets.find((t) => t.itemId === item.id && t.assignment);
 	const state = deps.state;
 	if (!state) return { content: "refused: agency_unavailable" };
@@ -130,4 +139,72 @@ export async function controlAssignment(input: {
 				? `answered: ${item.delegatedTo}に回答を渡した`
 				: `amended: ${item.delegatedTo}に変更を渡した`,
 	};
+}
+
+/**
+ * A registered goal reported as the agent's assignment: the user's answer, change or call-off goes to the goal (its
+ * question answered, its words revised, the goal withdrawn), in the user's words of `messageId`.
+ */
+async function controlGoal(input: {
+	deps: AgencyHostDeps;
+	c: AgendaScope;
+	parsed: z.infer<typeof args>;
+	item: { id: string; text: string; question?: string | null };
+	/** Absent while the agent has not issued the item yet (or after a restart, until it does). */
+	ticket: AgendaResearchTicket | undefined;
+	messageId: string | undefined;
+	at: number;
+	save(): Promise<boolean>;
+}): Promise<{ content: string }> {
+	const { deps, c, parsed, item, ticket } = input;
+	const work = deps.goalWork;
+	if (!work) return { content: "refused: agency_unavailable" };
+	if (!input.messageId) return { content: "refused: utterance_required" };
+	if (parsed.action !== "cancel" && !parsed.text)
+		return { content: "refused: text_required" };
+	// The goal is the ticket's; before the agent issued the item, the one its words name in this conversation.
+	const view = deps.store
+		.read((db) => work.viewsInTransaction(db))
+		.find((candidate) =>
+			ticket?.goal
+				? candidate.goalId === ticket.goal.goalId &&
+					candidate.revision === ticket.goal.revision
+				: candidate.conversationId === c.id &&
+					candidate.text.trim() === item.text.trim(),
+		);
+	if (!view) return { content: "refused: assignment_ended" };
+	// The answer is to the question the user was asked: one the goal no longer asks is not answered by it.
+	if (
+		parsed.action === "answer" &&
+		(!view.question || view.question.prompt !== item.question)
+	)
+		return { content: "refused: goal_question_not_current" };
+	let content: string;
+	try {
+		content = await work.control({
+			conversationId: c.id,
+			view,
+			action: parsed.action,
+			text: parsed.text ?? null,
+			messageId: input.messageId,
+			signal: c.closed.signal,
+		});
+	} catch (error) {
+		return { content: `refused: ${toErrorCode(error, "control_failed")}` };
+	}
+	if (parsed.action === "cancel") {
+		c.tickets = c.tickets.filter((t) => t !== ticket);
+		if (ticket) c.observed.delete(ticket.id);
+		c.agent.assignmentEnded({
+			itemId: item.id,
+			at: input.at,
+			status: "dropped",
+		});
+		c.revision++;
+		let saved = false;
+		for (let attempt = 0; attempt < 5 && !saved; attempt++)
+			saved = await input.save();
+	} else if (ticket) c.observed.delete(ticket.id);
+	c.kick();
+	return { content };
 }

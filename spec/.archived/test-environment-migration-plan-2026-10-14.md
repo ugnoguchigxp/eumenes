@@ -12,7 +12,7 @@ Eumenesの既存の `verify` を拡張し、正しい入力に対して必要な
 
 **変更からの自動選択は条件付きの後続段階とする。** 現在のdomain所有パスだけでは実際の変更の多くを扱えない。application・共通Web・DesignSystemの対応を含めた小さな分析で効果を見積もってから、表示専用の計画生成へ進む。
 
-Replay、不変条件の試験、JiTTestは[テスト品質改善の後続案](../test-quality-improvement-options-2026-10-15.md)へ分離した。本計画の完了に、それらの導入を要求しない。
+Replay、不変条件の試験、JiTTestは[テスト品質改善の後続案](../.todo/test-quality-improvement-options-2026-10-15.md)へ分離した。本計画の完了に、それらの導入を要求しない。
 
 ## 1 目的と成功の定義
 
@@ -267,7 +267,7 @@ Opusへの再評価では、次の依頼文を使用できる。
 - [domain一覧](../../docs/domains.md)
 - [自然言語UI受入](../../docs/nl-acceptance.md)
 - [既存の配布物整合試験](../../api/application/vendor.test.ts)
-- [Replay 不変条件 JiTTestの後続案](../test-quality-improvement-options-2026-10-15.md)
+- [Replay 不変条件 JiTTestの後続案](../.todo/test-quality-improvement-options-2026-10-15.md)
 
 
 ## 11 初回実装の記録（2026-10-15）
@@ -291,4 +291,4 @@ A・Bを実装し、Mの棚卸し・履歴集計・工程時間記録と比較�
 
 継続中に会話の機能選択と回答生成を分けた変更との試験前提の差も見つかった。利用者の明示承認により、機能を呼ばず文章だけが返った場合は既存のLLM再確認を1回行い、選ばれた操作を既存の契約検査・実行機構へ戻す。再確認にも直近の利用者発話を使い、過去のassistantの完了主張を操作根拠にしない。通常回答の場合は選択→再確認→回答の3呼出しになり、速度改善とは扱わない。画像の順序・確認質問・履歴の分離・一度だけの楽曲生成を保ったまま試験を整合させる。
 
-初回の全件検証は `scripts/codex-tasks-p0/orphan.test.ts` の完全停止要件で失敗した。その後、利用者がmacOSでのSDK完了待ち・管理対象終了を採用したため、[SDK計画の改訂7](../codex-sdk-task-artifact-plan-2026-10-14.md)に従って受入契約を更新する。同じ孤児再現を除外せず「全停止を偽って証明しない」試験として維持し、正常終了待ちと強制停止を実SDK＋CLI fixtureで追加検証する。全daemon子孫の停止は未対応であり、修正成功とは扱わない。変更後の全件結果は[終了処理の検証記録](../verification/test-environment-migration-2026-10-15/sdk-lifecycle.md)に保存し、過去の失敗レポートは保持する。
+初回の全件検証は `scripts/codex-tasks-p0/orphan.test.ts` の完全停止要件で失敗した。その後、利用者がmacOSでのSDK完了待ち・管理対象終了を採用したため、[SDK計画の改訂7](../.todo/codex-sdk-task-artifact-plan-2026-10-14.md)に従って受入契約を更新する。同じ孤児再現を除外せず「全停止を偽って証明しない」試験として維持し、正常終了待ちと強制停止を実SDK＋CLI fixtureで追加検証する。全daemon子孫の停止は未対応であり、修正成功とは扱わない。変更後の全件結果は[終了処理の検証記録](../verification/test-environment-migration-2026-10-15/sdk-lifecycle.md)に保存し、過去の失敗レポートは保持する。

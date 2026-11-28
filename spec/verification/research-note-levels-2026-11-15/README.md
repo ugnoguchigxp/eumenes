@@ -1,6 +1,6 @@
 # 調査メモ3段階・全文保存の検証（2026-11-15）
 
-設計は[承認済み設計](../../research-note-levels-and-okf-design-2026-11-15.md)。YAMLは利用者の追加指示により実装しない。保存物は再利用用Markdownであり、OKF仕様準拠とは扱わない。
+設計は[承認済み設計](../../.archived/research-note-levels-and-okf-design-2026-11-15.md)。YAMLは利用者の追加指示により実装しない。保存物は再利用用Markdownであり、OKF仕様準拠とは扱わない。
 
 ## 実装
 

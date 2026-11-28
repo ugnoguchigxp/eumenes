@@ -1,6 +1,6 @@
 # Claude Code 作業依頼の土台（P2a）検証記録（2026-10-14）
 
-計画: [Kanban × Claude Code 計画（改訂4）](../../kanban-claude-code-plan-2026-10-14.md) の P2a。terminals の作業依頼表・送信器・フックの結び付け・会話の復元・git 制限の起動設定と、会話からの直接依頼（`claude-code.request`）の載せ替え。実装・利用手順は [Claude Code 画面](../../../docs/terminals.md)。
+計画: [Kanban × Claude Code 計画（改訂4）](../../.todo/kanban-claude-code-plan-2026-10-14.md) の P2a。terminals の作業依頼表・送信器・フックの結び付け・会話の復元・git 制限の起動設定と、会話からの直接依頼（`claude-code.request`）の載せ替え。実装・利用手順は [Claude Code 画面](../../../docs/terminals.md)。
 
 fixture（固定試験）・実機（実 `claude`）の結果を分けて記録する。実 LARM の通し確認は未実施。
 

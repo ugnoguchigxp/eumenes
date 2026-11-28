@@ -27,6 +27,11 @@ import type { ScopePatch } from "./always-on-checkpoint";
 import type { AgendaNote, AgendaResearchTicket } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
 import { assignmentViews, workObservation } from "./work-observation";
+import {
+	goalNote,
+	offerGoalItems,
+	type GoalWorkView,
+} from "./goal-assignments";
 
 const log = getLogger("agency");
 
@@ -323,6 +328,14 @@ export async function collectAgendaResults(host: ResultHost) {
 	const { deps, now, conv, saveInTransaction, collected } = host;
 	if (!deps.state) return;
 	observeAssignments(host);
+	// A failure of the goals' side does not hold back the results of the user's other assignments.
+	try {
+		await collectGoalWork(host);
+	} catch (error) {
+		log.warn("agency.goal_work_failed", {
+			reason: toErrorCode(error, "goal_work_failed"),
+		});
+	}
 	const results = deps.store.read((db) => deps.state!.resultsInTransaction(db));
 	if (!results.length) return;
 	type Adopted = {
@@ -453,6 +466,124 @@ export async function collectAgendaResults(host: ResultHost) {
 	collected();
 }
 
+/** A changed progress or question of an assignment is told to the agent; a question that came or went wakes it. */
+function tellObserved(
+	c: AgendaScope,
+	ticket: AgendaResearchTicket,
+	at: number,
+	progress: string | null,
+	question: string | null,
+) {
+	const key = JSON.stringify([progress, question]);
+	const before = c.observed.get(ticket.id);
+	if (before === key) return;
+	c.observed.set(ticket.id, key);
+	c.agent.assignmentObserved({
+		ticketId: ticket.agentTicketId,
+		at,
+		progress,
+		question,
+	});
+	// Progress alone is shown to the next reply as it is; a question that came or went is the agent's to act on.
+	const asked = before === undefined ? null : JSON.parse(before)[1];
+	if (asked === question) return;
+	c.revision++;
+	c.kick();
+}
+
+/**
+ * Registered goals as the agent's assignments: each goal of a conversation becomes its item, what the goal shows now
+ * is told to the agent like an assignee's, and a met goal's report becomes a work-report note (once, with the goal's
+ * report marked told in the same transaction). A goal that went (withdrawn, revised, forgotten) ends its item quietly.
+ */
+async function collectGoalWork(host: ResultHost) {
+	const { deps, convs, now } = host;
+	const work = deps.goalWork;
+	if (!work) return;
+	const views = deps.store.read((db) => work.viewsInTransaction(db));
+	const viewOf = (c: AgendaScope, ticket: AgendaResearchTicket) =>
+		views.find(
+			({ goalId, revision, conversationId }) =>
+				conversationId === c.id &&
+				goalId === ticket.goal!.goalId &&
+				revision === ticket.goal!.revision,
+		);
+	const reported: {
+		c: AgendaScope;
+		ticket: AgendaResearchTicket;
+		view: GoalWorkView;
+	}[] = [];
+	for (const c of convs.values()) {
+		if (offerGoalItems(c, views, now())) {
+			c.revision++;
+			c.kick();
+		}
+		for (const ticket of c.tickets.filter(({ goal }) => goal)) {
+			const view = viewOf(c, ticket);
+			if (!view) {
+				c.tickets = c.tickets.filter((t) => t !== ticket);
+				c.observed.delete(ticket.id);
+				c.agent.assignmentEnded({
+					itemId: ticket.itemId,
+					at: now(),
+					status: "dropped",
+				});
+				c.revision++;
+				c.kick();
+			} else if (view.report) reported.push({ c, ticket, view });
+			else
+				tellObserved(
+					c,
+					ticket,
+					now(),
+					view.progress,
+					view.question?.prompt ?? null,
+				);
+		}
+	}
+	if (!reported.length) return;
+	const adopted: {
+		c: AgendaScope;
+		ticket: AgendaResearchTicket;
+		note: AgendaNote;
+	}[] = [];
+	const patch = new Map<string, ScopePatch>();
+	await deps.store.write((db) => {
+		adopted.length = 0;
+		patch.clear();
+		for (const { c, ticket, view } of reported) {
+			let note = goalNote(ticket, view, now());
+			if (deps.noteDocuments)
+				note = withNoteDocument(note, startNoteDocument(deps, db, c.id, note));
+			work.reportedInTransaction(db, view);
+			const p = patch.get(c.id) ?? {
+				tickets: [...c.tickets],
+				notes: [...c.notes],
+			};
+			patch.set(c.id, p);
+			p.tickets = p.tickets.filter((t) => t.id !== ticket.id);
+			p.notes = keepNotes([...p.notes, note]);
+			adopted.push({ c, ticket, note });
+		}
+		host.saveInTransaction(db, patch);
+	});
+	for (const { c, ticket, note } of adopted) {
+		c.tickets = c.tickets.filter((t) => t.id !== ticket.id);
+		c.observed.delete(ticket.id);
+		holdNote(c, keepNotes([...c.notes, note]));
+		const at = now();
+		think(c, at, "researched", `${note.title}: ${note.summary}`);
+		c.agent.researchReturned({
+			ticketId: ticket.agentTicketId,
+			at,
+			status: "succeeded",
+			note: noteRef(note),
+		});
+		c.revision++;
+		c.kick();
+	}
+}
+
 /**
  * What each running assignment's owner shows now (its progress, a question for the user), told to the agent when it
  * changes: the agent's state shows it to every reply, and a new question is the agent's to ask.
@@ -472,21 +603,6 @@ function observeAssignments(host: ResultHost) {
 			})),
 		),
 	);
-	for (const { c, ticket, progress, question } of seen) {
-		const key = JSON.stringify([progress, question]);
-		const before = c.observed.get(ticket.id);
-		if (before === key) continue;
-		c.observed.set(ticket.id, key);
-		c.agent.assignmentObserved({
-			ticketId: ticket.agentTicketId,
-			at: now(),
-			progress,
-			question,
-		});
-		// Progress alone is shown to the next reply as it is; a question that came or went is the agent's to act on.
-		const asked = before === undefined ? null : JSON.parse(before)[1];
-		if (asked === question) continue;
-		c.revision++;
-		c.kick();
-	}
+	for (const { c, ticket, progress, question } of seen)
+		tellObserved(c, ticket, now(), progress, question);
 }

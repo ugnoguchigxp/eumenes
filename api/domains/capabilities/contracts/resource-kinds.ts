@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * The resource kinds a capabilities item registers (spec/resource-uri-implementation-plan-2026-10-25.md §2.2).
+ * The resource kinds a capabilities item registers (spec/.todo/resource-uri-implementation-plan-2026-10-25.md §2.2).
  * Capabilities is tier 0 and cannot import the resources domain, so the action names and the resolved shape
  * are declared here; the resolved `ResourceKindData` is plain data shaped like the resources domain's `ResourceKind`.
  */

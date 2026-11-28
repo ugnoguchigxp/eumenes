@@ -8,7 +8,7 @@ Memory registration, forget/restore lifecycle, the names-only context hint, `wor
 
 Owner maintenance can remove selected claims and collected documents from ordinary use without deleting or retracting their contents. `GET /api/world/maintenance` includes stored usable material and its `active` flag. `POST /api/world/maintenance/preview` and `/apply` take `{ active, refs: [{ kind, id, revision }] }`, where kind is `claim` or `document` and revision is a string. Scope comes only from the authenticated host. All refs must match, or the whole transaction is refused. Restore uses the same operation with `active: true`; unavailable sources and withdrawn documents cannot be restored by it.
 
-`world/0013-working-set` stores only the selected IDs and revisions. Ordinary claim snapshots, document lists/search/reads and report adoption exclude them. Owner inventory uses a separate host read, with the same authorization and source checks. A curation result prepared before this selection changed is stale. No model-facing archive tool or automatic classifier is added. This is separate from forgetting, and retains original bytes and origin. See [the approved cleanup scope](../../../spec/memory-world-default-set-proposal-2026-11-07.md).
+`world/0013-working-set` stores only the selected IDs and revisions. Ordinary claim snapshots, document lists/search/reads and report adoption exclude them. Owner inventory uses a separate host read, with the same authorization and source checks. A curation result prepared before this selection changed is stale. No model-facing archive tool or automatic classifier is added. This is separate from forgetting, and retains original bytes and origin. See [the approved cleanup scope](../../../spec/.archived/memory-world-default-set-proposal-2026-11-07.md).
 
 `server.ts` builds World through `assembleServerWorld` (`api/application/server-world.ts`)
 and `createWorldAssembly`. The mode is decided once at backend startup by
@@ -66,7 +66,7 @@ original evidence refs (including byte ranges and quote digests). Research Sourc
 value, predicate, condition and valid time; they are fitted as whole items to the existing byte bounds.
 A bounded or omitted read stays partial. The updated package also supports exact assertion refs in
 the public Slice API; this is covered on the host store without adding a model-facing selector or
-changing the names-only conversation hint. See [the integration record](../../../spec/world-evidence-integration-2026-10-31.md)
+changing the names-only conversation hint. See [the integration record](../../../spec/.archived/world-evidence-integration-2026-10-31.md)
 for fixed-fixture evidence and the remaining model-acceptance gate.
 
 ### Consumers

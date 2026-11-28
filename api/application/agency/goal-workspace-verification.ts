@@ -72,13 +72,24 @@ async function complete<T extends z.ZodType>(
 	return schema.parse(result.value) as z.output<T>;
 }
 
-function candidates(tests: string[], context: string) {
-	const words = new Set(context.toLowerCase().match(/[a-z][a-z0-9-]{3,}/gu));
+/** Words of identifiers and paths, also split where camelCase joins them: avatarBackgroundColor → avatar, background, color. */
+const words = (text: string) =>
+	new Set(
+		(text.match(/[A-Za-z][A-Za-z0-9-]{3,}/gu) ?? []).flatMap((word) => [
+			word.toLowerCase(),
+			...(word.match(/[A-Z]?[a-z0-9]{4,}/gu) ?? []).map((part) =>
+				part.toLowerCase(),
+			),
+		]),
+	);
+
+export function testCandidates(tests: string[], context: string) {
+	const known = words(context);
+	const generic = new Set(["test", "spec", "tests"]);
 	const rank = (path: string) =>
 		(context.includes(path) ? 20 : 0) +
-		(path.toLowerCase().match(/[a-z][a-z0-9-]{3,}/gu) ?? []).filter((word) =>
-			words.has(word),
-		).length;
+		[...words(path)].filter((word) => !generic.has(word) && known.has(word))
+			.length;
 	return tests
 		.map((path) => ({ path, score: rank(path) }))
 		.sort((left, right) => right.score - left.score)
@@ -205,7 +216,11 @@ export function createGoalWorkspaceVerification(ports: {
 				),
 			]),
 		];
-		const findings = target.attempts
+		// Results that reported something come first; a timed-out try says nothing about the code.
+		const reported = target.attempts.filter(
+			({ outcome }) => outcome === "succeeded" || outcome === "partial",
+		);
+		const findings = (reported.length ? reported : target.attempts)
 			.slice(-3)
 			.map(({ observed }) => observed?.slice(0, 1400) ?? "");
 		return async (signal) => {
@@ -224,7 +239,7 @@ export function createGoalWorkspaceVerification(ports: {
 							criterion: criterion.text,
 							findings,
 							materials: materials.map(({ summary }) => summary.slice(0, 500)),
-							testFiles: candidates(
+							testFiles: testCandidates(
 								testFiles,
 								JSON.stringify([
 									criterion.text,

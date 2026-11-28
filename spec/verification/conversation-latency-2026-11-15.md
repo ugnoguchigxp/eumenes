@@ -10,10 +10,10 @@
 
 根拠となる既存設計:
 
-- [Agency の返答契約 §11.2](../agency-conversation-agent-design-2026-10-25.md): ツール選択と同じ出力の本文を前置きとして保持する。
-- [音声ストリーミング](../tts-sql-stall-and-streaming-design-2026-10-27.md): 生成中の本文を音声へ渡し、取消時に未再生分を破棄する。保存・SSEは採用済み本文を公開する。
-- [Router の選択方式](../router-package-integration-2026-11-04.md): 会話前の選択と会話からの外部検索。
-- [Memory 結合の受入](../memory-integration-2026-11-05.md): 推論量 low / medium で読取りツールを選ばない失敗があり、cloud は high を使う。
+- [Agency の返答契約 §11.2](../.todo/agency-conversation-agent-design-2026-10-25.md): ツール選択と同じ出力の本文を前置きとして保持する。
+- [音声ストリーミング](../.archived/tts-sql-stall-and-streaming-design-2026-10-27.md): 生成中の本文を音声へ渡し、取消時に未再生分を破棄する。保存・SSEは採用済み本文を公開する。
+- [Router の選択方式](../.archived/router-package-integration-2026-11-04.md): 会話前の選択と会話からの外部検索。
+- [Memory 結合の受入](../.archived/memory-integration-2026-11-05.md): 推論量 low / medium で読取りツールを選ばない失敗があり、cloud は high を使う。
 
 ## 修正前の観測
 
@@ -109,7 +109,7 @@ Codex 接続はツール選択時の `reply` を空文字へ置き換え、指�
 
 ### 未実装の提案: 文字も生成中から表示する
 
-追記（2026-11-15）: この提案は後続の依頼で利用者が承認した。[具体化した設計](../conversation-text-stream-design-2026-11-15.md)と[実装・検証記録](conversation-text-stream-2026-11-15.md)へ引き継いだ。以下は提案時点の記録。
+追記（2026-11-15）: この提案は後続の依頼で利用者が承認した。[具体化した設計](../.archived/conversation-text-stream-design-2026-11-15.md)と[実装・検証記録](conversation-text-stream-2026-11-15.md)へ引き継いだ。以下は提案時点の記録。
 
 現行 `progress.ts` は採用済み本文だけをSSEへ返すため、文字画面は回答全体の確定を待つ。既存のメモリ上の本文ストリームから、生成IDと連番を持つ暫定本文を画面へ渡す案がある。完了時に採用済み本文へ置換し、取消・失効・失敗時は暫定本文を除去する。再接続で古い生成を復活させず、未採用本文を会話履歴へ保存しない。権限・削除・取消との競合試験と、消音したブラウザーE2Eが必要。
 

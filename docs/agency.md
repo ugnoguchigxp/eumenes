@@ -1,6 +1,6 @@
 # 会話エージェント（agency）と agenda の思考表示
 
-会話の返事と自分からの話しかけは `eumenes-agency` が担う。背景で動くのは always-on の agenda エージェント（計画・調べもの・自分からの発話。ログは `agency.llm_call` の `purpose: "think"`）だけで、設定の切替はない。設計と決定は [spec/agency-agenda-integration-2026-11-11.md](../spec/agency-agenda-integration-2026-11-11.md)。記憶系の作り直し（即時の層と睡眠の層）の設計は [spec/memory-architecture-redesign-2026-11-22.md](../spec/memory-architecture-redesign-2026-11-22.md)。
+会話の返事と自分からの話しかけは `eumenes-agency` が担う。背景で動くのは always-on の agenda エージェント（計画・調べもの・自分からの発話。ログは `agency.llm_call` の `purpose: "think"`）だけで、設定の切替はない。設計と決定は [spec/agency-agenda-integration-2026-11-11.md](../spec/.todo/agency-agenda-integration-2026-11-11.md)。記憶系の作り直し（即時の層と睡眠の層）の設計は [spec/memory-architecture-redesign-2026-11-22.md](../spec/.todo/memory-architecture-redesign-2026-11-22.md)。
 
 ## 設定変更と host の作り直し
 
@@ -10,7 +10,7 @@ host が設定から読むのは、`agency.thinkResourceId`・`agency.speechInte
 
 返事の入力には、末尾の利用者のメッセージの先頭に `## Agency` の節として Agency の状態（計画・関心・メモ・調べもの・問いの候補・静かな時間など）を入れる。現在時刻は `## State` の「今:」だけに置く。記憶は会話エージェントが必要なときに `read_memory` で読み、その返事で読んだ記憶だけを返事の出典として記録する（忘却で消えると、その返事の記録も無効になる）。`## State` には期限の近い予定と、枠に入った目標が載る（[会話の入力](dialogue.md#state-の予定目標の欄)）。登録済みの目標が0件のときは、目標の処理を動かさず、返事には `register_goal` とその規則だけを出す。
 
-背景の呼出し（`plan`・下書き・`askCheck`）には、host が読む時に渡す。記憶に当たる記録（`known`。呼出しごとに plan 12・下書き 6・問いの確認 6 件まで）、計画・目標・未解決の矛盾・質問の台帳（`records`）、それらの印（`marks`）の 3 つで、除外・抑制されたものは渡さない（[設計書](../spec/memory-architecture-redesign-2026-11-22.md) §5.4）。
+背景の呼出し（`plan`・下書き・`askCheck`）には、host が読む時に渡す。記憶に当たる記録（`known`。呼出しごとに plan 12・下書き 6・問いの確認 6 件まで）、計画・目標・未解決の矛盾・質問の台帳（`records`）、それらの印（`marks`）の 3 つで、除外・抑制されたものは渡さない（[設計書](../spec/.todo/memory-architecture-redesign-2026-11-22.md) §5.4）。
 
 - 印の「見直し中」は、変更フィードの訂正（`correction`）で置き換わった旧版を、今の項目（と計画）が根拠に持っているものだけに付ける。項目が現行の版で作り直されれば外れる。見直し中の項目は、返事にも話しかけにも使わない。「抑制」は、事実に付いたものと話題の語の両方で、Agency の話題選びと問いかけから外す。印の読みは、続けて選ぶ 1 回の間は 1 度だけで、読めなければその呼出しを失敗にする（読めなかったものを通さない）。
 - 意味の変わらない版の更新（統合。`consolidation`）は、旧版を参照する項目を新版へ付け替える（保存する checkpoint も新版の参照になる）。訂正は見直し中、忘却は落とす。
@@ -23,7 +23,7 @@ host が設定から読むのは、`agency.thinkResourceId`・`agency.speechInte
 
 | 項目 | 内容 |
 | --- | --- |
-| 書くもの | 期限付きの計画（L3）と質問の台帳だけ。事実・好み・候補・記憶との食い違いは書かない（記憶は記憶担当の curate-memory が会話から直接書く。[設計](../spec/memory-direct-curation-2026-11-23.md)）。パッケージが事実・候補・食い違いを返しても捨てる |
+| 書くもの | 期限付きの計画（L3）と質問の台帳だけ。事実・好み・候補・記憶との食い違いは書かない（記憶は記憶担当の curate-memory が会話から直接書く。[設計](../spec/.archived/memory-direct-curation-2026-11-23.md)）。パッケージが事実・候補・食い違いを返しても捨てる |
 | 読まない発言 | 記憶の操作を頼んだ発言（覚えて・忘れて・訂正して・話題にしないで・取り消して。会話の `memory.request` の行為が根拠にした発言）。入力にも記憶の根拠にもしない（パッケージの指示文にも 1 行ある） |
 | 処理済みの位置 | 会話ごとに、読み終えた出来事の位置を持つ。記録を書く transaction の中で checkpoint の行と一緒に保存する。設定の変更・epoch の変化で checkpoint が取り消されても、位置は残す（会話の読み位置であって、Agency の記憶ではない）。位置が無い会話は、末尾の 16 件の手前から読み始める（読み飛ばさない） |
 | 読む範囲 | 位置より後の発言を 1 回に 8 件・16 KiB まで。超えた分は次のパスで読む。忘却・取り下げ済みの発言は読まない。入力には、関係する計画と質問の台帳を短い参照で付け、重複を書かせない（記憶の一覧は付けない） |
@@ -44,7 +44,7 @@ host が設定から読むのは、`agency.thinkResourceId`・`agency.speechInte
 
 ## 自分から話す間合い（agenda）
 
-agent の規則は参照ホスト（agenda の CLI）と同じ。Eumenes が違うのは、言葉を画面が読み上げることと、サーバーの再起動が会話の区切りではないことで、その差は host が埋める（[設計](../spec/agency-agenda-integration-2026-11-11.md)の「参照ホスト（CLI）との挙動差の解消」）。
+agent の規則は参照ホスト（agenda の CLI）と同じ。Eumenes が違うのは、言葉を画面が読み上げることと、サーバーの再起動が会話の区切りではないことで、その差は host が埋める（[設計](../spec/.todo/agency-agenda-integration-2026-11-11.md)の「参照ホスト（CLI）との挙動差の解消」）。
 
 | こと | 規則 |
 | --- | --- |
@@ -58,7 +58,7 @@ agent の規則は参照ホスト（agenda の CLI）と同じ。Eumenes が違�
 
 ## 会話の返事から担当に頼む
 
-担当への依頼は、会話エージェントが判断する（雑談か実行依頼か）。依頼なら、返事が自分で担当を探して頼める。「作りましょうか？」に「はい、お願いします」と答えた回のように、利用者の言葉だけでは依頼の中身が分からない場合も同じ道を通る（[設計](../spec/conversation-first-toolchain-2026-11-21.md)）。
+担当への依頼は、会話エージェントが判断する（雑談か実行依頼か）。依頼なら、返事が自分で担当を探して頼める。「作りましょうか？」に「はい、お願いします」と答えた回のように、利用者の言葉だけでは依頼の中身が分からない場合も同じ道を通る（[設計](../spec/.archived/conversation-first-toolchain-2026-11-21.md)）。
 
 | 道具 | すること |
 | --- | --- |
@@ -106,7 +106,7 @@ agenda が動いている会話では、考えたこと（足した・落とし�
 | 後から開く | メッセージのチップ、または Markdown の一覧の `notes/`（Docling に保存できたもの。表示を頼んでいないメモもここにある） |
 | 失敗 | 保存できなかったときはメッセージを出さない。ログは `agency.show_note_failed` |
 
-設計は [agency-agenda-integration](../spec/agency-agenda-integration-2026-11-11.md) の「メモは Markdown 文書として表示する」と「メモを Markdown に蓄積する」。
+設計は [agency-agenda-integration](../spec/.todo/agency-agenda-integration-2026-11-11.md) の「メモは Markdown 文書として表示する」と「メモを Markdown に蓄積する」。
 
 ## 調べものと担当への依頼
 
@@ -121,6 +121,6 @@ agenda が動いている会話では、考えたこと（足した・落とし�
 
 ## 登録目標の思考（待機中の1周）
 
-登録目標は、利用者が席を外して Eumenes が待機中のとき（前景の会話・音声認識・読み上げが止まって2分）に、1周ずつ考えて進む。1周は思考プラン `api/application/agency/goal-thought-plan.json` の段（振り返りと継続の判断 → 残りの計画の確認 → 方法と影響の見積もり）で、[eumenes-thought-plan](../vendor/thought-plan/manifest.json) が実行し、各段の入出力を SQLite の台帳（`thought_plan_*`）に残す。計画どおりに進んでいる間・決めた手の実行待ち・結果の検証では推論しない。失敗のあとは必ず振り返りから考え直し、同じ能力で続けて失敗した手は選び直さない。止まった目標は1時間から倍々（上限24時間）で見直し、止まり続ければ待つか本人に一点を聞く。設計と実装の対応は[再設計書](../spec/goal-idle-deliberation-redesign-2026-11-26.md) §9。
+登録目標は、利用者が席を外して Eumenes が待機中のとき（前景の会話・音声認識・読み上げが止まって2分）に進む。1回の自発行動（登録・更新・本人の回答から、完了・質問まで）は、[eumenes-thought-plan](../vendor/thought-plan/manifest.json) 同梱の思考プラン `goal-pursuit` の1回の実行で、最初の段から最後の段まで1つのモデルのセッションで考える。最初のラウンドで、前回どこまで何をやったか、達成しているか・続けられるかを判断し、達成の手順と影響を見積もる。手順はホストが推論なしで1手ずつ実行し、結果が期待どおりなら次の手へ進む。外れたとき（失敗・部分的な成功・検査の不合格、手順を使い切っても未達）だけ、同じセッションの次のラウンドに結果を渡して振り返り、手順を立て直す。思考は1回の自発行動で4回まで（セッションも4ラウンドまで）で、使い切ったらモデルを呼ばずに元の会話へ一度だけ知らせ、本人の回答で新しいセッションを始める。各段の入出力とラウンドは SQLite の台帳（`thought_plan_*`）に残る。完了した目標はそれ以上考えない。目標の進み具合・質問・完了は、担当への依頼と同じく `assignments` の項目（担当「登録目標」）と作業報告メモで会話エージェントに届き、エージェントが自分の言葉で伝える（[assignments.md](assignments.md)）。設計は[1つのセッションで進める](../spec/.archived/goal-thought-session-2026-11-26.md)と[思考の上限](../spec/.archived/goal-thought-budget-2026-11-26.md)。
 
-登録目標の開発作業は、通常の Claude Code と同じ checkout で進める。作業場所やファイルごとの指定は不要。実装が揃っていれば検証へ進み、改修した場合も元の達成条件を別の実行で確認する。実行枠の空きや停止の状態は目標の詳細に残す。 [通常の Claude Code 実行の設計](../spec/registered-goal-claude-execution-2026-11-26.md)
+登録目標の開発作業は、通常の Claude Code と同じ checkout で進める。作業場所やファイルごとの指定は不要。実装が揃っていれば検証へ進み、改修した場合も元の達成条件を別の実行で確認する。実行枠の空きや停止の状態は目標の詳細に残す。 [通常の Claude Code 実行の設計](../spec/.todo/registered-goal-claude-execution-2026-11-26.md)

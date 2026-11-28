@@ -3,7 +3,7 @@
 - 日付: 2026-10-25
 - 状態: 仕様・実装済み（2026-10-25、§13）。fixture 検証済み。live は §12 の1・2のみ確認、実機器は未実施
 - 位置付け: [context-window-spec-2026-10-24.md](context-window-spec-2026-10-24.md) のうち、§5（形式と構造）、§8〜§10 の区画の置き場所と表記、§12.1・§12.4（書換えの時期と読み直す範囲）、§14 の自動想起、§15（先読み）を本書で置き換える。予算（§7）、再構成の条件（§12.3）、忘却・即時の変更（§13）、採用の検査はそのまま使う
-- 前提: 会話エージェントは agency（[agency-conversation-agent-design-2026-10-25.md](agency-conversation-agent-design-2026-10-25.md)）。LLM は設定された一つ。主会話の LARM 接続は保たれる（[larm-connection-cache-design-2026-10-25.md](larm-connection-cache-design-2026-10-25.md)）
+- 前提: 会話エージェントは agency（[agency-conversation-agent-design-2026-10-25.md](.todo/agency-conversation-agent-design-2026-10-25.md)）。LLM は設定された一つ。主会話の LARM 接続は保たれる（[larm-connection-cache-design-2026-10-25.md](.todo/larm-connection-cache-design-2026-10-25.md)）
 
 ## 1 全体の構成
 

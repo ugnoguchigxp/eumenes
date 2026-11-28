@@ -1,7 +1,7 @@
 import type { StateItem } from "eumenes-memory/sqlite";
 
 /**
- * How a query matches a record (spec/memory-recall-implementation-2026-11-23.md section 2.1). Natural Japanese has no
+ * How a query matches a record (spec/.archived/memory-recall-implementation-2026-11-23.md section 2.1). Natural Japanese has no
  * word breaks, so a word is rated by how many of its character pairs the record's words hold. Pure functions of the
  * two texts: the same inputs give the same score.
  */

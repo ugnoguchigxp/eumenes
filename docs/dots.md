@@ -341,7 +341,7 @@ bun test api/domains/dots api/application/work/dots-tasks.test.ts api/applicatio
 
 本文は完了・取消・失効から7日、本文なしのreceiptと再送照合は30日保持する。元の発言の削除・訂正は派生する要約と後続snapshotにも反映する。返答は会話にも「dots の返答」、要約は「dots の要約」と出所を付けて保存する。
 
-メッセージ用手順は `skill:dots.messaging@1`。既存委任の `dots.orchestrate@1`・`@2` は自動変更しない。現在の実装・固定検証と、全体gate・実dots・サーバー反映の未完了事項は[設計書§15](../spec/dots-messaging-design-and-plan-2026-10-25.md#15-実装と検証の記録)を参照する。
+メッセージ用手順は `skill:dots.messaging@1`。既存委任の `dots.orchestrate@1`・`@2` は自動変更しない。現在の実装・固定検証と、全体gate・実dots・サーバー反映の未完了事項は[設計書§15](../spec/.archived/dots-messaging-design-and-plan-2026-10-25.md#15-実装と検証の記録)を参照する。
 
 
 ## 保存した設定からの作業委任
@@ -356,4 +356,4 @@ bun test api/domains/dots api/application/work/dots-tasks.test.ts api/applicatio
 
 追加の常設受付サーバーは用意しない。Eumenes稼働中にdotsへ依頼を渡し、受領済みの仕事と結果はChatGPT側で確認する。PC停止中に使えないローカル資源は使えると扱わない。Eumenesへの起動時自動回収は未実装なので、同期スイッチは置かない。後から要約を戻す方式は別途確認する。未実装の自動回収を前提にして、現行の報告期限や取消検査を緩めない。
 
-以前の追加サーバー計画とその準備コードは撤回・削除した。`dots/0006-remove-unused-work-settings` は不要な設定だけを除き、他の設定とrevisionを保持する。[現行設計](../spec/dots-permanent-delegation-design-and-plan-2026-10-25.md)と[削除・検証記録](../spec/dots-no-relay-cleanup-2026-10-25.md)を参照する。
+以前の追加サーバー計画とその準備コードは撤回・削除した。`dots/0006-remove-unused-work-settings` は不要な設定だけを除き、他の設定とrevisionを保持する。[現行設計](../spec/.archived/dots-permanent-delegation-design-and-plan-2026-10-25.md)と[削除・検証記録](../spec/.archived/dots-no-relay-cleanup-2026-10-25.md)を参照する。

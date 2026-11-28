@@ -22,7 +22,7 @@
 - 質問の同一性を所有者・目標ID・版・条件集合・不足理由で判定する。進行版やジョブIDの更新で同じ質問を増やさず、旧IDと本文を再利用する。回答済み・解消済みの質問は復活させない。
 - 認証済み`GET /api/agency/goals`を既存`list_goals`の読取投影へ接続した。会話の生成・選択・attend、LLM呼出し、writer、キュー投入を行わない。未認証拒否と反復GETによる更新0件を固定試験で確認した。
 
-契約と受入の詳細は[承認済み設計差分](../../registered-goal-capability-selection-2026-11-23.md)に記載した。
+契約と受入の詳細は[承認済み設計差分](../../.todo/registered-goal-capability-selection-2026-11-23.md)に記載した。
 
 ## 配布・設定・検証
 

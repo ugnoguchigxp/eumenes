@@ -1,6 +1,6 @@
 # 会話エージェントの計測準備と Codex の追記検証
 
-2026-11-21。コードの比較基準は `04a9c7ab`。[性能改善計画](../conversation-agent-performance-improvement-plan-2026-11-21.md)の工程0の計測準備と工程1を実施した。
+2026-11-21。コードの比較基準は `04a9c7ab`。[性能改善計画](../.todo/conversation-agent-performance-improvement-plan-2026-11-21.md)の工程0の計測準備と工程1を実施した。
 
 ## 保存済みログの再集計
 
@@ -36,13 +36,13 @@ bun scripts/conversation-performance.ts --since 2026-11-21T08:17:49.629 --until 
 | 標準 `verify` | `createCodexProcesses` の336行が既存の上限300行を超え、`size-budget` で停止 |
 | リポジトリの型検査 | 変更範囲外に3件。旧 Memory schema の依存と `ConversationContextPanel` テストの型 |
 
-実際の Codex 接続でのキャッシュ率と初回応答の比較は、API と保存済み接続を使える時点で既存の受入条件に沿って行う。[キャッシュの受入条件](../codex-input-cache-structure-2026-11-12.md#6-検証)
+実際の Codex 接続でのキャッシュ率と初回応答の比較は、API と保存済み接続を使える時点で既存の受入条件に沿って行う。[キャッシュの受入条件](../.archived/codex-input-cache-structure-2026-11-12.md#6-検証)
 
 ## 標準検証の再開と区間計測（2026-11-21）
 
 基準は `7d026dc0`。単一の子プロセスの起動、初期化、JSON-RPC を `spawnProcess` に切り出し、プールの `createCodexProcesses` は336行から113行になった。再利用・スレッドの巻き戻し・取消・終了を含む Codex の既存29件は分割前後とも通過した。
 
-独立した Router を撤去した後の[会話主導の担当選択](../conversation-first-toolchain-2026-11-21.md)に沿って、入力の組み立て、添付と作業結果の更新、担当検索とツール、回答の採用を計測した。Codex のプロセス・スレッド準備、経路別の入力予算処理、LARM の要求準備、推論層に届く初回本文も `performance.stage` で確認できる。集計には `stageTimingMs`、`larmTimingMs` と初回本文からジョブ完了までの区間を追加した。[計測手順](../../docs/performance.md#保存済みログから会話の基準値を取る)
+独立した Router を撤去した後の[会話主導の担当選択](../.archived/conversation-first-toolchain-2026-11-21.md)に沿って、入力の組み立て、添付と作業結果の更新、担当検索とツール、回答の採用を計測した。Codex のプロセス・スレッド準備、経路別の入力予算処理、LARM の要求準備、推論層に届く初回本文も `performance.stage` で確認できる。集計には `stageTimingMs`、`larmTimingMs` と初回本文からジョブ完了までの区間を追加した。[計測手順](../../docs/performance.md#保存済みログから会話の基準値を取る)
 
 | 検証 | 結果 |
 | --- | --- |

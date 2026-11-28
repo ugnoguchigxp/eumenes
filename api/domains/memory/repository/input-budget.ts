@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { MemoryInputBudget } from "../contracts/recall";
 
 /**
- * The input budget lives in the host settings row (spec/memory-recall-implementation-2026-11-23.md section 5): the
+ * The input budget lives in the host settings row (spec/.archived/memory-recall-implementation-2026-11-23.md section 5): the
  * values are these column defaults and what the settings API saves, never constants of the code. Appended after the
  * others; frozen once deployed. The `recall_*` columns stay in the table (the per-turn `## Recall` section was
  * removed): nothing reads or writes them.

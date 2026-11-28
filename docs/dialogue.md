@@ -1,6 +1,6 @@
 # 会話の入力と記憶ツール（dialogue）
 
-会話の入力の仕様は [conversation-input-spec](../spec/conversation-input-spec-2026-10-26.md)、記憶系の作り直しは [memory-architecture-redesign](../spec/memory-architecture-redesign-2026-11-22.md)。本書は、記憶系の作り直しで dialogue に入った即時の層の配線だけを書く。記憶側の公開操作は [memory.md](memory.md#即時の層明示の依頼の反映)、Agency 側は [agency.md](agency.md)。
+会話の入力の仕様は [conversation-input-spec](../spec/conversation-input-spec-2026-10-26.md)、記憶系の作り直しは [memory-architecture-redesign](../spec/.todo/memory-architecture-redesign-2026-11-22.md)。本書は、記憶系の作り直しで dialogue に入った即時の層の配線だけを書く。記憶側の公開操作は [memory.md](memory.md#即時の層明示の依頼の反映)、Agency 側は [agency.md](agency.md)。
 
 ## `memory` ツール
 

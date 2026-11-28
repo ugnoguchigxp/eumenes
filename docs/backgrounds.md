@@ -20,7 +20,7 @@
 
 近接では原型を明るくし、拡散点も見える大きさと不透明度にする。Eumenesの画面出力へ色空間変換を適用し、静的な表示光量を1.5倍に調整した。これは活動の10%上限やhealth判定を変えるものではない。
 
-状態色は正常=濃い水色、準備済みサービスの待機=白、注意/準備中=黄、悪化=赤、無接続=紫。星・詳細・ラベルで共通の表示規則を使い、正常時の多色変化や利用率による暖色化は行わない。利用率から故障を作らない。モデルの固定座標・穏やかな光の波と活動輝度の上限は維持する。Ready・Warm ready・Cold等は取得した準備状態を別に表示し、設定だけでWarm readyや正常を作らない。詳細は[準備状態と状態色](../spec/spatial-readiness-and-status-colors-2026-10-31.md)。
+状態色は正常=濃い水色、準備済みサービスの待機=白、注意/準備中=黄、悪化=赤、無接続=紫。星・詳細・ラベルで共通の表示規則を使い、正常時の多色変化や利用率による暖色化は行わない。利用率から故障を作らない。モデルの固定座標・穏やかな光の波と活動輝度の上限は維持する。Ready・Warm ready・Cold等は取得した準備状態を別に表示し、設定だけでWarm readyや正常を作らない。詳細は[準備状態と状態色](../spec/.archived/spatial-readiness-and-status-colors-2026-10-31.md)。
 
 設定画面は `settings.display@10`。旧revisionは不変。廃止したモデル内自転の保存項目は旧文書互換として受理するが、描画では使わず新版画面には表示しない。
 
@@ -28,11 +28,11 @@
 
 `SpatialBackground.items` が唯一の観測入力。取得側の `web/src/domains/monitoring` が既存 `GET /api/monitoring/snapshot` をSpatial表示中だけ1分ごとに読み、実体IDと状態を渡す。Sceneやモデルはhealthを判断せず、観測値がないことと0を区別する。APIの旧shape=`network`だけはWeb取得境界で新モデル=`backend`へ対応付ける（既存APIの互換接続）。
 
-取得から1分以内の表示・フォーカス・通信復帰では前回結果を共有し、ローカルのCPU・Memory・SSD計測もbackendで1分間共有する。監視の通常取得はログに出さず、状態変化は残す。音声側のLARM準備確認も同じ接続・同じ状態の重複ログを出さない（[頻度の修正](../spec/spatial-polling-frequency-fix-2026-10-31.md)）。
+取得から1分以内の表示・フォーカス・通信復帰では前回結果を共有し、ローカルのCPU・Memory・SSD計測もbackendで1分間共有する。監視の通常取得はログに出さず、状態変化は残す。音声側のLARM準備確認も同じ接続・同じ状態の重複ログを出さない（[頻度の修正](../spec/.archived/spatial-polling-frequency-fix-2026-10-31.md)）。
 
-CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用する。LARM4体は既存のControl認証を使う読み取り専用監視APIへ接続する。個別の計測時刻・取得品質・履歴欠落を保持する。約1分の定期確認の間は、取得時に有効だった前回値を表示し、10秒の期限を超えただけでは画面の警告・停止を行わない。受信前から古い計測、取得失敗・世代不一致・3分以上の更新停止は区別する。時刻は1回だけ表示し、履歴は確認済み範囲と欠落を分ける。サービスは実行記録と設定経路を表示し、API取得時刻を疎通時刻とは呼ばない。詳細は[表示修正](../spec/spatial-status-display-fix-2026-10-31.md)。外部連携は引き続き未計測で、他サービスの状態を流用しない。言語・画像・楽曲の監視はAPIに残るが新しい形へ勝手に割り当てない。LARM本番APIの公開と実画面確認は[接続設計の記録](../spec/larm-spatial-monitoring-integration-design-2026-10-18.md)を参照する。
+CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用する。LARM4体は既存のControl認証を使う読み取り専用監視APIへ接続する。個別の計測時刻・取得品質・履歴欠落を保持する。約1分の定期確認の間は、取得時に有効だった前回値を表示し、10秒の期限を超えただけでは画面の警告・停止を行わない。受信前から古い計測、取得失敗・世代不一致・3分以上の更新停止は区別する。時刻は1回だけ表示し、履歴は確認済み範囲と欠落を分ける。サービスは実行記録と設定経路を表示し、API取得時刻を疎通時刻とは呼ばない。詳細は[表示修正](../spec/.archived/spatial-status-display-fix-2026-10-31.md)。外部連携は引き続き未計測で、他サービスの状態を流用しない。言語・画像・楽曲の監視はAPIに残るが新しい形へ勝手に割り当てない。LARM本番APIの公開と実画面確認は[接続設計の記録](../spec/.todo/larm-spatial-monitoring-integration-design-2026-10-18.md)を参照する。
 
-接続断（disconnected）は紫、faultは赤で区別し、無接続の光の時間変化は止める。LARMのあるLANの外ではLARM経由の用途とLARM4体の不達をunknown（`larm_off_lan`）にする（[§12](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)）。取得失敗時はBackendをdisconnected、他をstaleへ。明示的な状態プレビューだけはデモ値を優先する。デモは実測として保存・表示しない。既存の監視判定の正本は[実測接続の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)。
+接続断（disconnected）は紫、faultは赤で区別し、無接続の光の時間変化は止める。LARMのあるLANの外ではLARM経由の用途とLARM4体の不達をunknown（`larm_off_lan`）にする（[§12](../spec/.archived/spatial-monitoring-eumenes-design-2026-10-18.md)）。取得失敗時はBackendをdisconnected、他をstaleへ。明示的な状態プレビューだけはデモ値を優先する。デモは実測として保存・表示しない。既存の監視判定の正本は[実測接続の設計](../spec/.archived/spatial-monitoring-eumenes-design-2026-10-18.md)。
 
 ## 描画と資源管理
 
@@ -40,4 +40,4 @@ CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用
 
 WebGL初期化・context loss・描画失敗ではGPU資源を解放し、HTML状態一覧と再表示ボタンを出す。HTMLからの選択、Sceneの有限カメラ遷移、reduced-motion即時切替も維持する。会話画面に状態を見るボタンやモデルドロップダウンを追加しない。
 
-出所と全資産hashは`models/MODEL-SOURCE.md`と`source-hashes.json`。採用設計・確認範囲は[置換計画](../spec/spatial-monitor-galaxy-adoption-2026-10-18.md)。長時間GPU測定とLARM4体の実機計測対応を、この描画移植の完了と混同しない。
+出所と全資産hashは`models/MODEL-SOURCE.md`と`source-hashes.json`。採用設計・確認範囲は[置換計画](../spec/.archived/spatial-monitor-galaxy-adoption-2026-10-18.md)。長時間GPU測定とLARM4体の実機計測対応を、この描画移植の完了と混同しない。

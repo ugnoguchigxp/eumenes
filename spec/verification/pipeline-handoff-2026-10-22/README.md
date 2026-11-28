@@ -2,7 +2,7 @@
 
 追加レビューと改善を完了した。[最新のレビュー結果・検証記録](review.md)を参照。以下は初回実装時の記録。
 
-2026-10-22。利用者が承認した[小型モーダルと別選択画面の設計](../../design/pipeline-studio-2026-10-22/handoff-modal-design.md)を実装した。
+2026-10-22。利用者が承認した[小型モーダルと別選択画面の設計](../../.archived/design/pipeline-studio-2026-10-22/handoff-modal-design.md)を実装した。
 
 ## 実装した動作
 

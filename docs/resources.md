@@ -1,6 +1,6 @@
 # リソースURI（`eumenes://`）
 
-Eumenes が作ったもの（生成物）・会話の出来事を、`eumenes://<種類>/<ID>` の URI で指す。URI を解決すると、その種類の画面で開く・指し示す・再生する・読むことができる。設計と実装の記録は [resource-uri-implementation-plan-2026-10-25.md](../spec/resource-uri-implementation-plan-2026-10-25.md)。
+Eumenes が作ったもの（生成物）・会話の出来事を、`eumenes://<種類>/<ID>` の URI で指す。URI を解決すると、その種類の画面で開く・指し示す・再生する・読むことができる。設計と実装の記録は [resource-uri-implementation-plan-2026-10-25.md](../spec/.todo/resource-uri-implementation-plan-2026-10-25.md)。
 
 ## 書式
 

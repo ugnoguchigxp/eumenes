@@ -446,7 +446,7 @@ type ErrorReportInput = {
 	logMissing?: boolean;
 };
 
-/** The fixed-format diagnostic text of a failed run; see spec/run-error-report-design-2026-10-17.md. */
+/** The fixed-format diagnostic text of a failed run; see spec/.todo/run-error-report-design-2026-10-17.md. */
 function formatErrorReport(input: ErrorReportInput): string {
 	const { run, kind, tasks, entries } = input;
 	const root = rootOf(tasks);

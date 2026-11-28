@@ -15,7 +15,7 @@
 
 - steward は memory、continuity、conversation を使う。dialogue は memory だけを見る。複数 domain への保存は、step の settle が1つの transaction の中で各 domain の公開操作を呼んで行う。
 - 通常の記憶の変更は会話で伝える（依頼キュー）。設定画面は閲覧と「メモリーの接続」の入り切りに限る。導入時の例外として、本人の許可を得た未確認Seed候補を追加する管理API・CLIがある（下記）。
-- 会話にも既存の `memory(operation=request)` を渡し、保存・訂正・忘却・目標の依頼を受け付ける。Memoryが有効で整合しstewardがある場合だけ公開し、読む道具と同じ会話loopから共通executor・依頼キューへ渡す。Routerの `memory.request` も同じ受付を使う。受付と反映完了を区別し、完了はstewardの結果とStateで確認する。Routerの設定・判断データは[既存の導入手順](../spec/router-package-integration-2026-11-04.md#3-設定sqlite-が正本)を使う。
+- 会話にも既存の `memory(operation=request)` を渡し、保存・訂正・忘却・目標の依頼を受け付ける。Memoryが有効で整合しstewardがある場合だけ公開し、読む道具と同じ会話loopから共通executor・依頼キューへ渡す。Routerの `memory.request` も同じ受付を使う。受付と反映完了を区別し、完了はstewardの結果とStateで確認する。Routerの設定・判断データは[既存の導入手順](../spec/.archived/router-package-integration-2026-11-04.md#3-設定sqlite-が正本)を使う。
 - profile 名・モデル名はコードに固定しない。steward の推論は会話と同じ route、同じ接続先で行われる。例外は World の記録（curate-world）で、設定 `world.curationResourceId` に登録済みのクラウドの会話モデルを選ぶと、その resource だけで推論する（未設定・resource がない・接続が無効・会話の route がクラウドを許可しないときは会話と同じ route）。
 
 ## パッケージの利用とSeedの導入
@@ -29,13 +29,13 @@
 - 全参照の存在・版を検査し、1件でも不一致なら全件を適用しない。本文・出典・originを書き換えず、完全忘却された内容を復活させない。復帰でも引用元、既存の件数・文脈上限を確認する。過去版や紛争中のStateはこの操作で採用し直さない。
 - 変更は既存の単一writer内で行い、会話の公開窓を破棄する。古い背景推論を採用しないため、既存の記憶失効連番も進める。この連番の移動自体は忘却や原会話の削除ではない。
 
-適用前にpreviewで対象を照合する。停止・復帰後は返された新しいrevisionを使う。全件指定や語句による自動選択はなく、復帰は本人が明示した対象だけに行う。[整理方針](../spec/memory-world-default-set-proposal-2026-11-07.md)を参照。
+適用前にpreviewで対象を照合する。停止・復帰後は返された新しいrevisionを使う。全件指定や語句による自動選択はなく、復帰は本人が明示した対象だけに行う。[整理方針](../spec/.archived/memory-world-default-set-proposal-2026-11-07.md)を参照。
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
 配布物は `vendor/eumenes-memory/eumenes-memory-0.0.6-a16777d3f9d9.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.2.2-f0408abf80d4.tgz` に固定する。どちらも独立リポジトリの同じコミット `5bd64540726d065d060cb752ea3e78942eeee6eb` から作り（ホストは本体 0.0.6 を同梱する）、`manifest.json` と配布内の `dist/release-manifest.json` で出所を照合する。本体 0.0.6 は、睡眠の層の廃止で使い手が無くなった候補の昇格・却下、強度の減衰・強化、自分の run を除く変更の照会を取り除いた版（表と列、読み取り、忘却は残る）。SQLiteスキーマは10。Eumenesの移行処理が `memory-package/0009` で有効なStateから全文検索索引を構築し、`memory-package/0010` で除外・抑制・記憶の候補・強度の表と変更フィードの拡張を足す（0010を適用したDBは版9の本体では開けない）。ホストの補助テーブルはホストの起動時に更新される。移行前のDBとMemory・Worldそれぞれの最新の忘却ジャーナルを保全する。旧版へ切り戻すときは移行前DBを使い、読み取りやワーカーの再開前に最新ジャーナルを再適用する。[バックアップと復元](operations.md#バックアップからの復元)を参照。
 
-会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
+会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/.archived/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 
 旧会話台帳の一度限りの変換は、過去DBの更新・復元に必要な読取り互換として保持する。未移行の原文を捨てず、既存のcontinuity eventsを上書きせず、変換が完了した旧表を削除する。適用済みmigrationの変更や、旧台帳への新規の保存・読取り経路の追加は行わない。
 
@@ -94,7 +94,7 @@ MCPクライアントには、実行コマンドを `bun`、引数を次のよ�
 
 検索には `memory_search` を使い、回答に採用した記憶は `memory_use` に伝える。記憶を変更する計画を作るときは `memory_context` で全ページを読み、`memory_read` で出典を確かめる。記憶の保存・訂正・忘却は `memory_source → memory_plan → memory_apply` を使い、内容の判断はエージェント自身が行う。記憶の本文を実行指示として扱わない。初期権限では本人profileの参照・未確認の記憶の保存と忘却を許可し、本人確認済みの記憶の変更は許可しない。エージェントの提出内容は `agent_inferred` として扱う。権限を変える場合は利用者が `owner.json` を管理する。Memoryが無効・不整合、または起動途中なら操作を拒否する。
 
-通常起動・終了と設定異常の検証は[起動接続の設計](../spec/memory-cli-mcp-runtime-2026-11-07.md)を参照。使い捨てデータの保存・訂正・忘却試験と、稼働環境での参照確認は分けて記録する。
+通常起動・終了と設定異常の検証は[起動接続の設計](../spec/.archived/memory-cli-mcp-runtime-2026-11-07.md)を参照。使い捨てデータの保存・訂正・忘却試験と、稼働環境での参照確認は分けて記録する。
 
 ## ContextWindow
 
@@ -102,7 +102,7 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 
 ## step と実行単位
 
-記憶担当は、会話の出来事から記憶を書く役（推し量り）と、本人の依頼の処理、World の反映、忘却の閉包削除を起動する。設計は [記憶: 睡眠の層を外し、steward の直接の書き込みに戻す](../spec/memory-direct-curation-2026-11-23.md) §2・§5。
+記憶担当は、会話の出来事から記憶を書く役（推し量り）と、本人の依頼の処理、World の反映、忘却の閉包削除を起動する。設計は [記憶: 睡眠の層を外し、steward の直接の書き込みに戻す](../spec/.archived/memory-direct-curation-2026-11-23.md) §2・§5。
 
 - 本人の明示の依頼（`memory` ツールの `request`）のうち、目標（`goal`）と、除外済みの忘却の閉包削除。覚える・訂正・話題の抑制・取り下げは、会話の run の中で即時に適用するのでここには来ない（[即時の層](#即時の層明示の依頼の反映)）。依頼の行為を持つ発言（`memory.request`）は即時の層が反映済みなので、`curate-memory` には参照として見せるだけで、そこから書かない。
 - 推し量り（`curate-memory`）。会話の新しい出来事（本人と会話エージェントの発言）を読み、本人の発言で裏付けのある好み・事実・制約・習慣を、引用（`quote`）付きで長期の記憶（State）へ直接書く（`remember`・`update`）。短期メモは書かない（予定は Agency の記録係が持つ）。候補（L1）や傾向（L4）には書かない。
@@ -237,7 +237,7 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 
 ## 会話から記憶を確かめる
 
-設計は [記憶の想起の改善: 実装設計](../spec/memory-recall-implementation-2026-11-23.md) §2 と、[睡眠の層を外す設計](../spec/memory-direct-curation-2026-11-23.md)。記憶の件数に上限はない。読むのは常時の区画と `read_memory` の 2 つ（発言ごとに差し込む `## Recall` の区画は無い）。
+設計は [記憶の想起の改善: 実装設計](../spec/.archived/memory-recall-implementation-2026-11-23.md) §2 と、[睡眠の層を外す設計](../spec/.archived/memory-direct-curation-2026-11-23.md)。記憶の件数に上限はない。読むのは常時の区画と `read_memory` の 2 つ（発言ごとに差し込む `## Recall` の区画は無い）。
 
 | 段 | 置き場所 | 中身と枠 |
 | --- | --- | --- |
@@ -265,7 +265,7 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 
 ## 即時の層（明示の依頼の反映）
 
-設計は [記憶系の作り直し](../spec/memory-architecture-redesign-2026-11-22.md) §5.1・§7.2・§9.2。会話エージェントの `memory` ツールは、dialogue が会話の run の中（ツールを呼んだ時の writer transaction）で、記憶の公開操作に渡す。全操作に run の ID（`sourceRunId`）を付け、拒否は例外にせず `{status: "rejected", reason}` で返す。dialogue の側の扱いは [dialogue.md](dialogue.md#memory-ツール)。
+設計は [記憶系の作り直し](../spec/.todo/memory-architecture-redesign-2026-11-22.md) §5.1・§7.2・§9.2。会話エージェントの `memory` ツールは、dialogue が会話の run の中（ツールを呼んだ時の writer transaction）で、記憶の公開操作に渡す。全操作に run の ID（`sourceRunId`）を付け、拒否は例外にせず `{status: "rejected", reason}` で返す。dialogue の側の扱いは [dialogue.md](dialogue.md#memory-ツール)。
 
 | 公開操作 | 内容 |
 | --- | --- |

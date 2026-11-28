@@ -2,9 +2,9 @@
 
 作成日: 2026-10-18
 
-状態: 置換え（2026-10-18）。専用Chromiumを管理する方式は、利用者の普段のBraveをPlaywright MCP Bridge経由で操作する方式に置き換えた。現行は[ブラウザのタブ操作ツールチェーン設計](../browser-tabs-toolchain-design-2026-10-18.md)。
+状態: 置換え（2026-10-18）。専用Chromiumを管理する方式は、利用者の普段のBraveをPlaywright MCP Bridge経由で操作する方式に置き換えた。現行は[ブラウザのタブ操作ツールチェーン設計](../.todo/browser-tabs-toolchain-design-2026-10-18.md)。
 
-関連: [登録と拡張の手順](../docs/toolchain-extension.md)、[検証手順](../docs/toolchain-extension-verification.md)、[サブエージェントの二つの型](subagent-task-and-session-agents-design-2026-10-18.md)、[LARM](../docs/larm.md)、[画像ライブラリー](../docs/images.md)、[Claude Code画面](../docs/terminals.md)。
+関連: [登録と拡張の手順](../../docs/toolchain-extension.md)、[検証手順](../../docs/toolchain-extension-verification.md)、[サブエージェントの二つの型](../.todo/subagent-task-and-session-agents-design-2026-10-18.md)、[LARM](../../docs/larm.md)、[画像ライブラリー](../../docs/images.md)、[Claude Code画面](../../docs/terminals.md)。
 
 ## 1 目的と決定事項
 
@@ -36,7 +36,7 @@
 | queueとinferenceの公開操作、サブエージェント設計§6 | prepare・execute・settle、期限・取消、receipt検証、単発型の出力・文脈・予算 | commandの多段実行と共通核の単発型への適用は未実装。§5.4の最小拡張を先に行う |
 | 既存の非同期domainと会話通知 | 受付を保存してジョブを進め、commit後に通常担当へ完了を知らせる | 受付成功をページ操作や撮影の完了として答えない |
 | sharp | PNGからWebPへの変換 | 既存依存は0.35.5。会話添付の正規化はJPEG/PNG等を対象とする別契約で、保存用WebPの経路へ流用しない |
-| LARMの画像ライブラリー | 画像一覧・詳細・取得・削除とControl認証 | `larm/service/image-library.ts`に外部画像の登録操作はない。3D・画像選択向けの[画像取込API提案](reference/larm-image-import-v1-proposal/README.txt)があるが未公開・未実装 |
+| LARMの画像ライブラリー | 画像一覧・詳細・取得・削除とControl認証 | `larm/service/image-library.ts`に外部画像の登録操作はない。3D・画像選択向けの[画像取込API提案](../reference/larm-image-import-v1-proposal/README.txt)があるが未公開・未実装 |
 | DesignSystemとOpenUI | 一覧・状態・プレビュー・ダウンロード、JSONからの画面構成 | ブラウザのタブ・実行状態を扱うsourceと操作を追加する |
 
 ページ操作は外部の状態を一手ずつ観測して進めるため、bundleだけでは実現できない。ブラウザの実体・参照・操作受付を所有するdomainと、Playwrightへの接続が必要である。一方、担当選択・推論通信・キュー・結果通知を別方式で作り直す必要はない。
@@ -175,7 +175,7 @@ command担当へ公開する操作は、`browser.task.start`・`browser.task.sta
 
 ### 5.4 単発型エージェント核との整合
 
-[サブエージェント設計§6](subagent-task-and-session-agents-design-2026-10-18.md#6-エージェント核)の単発型へ合わせる。
+[サブエージェント設計§6](../.todo/subagent-task-and-session-agents-design-2026-10-18.md#6-エージェント核)の単発型へ合わせる。
 
 | 項目 | 本ツールチェーンでの契約 |
 | --- | --- |
@@ -265,7 +265,7 @@ viewport・要素・ページ全体の予定実寸を**撮影前**に求め、�
 
 既存の一覧・取得・削除と同じLARM画像ライブラリーに、外部WebPを登録する操作を使う。保存済みControl接続先とbackend内の既存Bearerを使い、生成用catalogの探索・モデル起動・Provider claimは行わない。LARMに同等の公開APIがあればその契約を優先する。
 
-3D・画像選択向けに、LARMへの[画像取込API v1提案](reference/larm-image-import-v1-proposal/README.txt)（[OpenAPI案](reference/larm-image-import-v1-proposal/openapi.json)）が既にある。撮影画像のために別の登録endpointを提案せず、**同じ取込APIを使い、撮影に必要な差分だけをその提案への追加として出す**。いずれも未公開・未実装であり、パス・上限・再送規則はLARM側の仕様で確定する。
+3D・画像選択向けに、LARMへの[画像取込API v1提案](../reference/larm-image-import-v1-proposal/README.txt)（[OpenAPI案](../reference/larm-image-import-v1-proposal/openapi.json)）が既にある。撮影画像のために別の登録endpointを提案せず、**同じ取込APIを使い、撮影に必要な差分だけをその提案への追加として出す**。いずれも未公開・未実装であり、パス・上限・再送規則はLARM側の仕様で確定する。
 
 | 項目 | 既存の取込提案をそのまま使う部分 |
 | --- | --- |

@@ -183,6 +183,22 @@ function command(runner: keyof ReturnType<typeof groupTests>, files: string[]) {
 			"--reporter=verbose",
 			...files,
 		];
+	// The package's own script bundles its Vite config into node_modules, which the check may not write.
+	if (node && runner === "design-system")
+		return [
+			node,
+			"packages/design-system/node_modules/vitest/vitest.mjs",
+			"run",
+			"--root",
+			"packages/design-system",
+			"--project",
+			"unit",
+			"--configLoader",
+			"runner",
+			"--no-cache",
+			"--reporter=verbose",
+			...files.map((path) => path.replace(/^packages\/design-system\//, "")),
+		];
 	return testCommand(runner, files);
 }
 
@@ -199,7 +215,7 @@ export function testRunPassed(
 		if (bunHeader) bunFile = bunHeader[1];
 		else if (bunFile && line.startsWith("(pass) ")) passed.add(bunFile);
 		const vitest =
-			/^\s*✓ (.+?\.(?:test|spec)\.[cm]?[jt]sx?)(?: > | \([1-9]\d* tests?\))/u.exec(
+			/^\s*✓ +(?:[^\s/]+ {2})?(.+?\.(?:test|spec)\.[cm]?[jt]sx?)(?: > | \([1-9]\d* tests?\))/u.exec(
 				line,
 			);
 		if (vitest?.[1]) passed.add(vitest[1]);

@@ -1,6 +1,6 @@
 # Plate Markdown → LARM文書APIの検証
 
-2026-11-07。利用者が提示した `larm.docling-files.v1` を接続契約の正本とする。実装の設計は [接続設計](../../markdown-larm-documents-integration-2026-11-07.md)。Doclingの起動・停止・lease・activity操作は行っていない。サーバーの再起動は利用者が実施した。
+2026-11-07。利用者が提示した `larm.docling-files.v1` を接続契約の正本とする。実装の設計は [接続設計](../../.todo/markdown-larm-documents-integration-2026-11-07.md)。Doclingの起動・停止・lease・activity操作は行っていない。サーバーの再起動は利用者が実施した。
 
 ## 実装
 

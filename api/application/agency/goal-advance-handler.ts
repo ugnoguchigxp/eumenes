@@ -27,12 +27,14 @@ import {
 import {
 	cycleOf,
 	deliberateGoal,
-	seenDigest,
+	answeredRefs,
+	budgetOf,
 	stepOffered,
 	withCycle,
 	type Deliberation,
 	type GoalCycle,
 } from "./goal-deliberation";
+import { thoughtCounted } from "./goal-thought-budget";
 import type { GoalProgressPorts } from "./goal-progress";
 
 const log = getLogger("agency");
@@ -54,6 +56,7 @@ type Prepared =
 			snapshot: Snapshot;
 			cycle: GoalCycle;
 			verificationFailed: boolean;
+			answered: readonly string[];
 	  }
 	| { kind: "deferred"; untilMs: number }
 	| { kind: "design"; preparation: GoalDesignPreparation }
@@ -77,6 +80,7 @@ type GoalAdvanceOps = {
 		row: GoalProgress,
 		note: string,
 		jobId: string,
+		cycle?: Partial<GoalCycle>,
 	) => void;
 	retryReceipt: (db: Database, row: GoalProgress, jobId: string) => void;
 	scopeAllowed: (db: Database, row: GoalProgress) => boolean;
@@ -152,10 +156,27 @@ function prepareGoalAdvance(
 					snapshot: prepared,
 					cycle: cycleOf(row),
 					verificationFailed: row.state.problem === "verification_incomplete",
+					answered: answeredRefs(row),
 				},
 			}
 		: { status: "stale", reason: "goal_not_current" };
 }
+
+/** The goal's state with what a turn thought kept (its session and count), when its step is not taken. */
+function keepingThought(progress: GoalProgress, result: Result) {
+	const thought =
+		result.kind === "decide" ? result.deliberation.cycle : undefined;
+	return thought
+		? withCycle(progress.state, { ...cycleOf(progress), ...budgetOf(thought) })
+		: progress.state;
+}
+
+/** A turn whose run reached the model is not tried again by the queue: it counts once, and the goal waits. */
+const classify = (error: unknown) =>
+	error instanceof Error &&
+	(error.message === invalidGoalCriterionQuote || thoughtCounted(error.message))
+		? ("fail" as const)
+		: ("retry" as const);
 
 export function createGoalAdvanceHandler(
 	ports: GoalProgressPorts,
@@ -185,10 +206,7 @@ export function createGoalAdvanceHandler(
 		prepareInTransaction: (db, claim) =>
 			prepareGoalAdvance(ports, ops, db, claim),
 		execute: (input, { signal }) => executeGoalAdvance(ports, input, signal),
-		classify: (error) =>
-			error instanceof Error && error.message === invalidGoalCriterionQuote
-				? "fail"
-				: "retry",
+		classify,
 		settleInTransaction(db, claim, input, settled) {
 			const row = claimRow(db, claim.payload, claim.jobId);
 			if (!row) return "stale";
@@ -238,7 +256,7 @@ export function createGoalAdvanceHandler(
 					row,
 					(current) => ({
 						phase: current.phase,
-						state: current.state,
+						state: keepingThought(current, result),
 						dueAtMs: current.dueAtMs,
 					}),
 					claim.jobId,
@@ -331,17 +349,27 @@ export function createGoalAdvanceHandler(
 					!current ||
 					current.context.contextId !== input.snapshot.context.contextId
 				) {
+					// The goal moved on meanwhile: the step is not taken, but what was thought is kept.
 					advance(
 						db,
 						row,
-						(latest) => ({ phase: "ready", state: latest.state }),
+						(latest) => ({
+							phase: "ready",
+							state: keepingThought(latest, result),
+						}),
 						claim.jobId,
 					);
 					return "stale";
 				}
 				const deliberation = result.deliberation;
 				if (deliberation.kind === "pause") {
-					problem(db, row, deliberation.reason, claim.jobId);
+					problem(
+						db,
+						row,
+						deliberation.reason,
+						claim.jobId,
+						deliberation.cycle,
+					);
 					return "applied";
 				}
 				const step = deliberation.step;
@@ -393,11 +421,10 @@ export function createGoalAdvanceHandler(
 				if (accepted.status === "applied") {
 					// The rest of the chosen method waits for this step's result; a stop count starts again.
 					const cycle: GoalCycle = {
-						remaining: deliberation.remaining,
+						...cycleOf(row),
+						...deliberation.cycle,
 						pending: null,
 						parks: 0,
-						stalled: deliberation.stalled,
-						seen: seenDigest(current.context),
 					};
 					const kept = goals.transitionProgressInTransaction(
 						db,
@@ -421,7 +448,7 @@ export function createGoalAdvanceHandler(
 							state: {
 								...withCycle(latest.state, {
 									...cycleOf(latest),
-									remaining: deliberation.remaining,
+									...deliberation.cycle,
 									pending: deliberation.planned,
 								}),
 								next: step,
@@ -431,7 +458,13 @@ export function createGoalAdvanceHandler(
 						claim.jobId,
 					);
 				else if (accepted.status !== "replayed")
-					problem(db, row, "goal_decision_" + accepted.status, claim.jobId);
+					problem(
+						db,
+						row,
+						"goal_decision_" + accepted.status,
+						claim.jobId,
+						deliberation.cycle && budgetOf(deliberation.cycle),
+					);
 			} else problem(db, row, "goal_worker_unavailable", claim.jobId);
 			return "applied";
 		},
@@ -458,6 +491,7 @@ async function executeGoalAdvance(
 			cycle: input.cycle,
 			signal,
 			verificationFailed: input.verificationFailed,
+			answered: input.answered,
 		});
 		// One line per turn: which goal, what it concluded, nothing of the goal's text.
 		log.info("agency.goal_cycle", {
@@ -465,7 +499,9 @@ async function executeGoalAdvance(
 			workRevision: input.snapshot.context.progressVersion,
 			decision: deliberation.kind === "step" ? deliberation.step.kind : "pause",
 			...(deliberation.kind === "pause" && { reason: deliberation.reason }),
-			...(deliberation.runId && { runId: deliberation.runId }),
+			...(deliberation.cycle?.runId && { runId: deliberation.cycle.runId }),
+			// How many rounds this autonomous run has thought so far.
+			count: deliberation.cycle?.thoughts ?? input.cycle.thoughts,
 		});
 		// A step outside what the turn was shown is never applied; the queue tries the turn again.
 		if (

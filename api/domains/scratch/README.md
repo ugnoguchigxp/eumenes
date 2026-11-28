@@ -8,4 +8,4 @@
 - service/resource-adapter: kind `scratch` の ResourceAdapter。
 - controller: `GET /api/scratch/:id`・`/content`、利用者のファイル添付 `POST /api/conversations/:id/scratch`。認証とOrigin検査はアプリ共通middleware。
 
-ほかの domain を参照しない。添付・貼り付けの登録、サブエージェントの `scratch.write`、model3d への橋渡しは application が接続する。使い方と見え方は [docs/scratch.md](../../../docs/scratch.md)、設計は [設計書](../../../spec/server-scratch-cache-design-2026-11-07.md)。
+ほかの domain を参照しない。添付・貼り付けの登録、サブエージェントの `scratch.write`、model3d への橋渡しは application が接続する。使い方と見え方は [docs/scratch.md](../../../docs/scratch.md)、設計は [設計書](../../../spec/.archived/server-scratch-cache-design-2026-11-07.md)。

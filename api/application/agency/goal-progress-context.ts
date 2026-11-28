@@ -304,6 +304,7 @@ export function prepareGoalSnapshot(
 			? { attemptRef: latest.id, criterionIds: toVerify }
 			: null;
 	const capabilities = verificationRequired ? [] : allowed;
+	const shownChecks = verificationRequired ? verificationChecks : checks;
 	const attempts = allAttempts
 		.filter(
 			(attempt) => matters(attempt, open) || attempt === allAttempts.at(-1),
@@ -385,13 +386,11 @@ export function prepareGoalSnapshot(
 			condition,
 			dueAtMs,
 		})),
-		checks: (verificationRequired ? verificationChecks : checks).map(
-			({ ref, description, criterionIds }) => ({
-				ref,
-				description,
-				criterionIds,
-			}),
-		),
+		checks: shownChecks.map(({ ref, description, criterionIds }) => ({
+			ref,
+			description,
+			criterionIds,
+		})),
 		...(configuration && {
 			configuration: { ref: configuration.ref, summary: configuration.summary },
 		}),

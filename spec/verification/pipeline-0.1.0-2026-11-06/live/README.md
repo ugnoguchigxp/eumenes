@@ -5,7 +5,7 @@
 - **実施条件**: 検証専用の会話 `verify-pipeline-010-20261106-{a..f}` で実施し、`main` は使っていない。
 - **Router設定**: `entry: route`、構造解析の接続なし、`accept 0.6`、`multi 0.5`、reranker profile `lfm2.5`。
 - **LLM**: 設定済みのクラウド経路。
-- **詳細**: [実接続の詳細](../../../pipeline-0.1.0-hardening-2026-11-06.md)の「live検証」節。
+- **詳細**: [実接続の詳細](../../../.todo/pipeline-0.1.0-hardening-2026-11-06.md)の「live検証」節。
 
 ## EUM004 に関わる証拠：振り分けがPipelineに届けば、実モデルで最後まで通る
 

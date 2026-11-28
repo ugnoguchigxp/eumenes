@@ -1,6 +1,6 @@
 # picsum テーマ目録の作業記録
 
-確認日: 2026-10-17。対象: [UI自由制作の表現力拡張](../ui-studio-expressive-parts-implementation-plan-2026-10-17.md) §4.1。正本は [picsum-themes.ts](../../packages/artifact-ui/src/picsum-themes.ts)。
+確認日: 2026-10-17。対象: [UI自由制作の表現力拡張](../.archived/ui-studio-expressive-parts-implementation-plan-2026-10-17.md) §4.1。正本は [picsum-themes.ts](../../packages/artifact-ui/src/picsum-themes.ts)。
 
 ## 手順
 

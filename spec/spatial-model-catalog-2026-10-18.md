@@ -2,9 +2,9 @@
 
 作成日・更新日: 2026-10-18
 
-状態: **採用14体の造形方針と本目録の更新は利用者承認済み。アニメーションの具体的な周期・位相配分は制作案で、未制作・未実装。** ChatGPT（dots）が Blender でモデリングし、点群（`.bin`＋`.json`）を作るための依頼仕様を兼ねる。今回の承認を、監視規則の変更や計測 API 新設の実装許可とは扱わない。§5〜§7 の判定案は、§8 の保留事項を決め、[Spatial 監視の実測接続](spatial-monitoring-eumenes-design-2026-10-18.md) へ反映してから実装する。
+状態: **採用14体の造形方針と本目録の更新は利用者承認済み。アニメーションの具体的な周期・位相配分は制作案で、未制作・未実装。** ChatGPT（dots）が Blender でモデリングし、点群（`.bin`＋`.json`）を作るための依頼仕様を兼ねる。今回の承認を、監視規則の変更や計測 API 新設の実装許可とは扱わない。§5〜§7 の判定案は、§8 の保留事項を決め、[Spatial 監視の実測接続](.archived/spatial-monitoring-eumenes-design-2026-10-18.md) へ反映してから実装する。
 
-関連: [Spatial 監視の実測接続](spatial-monitoring-eumenes-design-2026-10-18.md)（現行の判定規則・実装記録）、[背景の状態契約](../docs/backgrounds.md)、[既存モデルの出所](../web/src/domains/background/models/MODEL-SOURCE.md)。これらは現行実装の参照であり、本目録の14体への更新を反映済みという意味ではない。
+関連: [Spatial 監視の実測接続](.archived/spatial-monitoring-eumenes-design-2026-10-18.md)（現行の判定規則・実装記録）、[背景の状態契約](../docs/backgrounds.md)、[既存モデルの出所](../web/src/domains/background/models/MODEL-SOURCE.md)。これらは現行実装の参照であり、本目録の14体への更新を反映済みという意味ではない。
 
 ## 1. 方針
 

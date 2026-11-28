@@ -236,7 +236,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				await s.registeredGoals.recoverWorkspaceChecks();
 				await s.registeredGoals.thoughts.recover();
 				await s.registeredGoals.progress.recover();
-				await s.registeredGoals.reports.recover();
+				await s.registeredGoals.work.recover();
 			},
 		},
 		{
@@ -277,7 +277,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "registered_goals_start",
 			start: () => {
 				s.registeredGoals.progress.listen();
-				s.registeredGoals.reports.start();
 			},
 		},
 		{ name: "queue_start", start: () => s.queue.start() },
@@ -353,7 +352,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "registered_goals",
 			close: async () => {
 				s.registeredGoals.progress.close();
-				await s.registeredGoals.reports.close();
 			},
 		},
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },

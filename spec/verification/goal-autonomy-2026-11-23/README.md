@@ -4,7 +4,7 @@
 
 以下は11月23日の初期版の履歴であり、補修版の実稼働合格を表すものではない。
 
-[設計](../../registered-goal-autonomy-2026-11-23.md)と[導入・受入手順](../../registered-goal-autonomy-implementation-2026-11-23.md)の実装を、2026年11月23日に確認した。取込版は Agency 0.1.12、SHA-256 は `3d0e1932cb9ae4fec95f52160a872a46f77aa61949608a03b109345c3d512c2b`。Agency の Git 基準と採用差分から再構築した配布物はこの SHA-256 と一致した。[取込元、差分、ハッシュ](../../../vendor/agency/manifest.json)
+[設計](../../.todo/registered-goal-autonomy-2026-11-23.md)と[導入・受入手順](../../.todo/registered-goal-autonomy-implementation-2026-11-23.md)の実装を、2026年11月23日に確認した。取込版は Agency 0.1.12、SHA-256 は `3d0e1932cb9ae4fec95f52160a872a46f77aa61949608a03b109345c3d512c2b`。Agency の Git 基準と採用差分から再構築した配布物はこの SHA-256 と一致した。[取込元、差分、ハッシュ](../../../vendor/agency/manifest.json)
 
 同日、利用者の明示依頼に基づいて本家の作業先設定と再起動反映を行い、既存DB・通常APIで追加発話0件の実作業、独立検証、完了報告1件を確認した。通常runnerとの併用と、既存目標の引用訂正・再起動復旧の追加修正も反映した。登録した編集範囲、既存目標に残る編集能力の確認待ち、別作業の検証結果との差は[本家への反映と実稼働受入](production-rollout.md)に記録した。
 

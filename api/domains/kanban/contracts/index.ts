@@ -9,7 +9,7 @@ import type {
 } from "../../capabilities/contracts";
 
 /*
- * Fixed contract of the Kanban domain (spec/kanban-claude-code-plan-2026-10-14.md §2, §3.6, §3.8,
+ * Fixed contract of the Kanban domain (spec/.todo/kanban-claude-code-plan-2026-10-14.md §2, §3.6, §3.8,
  * §3.12). Implementations must not change these shapes; ask the supervisor when a change is needed.
  * Kanban never imports terminals: the hand-over is `KanbanDispatch`, mapped by the application.
  */

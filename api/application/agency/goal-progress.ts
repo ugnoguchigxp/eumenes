@@ -35,9 +35,13 @@ import {
 import {
 	cycleOf,
 	deliberateGoal,
+	answeredRefs,
+	ownRun,
 	parkDelayMs,
 	withCycle,
+	type GoalCycle,
 } from "./goal-deliberation";
+import { thoughtCounted } from "./goal-thought-budget";
 
 import {
 	createGoalAdvanceHandler,
@@ -264,6 +268,7 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 		row: GoalProgress,
 		note: string,
 		claimId: string,
+		cycle?: Partial<GoalCycle>,
 	) {
 		// The step is cleared below; this line keeps which step could not go on, for the goal's later reading.
 		log.warn("agency.goal_parked", {
@@ -282,7 +287,7 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 				dueAtMs: now() + parkDelayMs(cycleOf(current).parks),
 				state: {
 					...withCycle(current.state, {
-						...cycleOf(current),
+						...parkedCycle(current, note, cycle),
 						parks: cycleOf(current).parks + 1,
 						pending: null,
 					}),
@@ -441,4 +446,19 @@ export function createGoalProgress(ports: GoalProgressPorts) {
 				: "stale";
 		},
 	};
+}
+
+/**
+ * The cycle a parked goal keeps. A turn that concluded brings its own; a turn that failed after reaching the model
+ * was a thought all the same, counted in the run it belongs to (a new one if an answer came since).
+ */
+function parkedCycle(
+	current: GoalProgress,
+	note: string,
+	cycle: Partial<GoalCycle> | undefined,
+): GoalCycle {
+	if (cycle) return { ...cycleOf(current), ...cycle };
+	if (!thoughtCounted(note)) return cycleOf(current);
+	const run = ownRun(cycleOf(current), answeredRefs(current));
+	return { ...run, thoughts: run.thoughts + 1 };
 }

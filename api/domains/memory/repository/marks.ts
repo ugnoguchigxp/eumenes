@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 
 /**
- * The marks of a State item the record itself cannot carry (spec/memory-recall-implementation-2026-11-23.md section
+ * The marks of a State item the record itself cannot carry (spec/.archived/memory-recall-implementation-2026-11-23.md section
  * 2.2): the information is sensitive, or it is about someone or something else. The host's own table; it holds no
  * text. Appended after the others; frozen once deployed.
  */

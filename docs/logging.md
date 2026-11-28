@@ -89,7 +89,7 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 ## LARMの空き待ち
 
-オンデマンド起動の機能（画像・ジャケット画像・音楽/効果音・3D送信・詳細分析・OCR/物体認識・Excalidraw・Docling）は、LARMのメモリ不足の拒否（HTTP 503、`resource_exhausted`、resource `memory`）を受けると失敗せず、30秒ごと（`Retry-After`が長ければそれ、上限5分）に同じ依頼を送り直します。待てるのは最初の拒否から30分までで、呼出元が固定した期限は超えません（[設計](../spec/larm-capacity-wait-design-2026-11-01.md)）。
+オンデマンド起動の機能（画像・ジャケット画像・音楽/効果音・3D送信・詳細分析・OCR/物体認識・Excalidraw・Docling）は、LARMのメモリ不足の拒否（HTTP 503、`resource_exhausted`、resource `memory`）を受けると失敗せず、30秒ごと（`Retry-After`が長ければそれ、上限5分）に同じ依頼を送り直します。待てるのは最初の拒否から30分までで、呼出元が固定した期限は超えません（[設計](../spec/.todo/larm-capacity-wait-design-2026-11-01.md)）。
 
 | イベント | レベル | 項目 |
 | --- | --- | --- |
@@ -165,7 +165,7 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 
 ## Codexの常駐プロセスとスレッド
 
-接続種別 `codex-sdk` は、組（API キーの有無と値・接続先・Web検索の有無）ごとに `codex app-server` を1つ常駐させ、その上の固定スレッドに会話を載せます（[設計](../spec/codex-input-cache-structure-2026-11-12.md)）。Codex のホームは SQLite と同じ場所の `codex-home/` で、backend の起動時に空にして作り直します。個人の `~/.codex` は読みません（CLI ログインの `auth.json` だけをリンクで共有します）。スレッドが1本もなくなったプロセスは止め、最後のプロセスが終わるとホームを空にします。
+接続種別 `codex-sdk` は、組（API キーの有無と値・接続先・Web検索の有無）ごとに `codex app-server` を1つ常駐させ、その上の固定スレッドに会話を載せます（[設計](../spec/.archived/codex-input-cache-structure-2026-11-12.md)）。Codex のホームは SQLite と同じ場所の `codex-home/` で、backend の起動時に空にして作り直します。個人の `~/.codex` は読みません（CLI ログインの `auth.json` だけをリンクで共有します）。スレッドが1本もなくなったプロセスは止め、最後のプロセスが終わるとホームを空にします。
 
 | イベント（info） | 項目 | 内容 |
 | --- | --- | --- |
@@ -295,7 +295,7 @@ LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入�
 
 `streamFailure`は`output_limit`・`content_filter`・`missing_end`・`empty_output`・`invalid_tool_calls`・`aborted`・`invalid_response`・`read_error`を区別します。外向きのエラーは`chat_stream_incomplete`で、途中の本文・引数を採用しない判定は維持します。ただし、正常に終わって本文もツール呼出しも無い`empty_output`だけは外向きを`chat_output_empty`に分けます（会話の呼出しでは、その呼出しだけが終わり、推論の依頼は残ります。返事なしとして完了して`dialogue.no_answer`を記録します。ただし local ハーネスで利用者の発言に何も返さなかった回は、下の`dialogue.turn_failed`になります。ほかの呼出しでは失敗です）。思考（reasoning）の文字数は`reasoningChars`に数だけを記録します。例えば`output_limit`は出力上限到達を観測したもので、LARMの中継切断を示しません。usageやtimingsが届かない場合は不明として省略し、0にはしません。これらの診断には本文・引数・Providerの自由文は含めません。
 
-会話の回は、会話のモデルが LARM でもクラウドでも、Router（`eumenes_router` パッケージ。[組み込みの設計](../spec/router-package-integration-2026-11-04.md)）が振り分けます。`dialogue.turn_routed`は回ごとに1件で、`kind`が回の種類（`talk`＝会話の回、`request`＝依頼の回、`pending`＝確認・質問待ちのある回）、`count`がその回のモデル呼出しの数です。`dialogue.router_decided`は Router が決めた回ごとに1件で、`source`が入口（`route`・`routeStructured`）、`row`が決定表の行、`kind`が決めたものの種類、`count`が候補の数、`durationMs`が判断にかかった時間です。`dialogue.router_package`はパッケージの判断の段ごとに1件（`phase`・`row`・`candidateCount`、構造の判断では依頼の数 `hitCount` と部分の数 `count`、best-v2 が確かでなかったかを `outcome`）、Router が決められなかった回は `dialogue.router_failed`（`reason`）を warn で残し、会話の回が答えます。構造の判断の失敗は `dialogue.router_structure_failed`（`reason`）で、その回は発言全体を振り分けます。`dialogue.choice_made`は欄を埋める呼出しごとに1件で、`kind`が `fill`、`decision`が結果（`fill`・`ask`・`none`・`unreadable`）です。欄を埋める呼出しが呼出しそのものの失敗で終わると、`dialogue.choice_failed`（`reason`＝その code）を warn で残し、会話の回が答えます。クラウドの会話モデルには、欄の schema を厳密な structured output の形（1つの object、全部の欄が必須で、使わない欄は null）で送ります。利用者の言葉・依頼文は記録しません。`dialogue.turn_failed`は、回の中の呼出しがまだ何も話さないうちに失敗した（利用者の発言に会話の呼出しが何も返さなかったときを含む）回ごとに1件で、`kind`が回の種類、`reason`が失敗の符号です。このときホストは決まった一言を回の答えにします。モデルの答えのない回（ホストの言葉だけ、または何も話さない回）は、推論の依頼をホストの答えとして受け入れます。受け入れられなかった（設定の変更・期限切れ）ときは`dialogue.answer_request_not_accepted`（`reason`）を記録し、回は完了します。回が採用されずに終わった後でも、音声で再生できた文はエージェントの発言として会話の記録とチャット欄に残ります。
+会話の回は、会話のモデルが LARM でもクラウドでも、Router（`eumenes_router` パッケージ。[組み込みの設計](../spec/.archived/router-package-integration-2026-11-04.md)）が振り分けます。`dialogue.turn_routed`は回ごとに1件で、`kind`が回の種類（`talk`＝会話の回、`request`＝依頼の回、`pending`＝確認・質問待ちのある回）、`count`がその回のモデル呼出しの数です。`dialogue.router_decided`は Router が決めた回ごとに1件で、`source`が入口（`route`・`routeStructured`）、`row`が決定表の行、`kind`が決めたものの種類、`count`が候補の数、`durationMs`が判断にかかった時間です。`dialogue.router_package`はパッケージの判断の段ごとに1件（`phase`・`row`・`candidateCount`、構造の判断では依頼の数 `hitCount` と部分の数 `count`、best-v2 が確かでなかったかを `outcome`）、Router が決められなかった回は `dialogue.router_failed`（`reason`）を warn で残し、会話の回が答えます。構造の判断の失敗は `dialogue.router_structure_failed`（`reason`）で、その回は発言全体を振り分けます。`dialogue.choice_made`は欄を埋める呼出しごとに1件で、`kind`が `fill`、`decision`が結果（`fill`・`ask`・`none`・`unreadable`）です。欄を埋める呼出しが呼出しそのものの失敗で終わると、`dialogue.choice_failed`（`reason`＝その code）を warn で残し、会話の回が答えます。クラウドの会話モデルには、欄の schema を厳密な structured output の形（1つの object、全部の欄が必須で、使わない欄は null）で送ります。利用者の言葉・依頼文は記録しません。`dialogue.turn_failed`は、回の中の呼出しがまだ何も話さないうちに失敗した（利用者の発言に会話の呼出しが何も返さなかったときを含む）回ごとに1件で、`kind`が回の種類、`reason`が失敗の符号です。このときホストは決まった一言を回の答えにします。モデルの答えのない回（ホストの言葉だけ、または何も話さない回）は、推論の依頼をホストの答えとして受け入れます。受け入れられなかった（設定の変更・期限切れ）ときは`dialogue.answer_request_not_accepted`（`reason`）を記録し、回は完了します。回が採用されずに終わった後でも、音声で再生できた文はエージェントの発言として会話の記録とチャット欄に残ります。
 
 補助接続の内部処理では物理的にmainへ置き換わっても、`sessionRole`へ呼出し元の`auxiliary`または`subagent`を保持します。`profile`だけで会話段を分類せず、`phase`・runId・attemptId等と対応させてください。接続を比較するrunnerは、同一接続の対照でも論理的な呼出し元を記録します。
 

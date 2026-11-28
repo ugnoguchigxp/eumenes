@@ -2,7 +2,7 @@
 
 2026-11-08。実装・固定検証済み。後続の起動許可を受け、実モデル・実Docling・稼働画面でも文書保存を確認した。自然文の中止と担当選択には未解決の課題がある。
 
-目的: 調査の担当を切り替えず、タイトル付きMarkdownを一時ファイルと利用可能なDoclingのEumenes専用領域へ保存する。[合意済み設計](../../web-research-markdown-design-2026-11-08.md)。
+目的: 調査の担当を切り替えず、タイトル付きMarkdownを一時ファイルと利用可能なDoclingのEumenes専用領域へ保存する。[合意済み設計](../../.archived/web-research-markdown-design-2026-11-08.md)。
 
 ## 検証の条件
 

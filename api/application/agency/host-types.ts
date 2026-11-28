@@ -108,6 +108,8 @@ export type AgencyHostDeps = {
 	};
 	/** Keeps and shows research notes as Markdown documents; absent: notes are not kept and cannot be shown. */
 	noteDocuments?: NoteDocumentPort;
+	/** Registered goals, reported to their conversations as the agent's assignments. */
+	goalWork?: import("./goal-assignments").GoalWorkPort;
 	goalResearchNoteInTransaction?(
 		db: Database,
 		note: {

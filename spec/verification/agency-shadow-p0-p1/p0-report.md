@@ -1,6 +1,6 @@
 # Agency Shadow P0 報告 — 基準測定と比較条件の固定
 
-2026-11-05。範囲: [実装依頼・受入計画](../../agency-shadow-p0-p1-implementation-request-2026-11-05.md) §3 のP0だけ。P1、製品反映、実モデルの意味評価・課金試験、外部サービス、src／api・依存の変更、サーバー操作、branch・commit・pushはいずれも行っていない。r1・r2の実施場所は候補workspace（`/private/tmp/eumenes-p0-20261105-jqewp9kw/{eumenes,eumenes_agency}`）のmain。親レビューでR1〜R5の解消を独立に確認した後、レビュー済みの同じファイルを正本（`/Users/y.noguchi/Code/{eumenes,eumenes_agency}`のmain）へ配置し、正本で最終確認した（§11）。これは製品機能・配布物の本番採用ではない。
+2026-11-05。範囲: [実装依頼・受入計画](../../.todo/agency-shadow-p0-p1-implementation-request-2026-11-05.md) §3 のP0だけ。P1、製品反映、実モデルの意味評価・課金試験、外部サービス、src／api・依存の変更、サーバー操作、branch・commit・pushはいずれも行っていない。r1・r2の実施場所は候補workspace（`/private/tmp/eumenes-p0-20261105-jqewp9kw/{eumenes,eumenes_agency}`）のmain。親レビューでR1〜R5の解消を独立に確認した後、レビュー済みの同じファイルを正本（`/Users/y.noguchi/Code/{eumenes,eumenes_agency}`のmain）へ配置し、正本で最終確認した（§11）。これは製品機能・配布物の本番採用ではない。
 
 ## 0. 現在の結論と版
 

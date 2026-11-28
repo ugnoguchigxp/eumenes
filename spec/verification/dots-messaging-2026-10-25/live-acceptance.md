@@ -42,4 +42,4 @@ dotに手動refreshの専用操作は提供されていなかった。更新の�
 - `dots-messages.test.ts` と `dots-messaging-http.test.ts`: 14件成功、81 assertions。管理IDの誤使用拒否と未保存、正しい参照元での回復を含む。
 - 変更したapplicationファイルのformat・lintと最終 `git diff --check` が成功。公開JSON Schemaにも引数の説明が含まれることを確認。
 
-今回の追加実装は公開説明と回帰試験のみ。意味判断、要約作成、識別子の選択はdotが行う。コードは従来どおり認証・所有者・参照元の範囲・lease・期限を検証する。担当外の音声試験用ファイルは変更していない。P0〜P4の全体gateに関する制限は[設計書](../../dots-messaging-design-and-plan-2026-10-25.md)の記録を維持する。
+今回の追加実装は公開説明と回帰試験のみ。意味判断、要約作成、識別子の選択はdotが行う。コードは従来どおり認証・所有者・参照元の範囲・lease・期限を検証する。担当外の音声試験用ファイルは変更していない。P0〜P4の全体gateに関する制限は[設計書](../../.archived/dots-messaging-design-and-plan-2026-10-25.md)の記録を維持する。

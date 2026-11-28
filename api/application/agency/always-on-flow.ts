@@ -22,6 +22,11 @@ import { getLogger } from "../../infrastructure/logger";
 import type { AgencyHostDeps } from "./host-types";
 import { prepareResearch } from "./research-admission";
 import { openScreen } from "./always-on-screens";
+import {
+	GOAL_ASSIGNEE,
+	goalTicket,
+	type GoalWorkView,
+} from "./goal-assignments";
 
 export { researchRevision } from "./research-admission";
 
@@ -109,6 +114,34 @@ export async function startResearch(input: {
 		});
 		c.revision++;
 		return { status: "started" };
+	}
+	// A registered goal runs on its own: its item is held as the goal's ticket, and nothing is started.
+	if (ticket.delegatedTo === GOAL_ASSIGNEE) {
+		const held = c.tickets.find((t) => t.itemId === ticket.itemId && t.goal);
+		if (held) return markResearchAccepted(c, held, ticket, input.now());
+		const item = c.agent.view().items.find((i) => i.id === ticket.itemId);
+		let views: readonly GoalWorkView[];
+		try {
+			views = deps.goalWork
+				? deps.store.read((db) => deps.goalWork!.viewsInTransaction(db))
+				: [];
+		} catch {
+			// The goals could not be read now: the item waits and is issued again, nothing is told.
+			return { status: "retry", code: "agency_goal_unreadable" };
+		}
+		const made = goalTicket(ticket, item?.text ?? ticket.text, views, c.id);
+		// The goal went before its item was issued (withdrawn, revised, forgotten): the item ends without a word.
+		if (!made) {
+			c.agent.assignmentEnded({
+				itemId: ticket.itemId,
+				at: input.now(),
+				status: "dropped",
+			});
+			c.revision++;
+			return { status: "retry", code: "agency_goal_gone" };
+		}
+		c.tickets.push(made);
+		return markResearchAccepted(c, made, ticket, input.now());
 	}
 	// Work the user asked a toolchain for: what it needs to start was kept when the user asked (`delegate`).
 	const assignment = ticket.delegatedTo

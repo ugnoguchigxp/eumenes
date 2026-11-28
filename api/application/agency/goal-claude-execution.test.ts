@@ -42,11 +42,11 @@ import { createGoalClaude } from "../work/goal-claude";
 import { testRunPassed } from "./goal-checkout-tests";
 import { createGoalPolicyConfiguration } from "./goal-policy-configuration";
 import { createGoalProgress } from "./goal-progress";
-import { createGoalReportDelivery } from "./goal-report-delivery";
-import { pendingGoalQuestions } from "./goal-question-delivery";
+import { createGoalWork } from "./goal-work";
 import {
 	createGoalWorkspaceVerification,
 	recoverGoalWorkspaceChecks,
+	testCandidates,
 	workspaceCheckRef,
 } from "./goal-workspace-verification";
 import { createGoalWorkspaceRegistry } from "./goal-workspaces";
@@ -71,7 +71,7 @@ for (const needsEdit of [false, true]) {
 				...kanbanMigrations,
 			],
 		});
-		const { store, conversation, memory } = h;
+		const { store, conversation } = h;
 		const queue = createQueue(store, { pollMs: 5 });
 		const goals = createGoalStore(store, createGoalsService());
 		let claude: ReturnType<typeof createClaudeCode>;
@@ -288,21 +288,20 @@ for (const needsEdit of [false, true]) {
 							.map(({ ref }) => ref),
 						...planned,
 					}),
-					remaining: [],
 					planned: null,
-					stalled: 0,
-					runId: null,
 				};
 			},
 		});
-		const reportPorts = {
+		const work = createGoalWork({
 			store,
 			goals,
 			conversation,
-			referenceInputs: memory.referenceInputs,
 			blocked: () => false,
-		};
-		const reports = createGoalReportDelivery(reportPorts);
+			reply: () => {
+				throw new Error("fixture_goal_reply_unused");
+			},
+		});
+		const view = () => store.read((db) => work.viewsInTransaction(db))[0];
 		try {
 			mkdirSync(join(root, "api/feature"), { recursive: true });
 			writeFileSync(
@@ -384,9 +383,7 @@ for (const needsEdit of [false, true]) {
 			claude.start();
 			await waitFor(() => state().phase === "observing");
 			expect(starts).toHaveLength(0);
-			expect(
-				store.read((db) => pendingGoalQuestions(db, reportPorts, Date.now())),
-			).toHaveLength(0);
+			expect(view()?.question).toBeNull();
 			await store.write((db) => workspace.release(db, "manual-terminal", true));
 			claude.flush();
 			await waitFor(() => state().phase === "completed", { timeout: 14_000 });
@@ -405,20 +402,21 @@ for (const needsEdit of [false, true]) {
 				passed: true,
 				checks: [{ tests: [testFile], exitCode: 0, passed: true }],
 			});
-			await reports.recover();
-			await reports.recover();
+			// The report is the agent's to tell as its assignment's: nothing is written to the conversation for it.
+			const met = view()!;
+			expect(met.report?.text).toBeTruthy();
+			await store.write((db) => work.reportedInTransaction(db, met));
 			const delivered = store.read((db) =>
 				goals.goalReportsInTransaction(db, access),
 			);
 			expect(delivered).toHaveLength(1);
 			expect(delivered[0]?.state).toBe("delivered");
+			expect(view()).toBeUndefined();
 			expect(conversation.get("c1").messages.map(({ role }) => role)).toEqual([
 				"user",
-				"assistant",
 			]);
 			expect(starts).toHaveLength(1);
 		} finally {
-			await reports.close();
 			progress.close();
 			await claude.close();
 			await queue.close(1_000);
@@ -445,4 +443,29 @@ ${different}:
 	expect(testRunPassed([testFile], result)).toBe(false);
 	expect(testRunPassed([testFile, different], result)).toBe(false);
 	expect(testRunPassed([different], result)).toBe(true);
+});
+
+test("a design-system run labels its lines with the project, and the file still counts as passed", () => {
+	const file = "packages/design-system/src/components/Avatar/Avatar.test.tsx";
+	const result = {
+		exitCode: 0,
+		stdout:
+			" ✓  unit  src/components/Avatar/Avatar.test.tsx > Avatar > renders 10ms\n",
+		stderr: "",
+	};
+	expect(testRunPassed([file], result)).toBe(true);
+});
+
+test("an identifier the findings name reaches the test whose path joins the same words", () => {
+	const tests = [
+		...Array.from({ length: 300 }, (_, n) => `api/other/feature-${n}.test.ts`),
+		"web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx",
+	];
+	const ranked = testCandidates(
+		tests,
+		"設定画面から general.avatarBackgroundColor を経て会話画面で描画する経路を確認した。",
+	);
+	expect(ranked[0]).toBe(
+		"web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx",
+	);
 });

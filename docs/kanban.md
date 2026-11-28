@@ -1,6 +1,6 @@
 # タスクボード（Kanban）と会話
 
-2026年11月22日更新。手動カードの仕様と担当分けは[タスクボードの計画](../spec/kanban-claude-code-plan-2026-10-14.md)・[実装の分担](../spec/kanban-implementation-assignments-2026-10-14.md)、開発監督の行と受入条件は[開発監督の設計](../spec/development-supervisor-design-2026-11-22.md)に記載する。
+2026年11月22日更新。手動カードの仕様と担当分けは[タスクボードの計画](../spec/.todo/kanban-claude-code-plan-2026-10-14.md)・[実装の分担](../spec/.archived/kanban-implementation-assignments-2026-10-14.md)、開発監督の行と受入条件は[開発監督の設計](../spec/.todo/development-supervisor-design-2026-11-22.md)に記載する。
 
 ## 利用者向け
 
@@ -83,7 +83,7 @@ bun run verify -- --domain kanban
 
 ## 自然言語受入
 
-会話側の8ケースは `tests/acceptance/nl/drafts/kanban/` にあり、まだ凍結していない。凍結までの案と必要な拡張は[計画 §5.2.1](../spec/kanban-claude-code-plan-2026-10-14.md#521-自然言語受入の案凍結前)にある。
+会話側の8ケースは `tests/acceptance/nl/drafts/kanban/` にあり、まだ凍結していない。凍結までの案と必要な拡張は[計画 §5.2.1](../spec/.todo/kanban-claude-code-plan-2026-10-14.md#521-自然言語受入の案凍結前)にある。
 
 ## 検証の状況
 

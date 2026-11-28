@@ -30,7 +30,7 @@ JSON出力の`type`は通常の発言が`message`、専門担当への切り替�
 
 接続先は既存CLIと同じ`EUMENES_URL`（既定`http://127.0.0.1:8787`）、API認証も同じ設定を使います。CLIがDBを開いたり、LARMやクラウドへ直接接続したりすることはありません。
 
-実装方針と検証記録: [CLI対話モードの設計](../spec/cli-chat-mode-design-2026-10-31.md)。
+実装方針と検証記録: [CLI対話モードの設計](../spec/.archived/cli-chat-mode-design-2026-10-31.md)。
 
 ## AIによる再現・デバッグ
 
@@ -83,7 +83,7 @@ bun run logs -- --id <run-id> --json
 
 runのJSONにはrequestId・jobId・状態・期限もあります。必要ならjobIdや`API request ID`でもログを絞ります。会話runの`completed`はその発言の処理完了を意味します。担当へ依頼を渡した場合、制作物の完成まで保証する値ではありません。後続の仕事は、会話の状態（`assignments`）と作業報告メモ、既存の担当別APIで確認します。詳しい追跡は[ログの確認](logging.md)を参照してください。
 
-会話設定のデバッグモードを有効にして再現すると、モデルの送信入力も確認できます。通常は採用された回答の入力を返し、`--call` を指定するとツールの前後や再試行時の入力を選べます。返答時に採取された本文を扱うので、通常の運用ログとは別に扱ってください。サーバーの一時保持は採取から最大30分です。[ContextWindowの閲覧設計](../spec/context-window-inspector-design-2026-11-17.md)
+会話設定のデバッグモードを有効にして再現すると、モデルの送信入力も確認できます。通常は採用された回答の入力を返し、`--call` を指定するとツールの前後や再試行時の入力を選べます。返答時に採取された本文を扱うので、通常の運用ログとは別に扱ってください。サーバーの一時保持は採取から最大30分です。[ContextWindowの閲覧設計](../spec/.archived/context-window-inspector-design-2026-11-17.md)
 
 ```sh
 bun run cli -- run <run-id> --context --json

@@ -16,9 +16,9 @@ SpatialのLARM Core・CPU・Memory・GPUは、保存済みControl接続先の `G
 
 表示中の既存monitoring取得を入口にbackendで60秒ごとに共有し、同時表示・失敗時の即時再試行を抑える。イベントとcursorは同じtransactionで保存し、409/410、再起動、取得品質、coverageの欠落を保持する。一般的な要求失敗をGPU障害にしない。
 
-LARMが返す `observedAt` と `maxAgeMs`、rawな期限切れの判定は保持する。Webは約1分の定期確認の間、取得時に有効だった前回値を表示し、通常の更新待ちでは警告しない。受信前からの古い計測・取得失敗・3分の更新停止は区別し、時刻を更新して新しい計測には見せない（[表示修正](../spec/spatial-status-display-fix-2026-10-31.md)）。詳しい計測値・状態・履歴の品質は認証付き `GET /api/monitoring/snapshot` の `larm` に保持する。多くのGPU等がある場合は設定の `larm.monitoringNodeId`・`larm.monitoringGpuId` で対象IDを指定し、一意な対象だけなら自動選択する。
+LARMが返す `observedAt` と `maxAgeMs`、rawな期限切れの判定は保持する。Webは約1分の定期確認の間、取得時に有効だった前回値を表示し、通常の更新待ちでは警告しない。受信前からの古い計測・取得失敗・3分の更新停止は区別し、時刻を更新して新しい計測には見せない（[表示修正](../spec/.archived/spatial-status-display-fix-2026-10-31.md)）。詳しい計測値・状態・履歴の品質は認証付き `GET /api/monitoring/snapshot` の `larm` に保持する。多くのGPU等がある場合は設定の `larm.monitoringNodeId`・`larm.monitoringGpuId` で対象IDを指定し、一意な対象だけなら自動選択する。
 
-契約は `larm-monitoring.v1`。正本と固定応答は[参照コピー](../spec/reference/larm-monitoring-v1/README.md)、責務・表示規則・配備との区別は[接続設計](../spec/larm-spatial-monitoring-integration-design-2026-10-18.md)。ソース実装とLARM本番APIの公開・Spatial実画面確認は分けて記録する。
+契約は `larm-monitoring.v1`。正本と固定応答は[参照コピー](../spec/reference/larm-monitoring-v1/README.md)、責務・表示規則・配備との区別は[接続設計](../spec/.todo/larm-spatial-monitoring-integration-design-2026-10-18.md)。ソース実装とLARM本番APIの公開・Spatial実画面確認は分けて記録する。
 
 LLMのProfileは設定画面で保存した値（`larm.profile`）だけを使います。コード・既定値・手順にProfile名やモデル名を固定しません。未保存のときは `larm_profile_missing` で接続しません。初回の `LARM_PROFILE` 指定は、未保存の設定へ取り込みます。選択肢は、保存済みのLARM接続先に `GET /v3/agent-profiles` をProfile指定なしで送って得たcatalogから作り、`selectionPolicy` が `default` で `deprecated` でなく、`llm` Providerを持つProfileだけを挙げます（`explicit-only` の用途別Profileと `backchannel` だけのProfileは含めません）。catalogを読めないときは保存済みのProfileをモデルなしで1件返します。
 
@@ -26,7 +26,7 @@ LLMのProfileは設定画面で保存した値（`larm.profile`）だけを使�
 
 Connectionは会話・エージェント・履歴分岐ごとに対応付け、作成応答のIDとbootEpochを保持します。clientはインストールの安定識別子と論理的な所有者・役割から導き、main/subで共有しません。本文や接続IDの文字列から役割を推測しません。生成枠はbackend共通でメイン1件、サブ・独立補助2件とし、追加要求は取消可能な待機列へ入れます。接続数を物理slot数とは扱わず、別エージェントの有効接続を枠のために追い出しません。
 
-主会話のConnectionはbackendの稼働中保持し、通常終了時もLARMの期限に任せます。同じ有効接続は再利用し、失効・idle release・bootEpochの変化では同じ役割・容量で作成し直します。接続とcredentialの短い方の期限でrenew・再claimします。入力キャッシュには接続IDとは別の不透明な `prompt_cache_key` を使い、同じ会話・エージェント・履歴分岐では再接続後も同じ値を送ります。キャッシュがなくても動くよう、毎回必要なmessagesを送ります。既存の会話prefixを読むonConversation処理は、同じメインエージェントの接続で直列に動きます。音声Providerは既存の独立scopeを維持します（[今回の設計](../spec/larm-agent-capacity-design-2026-11-01.md)、[以前の接続維持設計](../spec/larm-connection-cache-design-2026-10-25.md)）。
+主会話のConnectionはbackendの稼働中保持し、通常終了時もLARMの期限に任せます。同じ有効接続は再利用し、失効・idle release・bootEpochの変化では同じ役割・容量で作成し直します。接続とcredentialの短い方の期限でrenew・再claimします。入力キャッシュには接続IDとは別の不透明な `prompt_cache_key` を使い、同じ会話・エージェント・履歴分岐では再接続後も同じ値を送ります。キャッシュがなくても動くよう、毎回必要なmessagesを送ります。既存の会話prefixを読むonConversation処理は、同じメインエージェントの接続で直列に動きます。音声Providerは既存の独立scopeを維持します（[今回の設計](../spec/.archived/larm-agent-capacity-design-2026-11-01.md)、[以前の接続維持設計](../spec/.todo/larm-connection-cache-design-2026-10-25.md)）。
 
 待機はConnection lifecycleと呼出元の期限・取消に従い、初回はreadyとclaimableを確認するまで推論しません。生成POSTは従来のOpenAI互換で、独自のconnection ID・役割・slot項目やLARM内部ヘッダーを追加しません。通信切断で生成結果が不明なときは再生成しません。control要求の出力schemaは、LARMには `response_format: json_schema`（strict）、OpenAI互換のcloudには `response_format: json_schema`、Codexには `outputSchema`、Claude Agent SDKには `outputFormat` で渡します。
 
@@ -42,7 +42,7 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 catalogの`contextWindow.maxTokens`は提供可能な最大容量、作成要求の`contextTokens`は明示する要求容量、claimの`contextWindow.maxTokens`は実際に確保された容量です。省略時にruntimeの既定容量が広告上限より小さくても接続できます。主200k明示・補助省略の既存選択方針を維持し、全接続に広告上限を要求しません。
 
-claimは正の安全な整数で、広告上限以下、明示要求がある場合はその値と一致する必要があります。create/readyが実容量を返す場合はclaimと照合します。他のcontextWindow項目、モデル・プロトコル・接続先などの検証、renew時の容量変更拒否は維持します。入力計数・出力予約・履歴の予算にはcatalogでなくclaimの容量を使います。503統一・空き待ちとは別の契約です（[修正と受入計画](../spec/larm-context-capacity-contract-fix-2026-11-01.md)）。
+claimは正の安全な整数で、広告上限以下、明示要求がある場合はその値と一致する必要があります。create/readyが実容量を返す場合はclaimと照合します。他のcontextWindow項目、モデル・プロトコル・接続先などの検証、renew時の容量変更拒否は維持します。入力計数・出力予約・履歴の予算にはcatalogでなくclaimの容量を使います。503統一・空き待ちとは別の契約です（[修正と受入計画](../spec/.archived/larm-context-capacity-contract-fix-2026-11-01.md)）。
 
 ## チャット画面表示中のProfile利用依頼
 
@@ -52,7 +52,7 @@ claimは正の安全な整数で、広告上限以下、明示要求がある場
 
 取得済みConnectionの保持応答は、Connection・Profile・Providerの一致とready状態を検証します。`claimable`はLARMの短い疎通確認キャッシュの有無でも変わるため、取得済みclaimを使う保持処理の成功条件にはしません。初回claimと期限更新の既存処理は維持します。
 
-2026-10-18、改修済みEumenesの画面通知APIから実LARMまでの結合試験で、同じConnection・Allocationを6分2秒保持し、`idleReleaseAt`の約6分延長を確認しました。保持区間の推論要求・追加claimは0回。同じKeyの再送では期限が変わらず、送信停止後は最終利用依頼から300.067秒で自動解放されました。利用者によるbackend再起動後、画面通知APIの204と、起動後5分を超えた実画面・status APIの接続済みも確認しています。詳細は[作業記録](../spec/larm-connection-retention-design-2026-10-18.md#12-larm更新後の実接続受入と稼働反映確認)を参照してください。
+2026-10-18、改修済みEumenesの画面通知APIから実LARMまでの結合試験で、同じConnection・Allocationを6分2秒保持し、`idleReleaseAt`の約6分延長を確認しました。保持区間の推論要求・追加claimは0回。同じKeyの再送では期限が変わらず、送信停止後は最終利用依頼から300.067秒で自動解放されました。利用者によるbackend再起動後、画面通知APIの204と、起動後5分を超えた実画面・status APIの接続済みも確認しています。詳細は[作業記録](../spec/.archived/larm-connection-retention-design-2026-10-18.md#12-larm更新後の実接続受入と稼働反映確認)を参照してください。
 
 ## gzip圧縮通信
 
@@ -70,7 +70,7 @@ LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入�
 
 Controlの公開カタログから生成先とモデルを、公開APIの要求スキーマからサイズと長さの選択肢を取得します。現行は480×480、5秒、音声付きMP4、24fpsです。選択したサイズと長さは独立した生成条件として送ります。会話用のAgent Connectionは取得しません。
 
-生成中の状態確認と取消は「動画生成」にあります。画面の再読み込み後に同じ画面を開くと、保存された依頼の状態が表示されます。受付を確認できない場合は「同じ依頼の受付・状態を確認」を使います。保存済み動画の一覧から再生・MP4の保存・生成条件の確認・削除ができます。接続と試験の詳細は[動画生成の実装記録](../spec/video-generation-2026-11-14.md)を参照してください。
+生成中の状態確認と取消は「動画生成」にあります。画面の再読み込み後に同じ画面を開くと、保存された依頼の状態が表示されます。受付を確認できない場合は「同じ依頼の受付・状態を確認」を使います。保存済み動画の一覧から再生・MP4の保存・生成条件の確認・削除ができます。接続と試験の詳細は[動画生成の実装記録](../spec/.archived/video-generation-2026-11-14.md)を参照してください。
 
 ## 楽曲生成の音声形式
 
@@ -86,7 +86,7 @@ Controlの公開カタログから生成先とモデルを、公開APIの要求�
 
 202応答のjobIdで状態照会し、queued・loading・generating・encodingを待ちます。完了までPOSTを再送しません。取消は同じjobIdへのDELETEで行い、取消後の結果は採用しません。failed・cancelledは再生可能な成功にしません。`result.audioUrl` とmetadataUrlをControlのURLとして解決し、既存のMIME・内容検査と保存経路を使います。`result.model` と `result.metadata.runtime` を記録します。Provider識別子やモデル名への固定分岐はありません。過去の音声の再生・保存・検索・タグ・お気に入りは従来経路を維持します。
 
-`music.create@3`・`music.generate@3`・担当手順は `music-routing.bundle.json`、操作画面は `music.generation@3` です。旧V1/V2の登録定義・契約は保持し、既存music planner/generatorと登録済みmusic-screen adapterを再利用します。画面では3用途を選べ、効果音も共通プレイヤー、Visualizer、履歴・詳細・保存を使います。表示JSONに実行時URLや音声を保存しません。詳細は[今回の作業記録](../spec/audio-routing-work-record-2026-10-20.md)。
+`music.create@3`・`music.generate@3`・担当手順は `music-routing.bundle.json`、操作画面は `music.generation@3` です。旧V1/V2の登録定義・契約は保持し、既存music planner/generatorと登録済みmusic-screen adapterを再利用します。画面では3用途を選べ、効果音も共通プレイヤー、Visualizer、履歴・詳細・保存を使います。表示JSONに実行時URLや音声を保存しません。詳細は[今回の作業記録](../spec/.archived/audio-routing-work-record-2026-10-20.md)。
 
 サーバーを起動せず実LARMの3用途を1回ずつ確認するには `bun scripts/music-routing-live.ts --run` を使います。保存済み接続と認証で短い音声を生成し、デコード・長さ・ブラウザ再生を確認します。この実行が生成した確認音声だけをLARMから削除します。実スピーカーの聴取とは区別します。
 
@@ -125,7 +125,7 @@ Controlの公開カタログから生成先とモデルを、公開APIの要求�
 
 ASRの文字起こしは会話入力になり、発話の続き判定や言語判定のcontrolは呼びません。ASR要求には設定から選んだ `language` を1つ渡します。ASR receiptの受理、取消、回答/TTSへの検証parentはbackendが管理します。詳細は [toolchain](toolchain.md#タイマーと音声) を参照してください。
 
-現在の接続先ASRには1要求12秒の制限があるため、長いPCM WAVはlarm adapterで12秒以内に分割します。PCM16は上限直前に200ms以上の低振幅区間があればそこで区切り、すべての区間が成功してから一つの認識結果として採用します。音声サンプルの省略・重複、意味による語句の補正は行いません。途中の失敗・取消では部分結果を会話へ渡しません。録音側の60秒上限は維持します。認識精度・会話の短さの未受入を含む結果は[音声修正記録](../spec/voice-repair-work-record-2026-10-25.md)を参照してください。
+現在の接続先ASRには1要求12秒の制限があるため、長いPCM WAVはlarm adapterで12秒以内に分割します。PCM16は上限直前に200ms以上の低振幅区間があればそこで区切り、すべての区間が成功してから一つの認識結果として採用します。音声サンプルの省略・重複、意味による語句の補正は行いません。途中の失敗・取消では部分結果を会話へ渡しません。録音側の60秒上限は維持します。認識精度・会話の短さの未受入を含む結果は[音声修正記録](../spec/.todo/voice-repair-work-record-2026-10-25.md)を参照してください。
 
 画像生成ツールチェーンと、プロンプト編集・全画面の画像一覧を接続しました。保存画像の一覧と取得はControlの `/v1/image-artifacts` を使用し、生成やProvider claimは不要です。2026-10-13の配備OpenAPIで `DELETE /v1/image-artifacts/{id}`、Bearer認証、HTTP200と`{id,deleted:true}`を確認しました。一覧から保存画像を物理削除し、Eumenesでは応答IDが対象と一致することを検査します。生成履歴は維持し、削除を自動再送しません。詳細は[画像生成](images.md)を参照してください。
 
@@ -144,7 +144,7 @@ Retry-After: 30
 
 オンデマンド起動の機能（画像生成、ジャケット画像、音楽・効果音、3D生成の送信、詳細分析、OCR・物体認識の解析、Excalidraw、文章ナレッジベース管理）は、この拒否を失敗にしない。状態を `waiting_capacity`（「LARMの空きを待っています」）にして、30秒後（`Retry-After` が長ければその時刻、上限5分）に同じ依頼を送り直す。待てるのは最初の拒否から30分までで、制作の300秒などの処理時間とは別に数える。会話runの期限はその分だけ延ばすが、呼出元が固定した期限・委任タスクの予算は超えない。待機中はLARMの接続を手放し、取消すれば待っている依頼も取り消す。30分で空かなければ `larm_capacity_timeout` で失敗する。
 
-判定と送り直しは `api/domains/larm/service/resend.ts` の1か所だけで行う。規則は、空きなし（上の拒否）、準備中（同じ接続へのclaim）、応答の喪失（同じ `Idempotency-Key` で1回）の3つで、各機能・キュー・Webは独自に送り直さない。ほかの状態コードや、503でもコード・resourceが違う拒否は待たない。会話のLLM・ASR・TTS・判定・embeddingとサービス試用は待たない（サービス試用は `larm_capacity_busy` を表示する）。設計は [LARMの空き待ち](../spec/larm-capacity-wait-design-2026-11-01.md)、ログは [logging](logging.md#larmの空き待ち)。
+判定と送り直しは `api/domains/larm/service/resend.ts` の1か所だけで行う。規則は、空きなし（上の拒否）、準備中（同じ接続へのclaim）、応答の喪失（同じ `Idempotency-Key` で1回）の3つで、各機能・キュー・Webは独自に送り直さない。ほかの状態コードや、503でもコード・resourceが違う拒否は待たない。会話のLLM・ASR・TTS・判定・embeddingとサービス試用は待たない（サービス試用は `larm_capacity_busy` を表示する）。設計は [LARMの空き待ち](../spec/.todo/larm-capacity-wait-design-2026-11-01.md)、ログは [logging](logging.md#larmの空き待ち)。
 
 ## 保存曲のプレイリストと再生
 
@@ -170,7 +170,7 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 接続の内部設定は `larm.englishSpeechEnabled`（省略時無効）。旧 `sentenceLanguageEnabled` は保存文書の移行で引き継ぎ、`sentenceLanguageProvider` は削除する。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。`en` 区間には日本語の声・style・pitch・intonation・速度を使わない。逐次音声の表情は英語区間も句ごとに判定するが、日本語向けの抑揚パラメーターは英語TTSへ渡さない。英語TTSの到達確認は `/api/inference/voices?language=en`。言語の任意指定は合成APIに公開しない。
 
-英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、辞書適用後の同じ本文を `ja` として話し方を判定し、日本語TTSで合成する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。TTSにはクラウドへの代替がない。読み上げの経路は「LARMのみ」か「クラウドのみ」で、LARMの合成が失敗（429を含む）した句は発話せず、再試行もしない（[設計](../spec/tts-single-lane-design-2026-11-01.md) §4.6）。クラウドのみの経路（Cloudflare Workers AI など）では言語判定を行わず、日本語読み辞書を適用する。
+英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、辞書適用後の同じ本文を `ja` として話し方を判定し、日本語TTSで合成する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。TTSにはクラウドへの代替がない。読み上げの経路は「LARMのみ」か「クラウドのみ」で、LARMの合成が失敗（429を含む）した句は発話せず、再試行もしない（[設計](../spec/.archived/tts-single-lane-design-2026-11-01.md) §4.6）。クラウドのみの経路（Cloudflare Workers AI など）では言語判定を行わず、日本語読み辞書を適用する。
 
 TTSの合成は backend 全体で同時に1件。音声対話の句・読み上げ直し・自動読み上げ・通知の読み上げ・試聴が先着順に並び、待つ間に取り消された要求は LARM へ送らない。まだ生成していない同じ入力（文・設定revision・声の上書き・話し方の準備）の読み上げ直し・通知・試聴は1回の合成にまとめ、合流した全員が取り消したときだけ止める。生成済みの音声は再利用しない。待ちは `inference.speech_lane_waited`（`durationMs`・`count`）、統合は `inference.speech_joined`、発話しなかった句は `voice.speech_skipped` で記録する。
 
@@ -178,7 +178,7 @@ TTSの合成は backend 全体で同時に1件。音声対話の句・読み上�
 
 ## 会話から担当を選ぶ
 
-会話モデルが直近のやり取りを踏まえて発言と依頼内容を解釈します。依頼した作業を特定した後で `find_toolchain` を呼び、既存の Toolchain 検索が返した候補から担当を選びます。検索の埋め込みには保存済みの LARM 接続設定を使います。[会話の解釈から担当の選択まで](../spec/conversation-first-toolchain-2026-11-21.md)
+会話モデルが直近のやり取りを踏まえて発言と依頼内容を解釈します。依頼した作業を特定した後で `find_toolchain` を呼び、既存の Toolchain 検索が返した候補から担当を選びます。検索の埋め込みには保存済みの LARM 接続設定を使います。[会話の解釈から担当の選択まで](../spec/.archived/conversation-first-toolchain-2026-11-21.md)
 
 音声の発話態度判定は `decision.system-one` を使います。
 

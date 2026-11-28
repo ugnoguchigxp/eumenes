@@ -10,6 +10,6 @@ Plateの編集データと取込原文を管理する作業用文書。保存先
 
 登録は `markdown.bundle.json` と `adapter:markdown@1`。画面はDesignSystemのMarkdownWorkspaceをOpenUIの`markdown-workspace`から表示する。WebやCLIからDBを開かない。
 
-使い方と制約は [docs/markdown.md](../../../docs/markdown.md)、設計と検証記録は [設計書](../../../spec/markdown-collaboration-full-bundle-design-2026-11-07.md)を参照。
+使い方と制約は [docs/markdown.md](../../../docs/markdown.md)、設計と検証記録は [設計書](../../../spec/.todo/markdown-collaboration-full-bundle-design-2026-11-07.md)を参照。
 
 - service/generated・generated-job: タイトル付きMarkdownをsessionなしで新規保存する公開操作。ホストから注入する出所検査と一時ファイル接続を使い、既存ArchivePort・Queue・条件付きPUT・GET照合を共用する。生成文書の固定入力とreceiptを保持し、独自の文書版履歴は作らない。

@@ -8,7 +8,7 @@ import {
 } from "../contracts/resource-kinds";
 
 /**
- * The resource kinds of spec/resource-uri-implementation-plan-2026-10-25.md §2.2. A new kind is a new
+ * The resource kinds of spec/.todo/resource-uri-implementation-plan-2026-10-25.md §2.2. A new kind is a new
  * `resource-kind` item (here or in a bundle); no code branches on a kind name. `producedBy` lists the
  * toolchain ids whose results create the kind; the host creates `todo` and `event` itself.
  */

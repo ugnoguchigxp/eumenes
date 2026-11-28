@@ -1,6 +1,6 @@
 # 計画1　会話から仕事の完遂まで　検証記録
 
-2026-11-17。対象は [実装計画](../grok-improvement-plan-1-dialogue-pipeline-2026-11-17.md) の最初の作業、1-01、1-02。1-03以降と live は未実施。
+2026-11-17。対象は [実装計画](../.todo/grok-improvement-plan-1-dialogue-pipeline-2026-11-17.md) の最初の作業、1-01、1-02。1-03以降と live は未実施。
 
 ## 条件
 

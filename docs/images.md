@@ -56,4 +56,4 @@ UUID・変換済みbytes・接続/認証のfingerprintを外部送信前にimage
 
 `bun scripts/image-import-live.ts --run <PNGファイル>` はサーバーを起動せず、隔離したEumenes保存領域と実API routeから本番LARMへ送信する。新しく取り込んだ検証画像だけを削除する。2026-10-19には利用者添付の端末画像、透過2000×2000px、応答断の照会、未受付404後の同一bytes再送、削除後の非復活を確認済み。[結果](../spec/verification/model3d-image-import-2026-10-19/live.json)。Googleフォトの実同意・実写真取得と稼働画面は別途受入対象。
 
-要求モデルの追加と新版登録・検証結果は[モデル選択の作業記録](../spec/image-model-selection-work-record-2026-10-31.md)を参照してください。
+要求モデルの追加と新版登録・検証結果は[モデル選択の作業記録](../spec/.archived/image-model-selection-work-record-2026-10-31.md)を参照してください。

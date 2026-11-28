@@ -115,11 +115,35 @@ export function goalReplyTools(
 		tools: port.tools.map((tool) => {
 			const spec = GOAL_DESCRIPTIONS[tool.name];
 			if (!spec) return tool;
+			const parameters = compactParameters(tool.parameters, spec.props);
 			return {
 				...tool,
 				description: args[4] ? tool.description : spec.description,
-				parameters: compactParameters(tool.parameters, spec.props),
+				parameters:
+					tool.name === "update_goal" ? withoutAnswer(parameters) : parameters,
 			};
+		}),
+	};
+}
+
+/**
+ * A goal's question reaches the agent as its assignment's (`assignments`), and is answered with `assignment`:
+ * `update_goal` does not offer answering it as well.
+ */
+function withoutAnswer(parameters: Record<string, unknown>) {
+	const properties = { ...(parameters.properties as JsonObject) };
+	const action = properties.action as JsonObject | undefined;
+	if (Array.isArray(action?.enum))
+		properties.action = {
+			...action,
+			enum: action.enum.filter((value) => value !== "answer_question"),
+		};
+	delete properties.questionRef;
+	return {
+		...parameters,
+		properties,
+		...(Array.isArray(parameters.required) && {
+			required: parameters.required.filter((key) => key !== "questionRef"),
 		}),
 	};
 }

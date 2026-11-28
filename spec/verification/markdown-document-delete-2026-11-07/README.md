@@ -1,6 +1,6 @@
 # Markdown削除の事前確認
 
-2026-11-07。[追加設計](../../markdown-document-delete-design-2026-11-07.md)。削除機能は未実装。
+2026-11-07。[追加設計](../../.archived/markdown-document-delete-design-2026-11-07.md)。削除機能は未実装。
 
 ## 読取り専用の本番調査
 

@@ -199,7 +199,7 @@ tool定義は全生成・全段階で同じ一組とし、推定2,000 token以�
 
 ### 6.3 生成の形
 
-- 会話エージェントは eumenes-agency である（[会話エージェントを agency に置き換える設計](agency-conversation-agent-design-2026-10-25.md)、2026-10-25 合意）。返答は agency の `runRespond` が行い、hostはモデルの呼出し（`executeStream`）と固定のtoolの実行を渡す。
+- 会話エージェントは eumenes-agency である（[会話エージェントを agency に置き換える設計](.todo/agency-conversation-agent-design-2026-10-25.md)、2026-10-25 合意）。返答は agency の `runRespond` が行い、hostはモデルの呼出し（`executeStream`）と固定のtoolの実行を渡す。
 - 1回の生成で、話す・記憶を読む・担当を検索する・依頼する・仕事を操作する、を組み合わせて選べる。toolを呼んだ場合は、tool結果を受けて続ける。同じ先頭なので、続きの呼出しはキャッシュが効く。
 - タスクの依頼かどうかを判断する回を設けない。会話の流れでツールが必要と判断したら、その返答の中で担当を使う。発言の分類（`kind`・`freshness`・`impact`・`approved`）は出させず、分類と行動の突き合わせ（根拠のない回答の検査）もしない。
 - 断りは本文で話す。承認は依頼toolの`approve`、影響は依頼toolの`impact`で表す（§6.7）。
@@ -226,7 +226,7 @@ tool定義は全生成・全段階で同じ一組とし、推定2,000 token以�
 - 不正な引数・未知のtool・回数の上限・担当の検索の2回目は、hostが受け付けず、その理由（`refused`・`issues`・`fields`）をtool結果として返す。会話エージェントは結果を見て直して呼び直すか、できないと伝える。生成を失敗にしない。
 - 提示されたtool名や制御構文を本文に書いた出力（`control_text_in_body`）は採用しない。
 - 主会話の生成の呼出しの出力は1,024tokenまでとする。toolを渡していても温度を固定しない（`speaks`）。停止文字列（`stop`）は付けない（本文の後の空行で`respond`の呼出しの前に切れた run `6839d520`）。
-- 生成が失敗で終わったrunでは、その生成が受け取った発言を処理済みにする（run `3f369993`）。利用者の中止で終わったrunの発言は未処理のまま残す（[止めて編集](prompt-edit-design-2026-10-24.md) Q5）。
+- 生成が失敗で終わったrunでは、その生成が受け取った発言を処理済みにする（run `3f369993`）。利用者の中止で終わったrunの発言は未処理のまま残す（[止めて編集](.archived/prompt-edit-design-2026-10-24.md) Q5）。
 - 2026-10-25 までの`respond`・分類・根拠の検査・構造の修正（`respond_required`・`answer_without_basis`・`speech_required`・`spoken_reply_too_long`、`tool_choice: required`）は廃止した。ただの会話が返答なしで失敗した（run `6839d520`・`5145885e`）。
 
 ### 6.7 実行してよいか
@@ -399,7 +399,7 @@ tool定義は全生成・全段階で同じ一組とし、推定2,000 token以�
 
 ### 9.3 仕事の結果はアクティブな短期記憶に置く（`active`）
 
-2026-10-29変更（優先）: 完了したTODOは完了の取引でアーカイブし、結果は画面の通知で利用者に届ける。会話エージェントの窓には完了の結果を入れない（「## Host notice」に載るのは `waiting` の質問だけ）。結果は聞かれたときに work の `check` で読む。[変更設計](todo-completion-notice-design-2026-10-29.md)。
+2026-10-29変更（優先）: 完了したTODOは完了の取引でアーカイブし、結果は画面の通知で利用者に届ける。会話エージェントの窓には完了の結果を入れない（「## Host notice」に載るのは `waiting` の質問だけ）。結果は聞かれたときに work の `check` で読む。[変更設計](.archived/todo-completion-notice-design-2026-10-29.md)。
 
 - TODOが`done`になったとき、hostはその結果を、`waiting`になったときはその質問を、アクティブな短期記憶の`active`のそのTODOの枠に入れる。会話エージェントが先に確認しなくても、結果は窓にある。
 - 会話エージェントは、仕事の操作の「確認」で、TODOの現在の状態・版（`revision`）・質問ID・結果を読み直せる。確認の結果も同じ枠に入る。
@@ -417,14 +417,14 @@ tool定義は全生成・全段階で同じ一組とし、推定2,000 token以�
 - agency に渡すのは `todo`・`waiting` だけ。`waiting` の質問は従来どおり agency が `result_received` の機会で尋ねる。
 - `## State` の仕事には、アーカイブ後2時間のTODOを「通知済み」（取消は「取消済み」）の一行で載せる。結果の本文は載せない。
 - 利用者はTODO画面の「アーカイブ」で進行中のTODOを止めてアーカイブできる（確認あり、通知なし）。
-- 詳細は [todo-completion-notice-design-2026-10-29.md](todo-completion-notice-design-2026-10-29.md)。
+- 詳細は [todo-completion-notice-design-2026-10-29.md](.archived/todo-completion-notice-design-2026-10-29.md)。
 
 以下は廃止前の記述。
 
 - TODOが`done`・`waiting`になったrunは生成せずに完了し（サブエージェントの答えはここで消費）、agency の`result_received`の機会を開く。agency は機会（TODOの変化・発話後・沈黙後）に`done`を一言で報告し、`waiting`の質問を利用者に聞く。
 - agency の発話が`done`のTODO（`todo:<id>`）を引用していれば、保存時に報告待ちとして発話へ紐づけ、実際の音声再生が最後まで完了した通知で`archived`にする（2026-10-27変更）。文字の保存・表示だけでは確定しない。
 - 利用者の発言への返答がTODOの結果を伝えたかは、agency の背景の update が照合する。伝えた返答の音声が最後まで再生されていれば`archived`、まだなら音声配信の結果を待つ（文字の配信とは区別）。`heard: partial`・`none`なら`done`のまま残り、次の機会で再び見える。
-- 完了TODOを引用する報告は雑談の自発発話上限を消費しない。雑談が上限に達していても未報告の完了TODOには報告の機会を作る。音声配信待ちの同じ報告は重ねず、中断・失敗で未報告候補へ戻す。詳細は[todo-spoken-report-delivery-design-2026-10-27.md](todo-spoken-report-delivery-design-2026-10-27.md)。
+- 完了TODOを引用する報告は雑談の自発発話上限を消費しない。雑談が上限に達していても未報告の完了TODOには報告の機会を作る。音声配信待ちの同じ報告は重ねず、中断・失敗で未報告候補へ戻す。詳細は[todo-spoken-report-delivery-design-2026-10-27.md](.archived/todo-spoken-report-delivery-design-2026-10-27.md)。
 - 会話エージェントのアーカイブの操作（仕事の操作の`archive`・`told`）は廃止した。利用者が不要と言ったTODOの扱いは後の課題。
 
 ## 10. 作業状態（`state`）
@@ -587,7 +587,7 @@ cacheの区切りは、system末尾・`profile`末尾・`episode`末尾・`log`�
 
 ## 16. Agency
 
-- 会話エージェントは agency（eumenes-agency）である。利用者の発言への返答（`runRespond`）、自発発話（発話後・沈黙後の`decide`）、TODOの報告はすべて agency が行う（[設計](agency-conversation-agent-design-2026-10-25.md)）。agency は常に動き、ON/OFFの設定はない。推論はすべて Eumenes に設定された会話のLLMで行う。
+- 会話エージェントは agency（eumenes-agency）である。利用者の発言への返答（`runRespond`）、自発発話（発話後・沈黙後の`decide`）、TODOの報告はすべて agency が行う（[設計](.todo/agency-conversation-agent-design-2026-10-25.md)）。agency は常に動き、ON/OFFの設定はない。推論はすべて Eumenes に設定された会話のLLMで行う。
 - 返答の system の先頭は agency の`respondSystem`（自然な会話の基本・人格・音声の文体・感情・ツールの使い方。設定で決まる）。agency の変わる状態（意図・候補・関心の要約）は`now.agency`に置く。
 - Agencyの自発的な発言は`log`の出来事（`said`、`origin: spontaneous`）にする（§8.2）。
 - 本人の記憶と、エージェント自身の関心を混ぜない。Agencyの内部メモは記憶ツールで返さない。

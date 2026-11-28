@@ -1,6 +1,6 @@
 # LARM文書ライブラリ対応の検証
 
-2026-11-07。[対応設計](../../markdown-library-api-design-2026-11-07.md)、[確定引継ぎ](../../reference/larm-document-library-handoff-2026-11-07.md)、[接続・利用仕様](../../../docs/markdown.md)。利用者の範囲はEumenesの実装・固定試験・接続仕様更新。LARM拡張の配備とDocling起動は対象外。
+2026-11-07。[対応設計](../../.archived/markdown-library-api-design-2026-11-07.md)、[確定引継ぎ](../../reference/larm-document-library-handoff-2026-11-07.md)、[接続・利用仕様](../../../docs/markdown.md)。利用者の範囲はEumenesの実装・固定試験・接続仕様更新。LARM拡張の配備とDocling起動は対象外。
 
 ## 実装
 

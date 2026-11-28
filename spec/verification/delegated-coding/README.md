@@ -1,6 +1,6 @@
 # 委任タスク・CLI監督の検証記録
 
-対象: [全体計画](../../delegated-coding-implementation-2026-10-09/README.md)。2026-10-09の実装は計画01のタスク基盤。
+対象: [全体計画](../../.archived/delegated-coding-implementation-2026-10-09/README.md)。2026-10-09の実装は計画01のタスク基盤。
 
 | 検証 | 記録 | 状態 |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 /**
  * Ports the browser domain owns and `adapters/` implements
- * (spec/browser-tabs-toolchain-design-2026-10-18.md). The adapter drives the user's own Brave
+ * (spec/.todo/browser-tabs-toolchain-design-2026-10-18.md). The adapter drives the user's own Brave
  * through a child `@playwright/mcp --extension` and the Playwright MCP Bridge extension.
  * The domain never sees MCP, tool names or response text; it only sees these shapes.
  * All calls run outside the writer transaction, and the domain serialises them: one call at a

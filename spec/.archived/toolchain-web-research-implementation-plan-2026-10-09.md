@@ -18,7 +18,7 @@
 | 検索最大5件、取得本文最大3件、応答32 KiB以内、本文合計24,000 bytes | 同 service と contracts | 上限を緩めない |
 | 検索結果の受取りバッファは15分、最大64件、再起動で消える | 同 service の `results` | 永続結果と誤認しない |
 | stable 本文だけ別 SQLite にキャッシュする | `service/cache.ts` | 今回の自動調査は `freshness=live`、`retention=none`。既存手動CLIの stable は保持 |
-| Web取得の fixture と全体 gate の記録がある | [Web取得計画の実装記録](../web-research-cache-implementation-plan-2026-10-09.md#15-着手後の実装記録2026-10-09) | 過去の成功を今回の変更の成功として流用しない |
+| Web取得の fixture と全体 gate の記録がある | [Web取得計画の実装記録](../.todo/web-research-cache-implementation-plan-2026-10-09.md#15-着手後の実装記録2026-10-09) | 過去の成功を今回の変更の成功として流用しない |
 | 会話からの取得計画・結果採用は未実装 | 同計画の未実装欄、dialogue service | 本書がこの範囲を具体化 |
 | 推論資源は `inference.llm: 1`、取得は `web.fetch: 2` | `api/application/server.ts` | 1推論枠で受入。補助64K Profileに依存しない |
 | `InferencePort` は本文中心。LLM結果に発話態度判定が走る | `inference/contracts/index.ts`、`service/execute.ts` | 内部制御用推論を明示し、態度判定・TTS・収集から除外 |

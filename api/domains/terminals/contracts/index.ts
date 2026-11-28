@@ -97,7 +97,7 @@ export const errorStatus = {
 } as const satisfies Record<string, HttpErrorStatus>;
 
 /*
- * ---- Work requests (spec/kanban-claude-code-plan-2026-10-14.md §2.2, §3.3–§3.7) ----
+ * ---- Work requests (spec/.todo/kanban-claude-code-plan-2026-10-14.md §2.2, §3.3–§3.7) ----
  * Fixed contract for the request queue. Implementations must not change these shapes; ask the
  * supervisor when a change is needed.
  */

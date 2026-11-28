@@ -55,7 +55,6 @@ export function fixture(
 	// answer is the turn's step, checked against the step contract as a model's would be.
 	const deliberate: NonNullable<GoalProgressPorts["deliberate"]> = async ({
 		snapshot,
-		cycle,
 	}) => {
 		decisions++;
 		const context = snapshot.context;
@@ -68,14 +67,7 @@ export function fixture(
 			...decide(context),
 		});
 		if (!parsed.success) throw new Error("invalid_shape");
-		return {
-			kind: "step",
-			step: parsed.data,
-			remaining: cycle.remaining,
-			planned: null,
-			runId: null,
-			stalled: 0,
-		};
+		return { kind: "step", step: parsed.data, planned: null };
 	};
 	const llm: LlmPort = {
 		async complete() {

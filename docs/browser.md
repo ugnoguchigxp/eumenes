@@ -1,6 +1,6 @@
 # ブラウザ（Braveのタブの接続・操作・撮影）
 
-利用者が普段使うBraveのタブに接続し、開いているタブやEumenesの画面を読み取って操作し、画像として保存する。新しいブラウザやプロファイルは起動しない。設計は[設計書](../spec/browser-tabs-toolchain-design-2026-10-18.md)。現在の実装範囲は設計書の S1（接続とローカル撮影）と S2（ページ操作）、[実行Script・進捗UIと接続承認省略](../spec/browser-script-progress-ui-design-2026-10-20.md)。[固定試験と実機の未確認事項](../spec/verification/browser-script-progress-2026-10-20/README.md)は別に記録する。
+利用者が普段使うBraveのタブに接続し、開いているタブやEumenesの画面を読み取って操作し、画像として保存する。新しいブラウザやプロファイルは起動しない。設計は[設計書](../spec/.todo/browser-tabs-toolchain-design-2026-10-18.md)。現在の実装範囲は設計書の S1（接続とローカル撮影）と S2（ページ操作）、[実行Script・進捗UIと接続承認省略](../spec/.todo/browser-script-progress-ui-design-2026-10-20.md)。[固定試験と実機の未確認事項](../spec/verification/browser-script-progress-2026-10-20/README.md)は別に記録する。
 
 | 状態 | 内容 |
 | --- | --- |

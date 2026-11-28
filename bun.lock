@@ -23,7 +23,7 @@
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
         "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz",
         "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
-        "eumenes-thought-plan": "file:vendor/thought-plan/eumenes-thought-plan-0.2.0-6686cf56b513.tgz",
+        "eumenes-thought-plan": "file:vendor/thought-plan/eumenes-thought-plan-0.3.0-996cb530c03e.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
         "eumenes_router": "file:vendor/router/eumenes_router-0.0.3-5167c9f6fe48.tgz",
         "google-auth-library": "11.1.0",
@@ -1492,7 +1492,7 @@
 
     "eumenes-steer": ["eumenes-steer@vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz", {}, "sha512-d3viR9CIK/qNKPBav9hR2bIY+kNl1fPyQW4a893LrkKvlA8EsUzQRH9StDWfku3QTBnNoBNjYK/lCbeCmcQHYg=="],
 
-    "eumenes-thought-plan": ["eumenes-thought-plan@vendor/thought-plan/eumenes-thought-plan-0.2.0-6686cf56b513.tgz", { "dependencies": { "@modelcontextprotocol/sdk": "1.31.0" }, "peerDependencies": { "openai": "7.51.0", "zod": "^4.4.3" }, "optionalPeers": ["openai"] }, "sha512-dB3FsRgygi3ZCspykOhxc04LixzXUN+oGcFTR0G99uXj9jPvxd54rpqMD/ZejGuqbFMioAmeRWLoe49Jy8nrDQ=="],
+    "eumenes-thought-plan": ["eumenes-thought-plan@vendor/thought-plan/eumenes-thought-plan-0.3.0-996cb530c03e.tgz", { "dependencies": { "@modelcontextprotocol/sdk": "1.31.0" }, "peerDependencies": { "openai": "7.51.0", "zod": "^4.4.3" }, "optionalPeers": ["openai"] }, "sha512-FuUB7/Zj9wkC3k/VxGWe1/uc+wZ/64+JsQN+Bqmo3uoyB2mZlIRo2uN2HrJJJk/XkE2X0Zz9cgzGu6VeTEUHqg=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz", {}, "sha512-FDhxfk81KyuIKcgTHDyuX9SrYaOhKZa1aL0dkkwEausKzm1gRVCsLPNGfloiPoQUEtOc0rMvEr5LJVoWN3W6Hw=="],
 

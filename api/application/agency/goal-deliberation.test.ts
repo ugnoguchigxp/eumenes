@@ -11,11 +11,13 @@ import {
 	deliberateGoal,
 	goalThoughtPlan,
 	parkDelayMs,
-	seenDigest,
+	planInputs,
+	SESSION_SYSTEM,
 	stepOffered,
 	type GoalCycle,
 } from "./goal-deliberation";
 import type { GoalCapability } from "./goal-progress-context";
+import { THOUGHT_LIMIT, thoughtCounted } from "./goal-thought-budget";
 import { createIdleWatch, GOAL_IDLE_AFTER_MS } from "./registered-goals";
 
 const goalText =
@@ -98,66 +100,103 @@ const snapshot = (ctx: GoalStepContext) => ({
 	capabilities: capabilities(ctx),
 });
 const cycle = (partial: Partial<GoalCycle> = {}): GoalCycle => ({
+	runId: null,
+	current: null,
 	remaining: [],
+	since: [],
 	pending: null,
 	parks: 0,
-	stalled: 0,
-	seen: null,
+	consumed: null,
+	thoughts: 0,
+	answers: [],
+	reason: null,
 	...partial,
 });
 
-const review = (decision: string, extra: Record<string, unknown> = {}) => ({
-	done: ["関連テストの実行を監督に頼んだ"],
-	learned: ["色の選択と保存の実装がある"],
+const recall = {
+	done: ["実装ファイルを読んだ", "監督に関連テストを頼んだ"],
+	learned: ["背景色の選択と保存の実装がある"],
 	failures: [
-		{ approach: "監督に試験を頼む", count: 3, cause: "判断が確定しない" },
+		{
+			approach: "監督に関連テストを頼む",
+			count: 3,
+			cause: "監督の判断が確定しない",
+			causeIn: "means",
+		},
 	],
-	changedSinceLast: [],
+};
+const judge = (decision: string, extra: Record<string, unknown> = {}) => ({
+	criteria: [{ id: "root", state: "likely", basis: "実装がある" }],
 	decision,
 	reason: "登録検査をまだ試していない",
-	criterionIds: ["root"],
-	watchRef: null,
-	missing: null,
+	waitRef: null,
 	question: null,
-	questionKind: null,
-	resolvedQuestionRefs: [],
+	missing: null,
 	...extra,
 });
-const verifyPlan = (ref = checkRef) => ({
+const reflect = (decision: string, extra: Record<string, unknown> = {}) => ({
+	differed: "検査が通らなかった",
+	cause: "保存色を起動時に読んでいない",
+	change: "読み取って原因を確かめる",
+	decision,
+	waitRef: null,
+	question: null,
+	missing: null,
+	...extra,
+});
+const read = {
+	kind: "act",
+	capabilityRef: supervision,
+	request: "起動時の背景色の読み込みを確かめる",
+	expectedObservation: "読み込みの有無が分かる",
+	criterionIds: ["root"],
+};
+const verify = {
+	kind: "verify",
+	checkRef,
+	criterionId: "root",
+	evidenceRefs: [],
+};
+const procedure = (...steps: unknown[]) => ({
 	candidates: [
 		{
-			approach: "登録検査で既存の実装を確かめる",
-			steps: [
-				{
-					kind: "verify",
-					checkRef: ref,
-					criterionId: "root",
-					evidenceRefs: ["read:1"],
-				},
-			],
+			approach: "検査で確かめる",
+			steps,
 			impact: {
 				changes: "none",
 				reversible: true,
-				inferenceCalls: 0,
 				minutes: 2,
 				ifFails: "理由が残る",
 			},
 		},
 	],
 	chosen: 0,
-	reason: "変更なしで条件を試験で確かめられる",
+	reason: "変更なしで条件を確かめられる",
 });
 
-/** A model that answers each stage of the goal plan from `byStage`, counting the calls. */
+/**
+ * A model answering each stage of `goal-pursuit` from `byStage` (an array answers the stage's calls in order),
+ * keeping every request; the stage is the one whose system context opens the last message.
+ */
 function model(byStage: Record<string, unknown>) {
-	const stageOf = new Map(goalThoughtPlan.stages.map((s) => [s.system, s.id]));
 	const asked: string[] = [];
+	const requests: LlmRequest<unknown>[] = [];
+	const calls = new Map<string, number>();
 	const llm: LlmPort = {
 		async complete<T>(request: LlmRequest<T>) {
-			const id = stageOf.get(request.system)!;
-			asked.push(id);
+			const messages = (request as { messages?: { content: string }[] })
+				.messages!;
+			const last = messages.at(-1)!.content;
+			const stage = goalThoughtPlan.stages.find(({ system }) =>
+				last.includes(system),
+			)!;
+			asked.push(stage.id);
+			requests.push(request as LlmRequest<unknown>);
+			const n = calls.get(stage.id) ?? 0;
+			calls.set(stage.id, n + 1);
+			const answer = byStage[stage.id];
 			return {
-				value: byStage[id] as T,
+				value: (Array.isArray(answer) ? answer[n] : answer) as T,
 				model: "fixture",
 				inputTokens: 1,
 				outputTokens: 1,
@@ -166,13 +205,14 @@ function model(byStage: Record<string, unknown>) {
 			};
 		},
 	};
-	return { llm, asked };
+	return { llm, asked, requests };
 }
 const turn = (
 	llm: LlmPort,
 	ctx: GoalStepContext,
 	state: GoalCycle,
 	ledger = createLedger(null, "off"),
+	extra: { answered?: readonly string[]; verificationFailed?: boolean } = {},
 ) =>
 	deliberateGoal({
 		llm,
@@ -180,30 +220,60 @@ const turn = (
 		snapshot: snapshot(ctx),
 		cycle: state,
 		signal: new AbortController().signal,
+		...extra,
 	});
+const after = (state: GoalCycle, result: Awaited<ReturnType<typeof turn>>) =>
+	({ ...state, ...result.cycle, pending: null }) as GoalCycle;
 
-test("the stalled goal reviews its repeated failures and chooses the registered check it never tried", async () => {
+test("the stalled goal looks back, judges and devises in one session, and starts the procedure", async () => {
 	const ctx = context();
-	const { llm, asked } = model({
-		review: review("continue"),
-		plan: verifyPlan(),
+	const { llm, asked, requests } = model({
+		recall,
+		judge: judge("continue"),
+		devise: procedure(verify),
 	});
 	const result = await turn(llm, ctx, cycle());
-	expect(asked).toEqual(["review", "plan"]);
+	expect(asked).toEqual(["recall", "judge", "devise"]);
 	expect(result).toMatchObject({
 		kind: "step",
 		step: {
 			kind: "verify",
 			contextId: "ctx-1",
-			progressVersion: 7,
-			checks: [{ checkRef, criterionId: "root", evidenceRefs: ["read:1"] }],
+			checks: [{ checkRef, criterionId: "root" }],
 		},
+		cycle: { thoughts: 1, remaining: [], current: { kind: "verify" } },
 	});
 	if (result.kind === "step") expect(stepOffered(ctx, result.step)).toBe(true);
+	// One session: every stage goes under the same system, carrying the stages before it as messages.
+	expect(requests.every(({ system }) => system === SESSION_SYSTEM)).toBe(true);
+	const messages = (n: number) =>
+		(requests[n] as unknown as { messages: { role: string }[] }).messages;
+	expect(messages(0).map(({ role }) => role)).toEqual(["user"]);
+	expect(messages(2).map(({ role }) => role)).toEqual([
+		"user",
+		"assistant",
+		"user",
+		"assistant",
+		"user",
+	]);
+	expect(new Set(requests.map(({ session }) => session?.id)).size).toBe(1);
 });
 
-test("on track, decided, or due for a check: no model call", async () => {
-	const ctx = context({
+test("a step decided before, a due check, or a procedure on track: no model call", async () => {
+	const ctx = context();
+	const { llm, asked } = model({});
+	const planned = {
+		kind: "verify",
+		checkRef,
+		criterionId: "root",
+		evidenceRefs: ["read:1"],
+	} as const;
+	expect(await turn(llm, ctx, cycle({ pending: planned }))).toMatchObject({
+		kind: "step",
+		step: { kind: "verify" },
+		cycle: { pending: null },
+	});
+	const due = context({
 		attempts: [
 			{
 				...context().attempts[0]!,
@@ -211,107 +281,152 @@ test("on track, decided, or due for a check: no model call", async () => {
 				evidenceRefs: ["read:1"],
 			},
 		],
+		verificationRequired: { attemptRef: "attempt-1", criterionIds: ["root"] },
 	});
-	const next = {
-		kind: "verify" as const,
-		checkRef,
-		criterionId: "root",
-		evidenceRefs: ["read:1"],
-	};
-	const silent = model({});
+	expect(await turn(llm, due, cycle())).toMatchObject({
+		kind: "step",
+		step: { kind: "verify", checks: [{ checkRef, evidenceRefs: ["read:1"] }] },
+	});
+	const done = context({
+		attempts: [{ ...context().attempts[0]!, outcome: "succeeded" }],
+	});
 	const onTrack = await turn(
-		silent.llm,
-		ctx,
-		cycle({ remaining: [next], seen: seenDigest(ctx) }),
+		llm,
+		done,
+		cycle({
+			runId: "run-1",
+			current: { step: "act read", kind: "act" },
+			remaining: [planned],
+			consumed: "attempt-0",
+		}),
 	);
 	expect(onTrack).toMatchObject({
 		kind: "step",
 		step: { kind: "verify" },
-		remaining: [],
+		cycle: { remaining: [], since: [{ step: "act read" }] },
 	});
-
-	const pending = await turn(silent.llm, context(), cycle({ pending: next }));
-	expect(pending).toMatchObject({ kind: "step", step: { kind: "verify" } });
-
-	const due = await turn(
-		silent.llm,
-		context({
-			verificationRequired: { attemptRef: "attempt-1", criterionIds: ["root"] },
-		}),
-		cycle(),
-	);
-	expect(due).toMatchObject({
-		kind: "step",
-		step: { kind: "verify", checks: [{ checkRef, evidenceRefs: ["read:1"] }] },
-	});
-	expect(silent.asked).toEqual([]);
+	expect(asked).toEqual([]);
 });
 
-test("the capability that failed twice in a row with nothing new is not chosen again", async () => {
+test("a step that went wrong opens the next round of the same session, which reflects and re-plans", async () => {
+	const store = openLedgerStore(":memory:");
+	const ledger = createLedger(store);
 	const ctx = context();
-	const actPlan = {
-		...verifyPlan(),
-		candidates: [
-			{
-				...verifyPlan().candidates[0]!,
-				steps: [
-					{
-						kind: "act",
-						capabilityRef: supervision,
-						request: "もう一度試験を実行してください。",
-						expectedObservation: "試験の結果",
-						criterionIds: ["root"],
-					},
-				],
-			},
-		],
-	};
-	const { llm } = model({ review: review("continue"), plan: actPlan });
-	const seen = seenDigest(ctx);
-	expect(await turn(llm, ctx, cycle({ seen }))).toMatchObject({
-		kind: "pause",
-		reason: "goal_method_repeated",
+	const { llm, asked, requests } = model({
+		recall,
+		judge: judge("continue"),
+		devise: [procedure(verify), procedure(read, verify)],
+		reflect: reflect("replan"),
 	});
+	const first = await turn(llm, ctx, cycle(), ledger);
+	const failed = await turn(llm, ctx, after(cycle(), first), ledger, {
+		verificationFailed: true,
+	});
+	expect(asked).toEqual(["recall", "judge", "devise", "reflect", "devise"]);
+	expect(failed).toMatchObject({
+		kind: "step",
+		step: { kind: "act", capabilityRef: supervision },
+		cycle: { thoughts: 2, remaining: [verify] },
+	});
+	const reflectCall = requests[3]!;
+	expect(reflectCall.session?.id).toBe(first.cycle!.runId!);
+	expect(reflectCall.session?.turns).toHaveLength(3);
+	expect(JSON.parse(reflectCall.prompt)).toMatchObject({
+		result: { step: `verify ${checkRef} (root)`, outcome: "failed" },
+	});
+	expect(ledger.readRun(first.cycle!.runId!)?.run.rounds).toBe(2);
+	store.close();
 });
 
-test("a goal that kept stopping with nothing new may only wait or ask; a change lifts it", async () => {
+test("waiting on nothing in particular stops the goal for a while; asking ends the round with the question", async () => {
 	const ctx = context();
-	const seen = seenDigest(ctx);
-	const keepsGoing = model({ review: review("continue"), plan: verifyPlan() });
-	await expect(
-		turn(keepsGoing.llm, ctx, cycle({ parks: 2, seen })),
-	).rejects.toMatchObject({ code: "goal_cycle_stage_output_inconsistent" });
-	expect(
-		await turn(keepsGoing.llm, ctx, cycle({ parks: 2, seen: "older" })),
-	).toMatchObject({ kind: "step", step: { kind: "verify" } });
-	const asks = model({
-		review: review("ask", {
-			missing: "背景色を確かめる手段",
-			question: "背景色の設定を確かめる方法を指定できますか？",
-		}),
+	const waits = model({
+		recall,
+		judge: judge("wait", { waitRef: "recheck-later" }),
 	});
-	expect(await turn(asks.llm, ctx, cycle({ parks: 2, seen }))).toMatchObject({
-		kind: "step",
-		step: {
-			kind: "ask",
-			question: "背景色の設定を確かめる方法を指定できますか？",
-		},
-	});
-	const waitsOnNothing = model({
-		review: review("wait", { watchRef: "no-such-watch" }),
-	});
-	await expect(turn(waitsOnNothing.llm, ctx, cycle())).rejects.toMatchObject({
-		code: "goal_cycle_stage_output_inconsistent",
-	});
-	const waitsAWhile = model({
-		review: review("wait", { watchRef: "recheck-later" }),
-	});
-	expect(
-		await turn(waitsAWhile.llm, ctx, cycle({ parks: 2, seen })),
-	).toMatchObject({
+	expect(await turn(waits.llm, ctx, cycle())).toMatchObject({
 		kind: "pause",
 		reason: "goal_wait_recheck",
+		cycle: { thoughts: 1, current: { kind: "wait" } },
 	});
+	expect(waits.asked).toEqual(["recall", "judge"]);
+	const asks = model({
+		recall,
+		judge: judge("ask", {
+			question: "背景色を確かめる方法を指定できますか？",
+			missing: "確かめ方",
+		}),
+	});
+	expect(await turn(asks.llm, ctx, cycle())).toMatchObject({
+		kind: "step",
+		step: { kind: "ask", question: "背景色を確かめる方法を指定できますか？" },
+	});
+});
+
+test("one autonomous run thinks at most four rounds, then asks once; the owner's answer starts a new session", async () => {
+	const ctx = context();
+	const { llm, asked } = model({});
+	const spent = await turn(
+		llm,
+		ctx,
+		cycle({
+			runId: "run-1",
+			current: { step: "verify", kind: "verify" },
+			thoughts: THOUGHT_LIMIT,
+			reason: "独立検査が不成立",
+		}),
+	);
+	expect(asked).toEqual([]);
+	expect(spent).toMatchObject({ kind: "step", step: { kind: "ask" } });
+	if (spent.kind === "step" && spent.step.kind === "ask") {
+		expect(spent.step.question).toContain(`${THOUGHT_LIMIT}回考えて進めました`);
+		expect(spent.step.question).toContain("最後の判断: 独立検査が不成立");
+	}
+	const fresh = model({
+		recall,
+		judge: judge("continue"),
+		devise: procedure(verify),
+	});
+	const answered = await turn(
+		fresh.llm,
+		ctx,
+		cycle({ runId: "run-1", thoughts: THOUGHT_LIMIT, answers: ["q-old"] }),
+		createLedger(null, "off"),
+		// The old question went (its source lapsed); the new answer is still news.
+		{ answered: ["q-new"] },
+	);
+	expect(fresh.asked).toEqual(["recall", "judge", "devise"]);
+	expect(answered).toMatchObject({
+		cycle: { thoughts: 1, answers: ["q-new"] },
+	});
+	expect(answered.cycle!.runId).not.toBe("run-1");
+});
+
+test("a session past its rounds asks the owner without the model", async () => {
+	const store = openLedgerStore(":memory:");
+	const ledger = createLedger(store);
+	const ctx = context();
+	const { llm, asked } = model({
+		recall,
+		judge: judge("continue"),
+		devise: procedure(verify),
+		reflect: reflect("replan"),
+	});
+	let state = after(cycle(), await turn(llm, ctx, cycle(), ledger));
+	for (let round = 2; round <= goalThoughtPlan.rounds!.max; round++)
+		state = after(
+			{ ...state, thoughts: 0 },
+			await turn(llm, ctx, { ...state, thoughts: 0 }, ledger, {
+				verificationFailed: true,
+			}),
+		);
+	const calls = asked.length;
+	const beyond = await turn(llm, ctx, { ...state, thoughts: 0 }, ledger, {
+		verificationFailed: true,
+	});
+	expect(asked).toHaveLength(calls);
+	expect(beyond).toMatchObject({ kind: "step", step: { kind: "ask" } });
+	store.close();
 });
 
 test("a call the host preempted, or an unusable answer, is tried again rather than stopping the goal", async () => {
@@ -333,43 +448,7 @@ test("a call the host preempted, or an unusable answer, is tried again rather th
 	});
 });
 
-test("evidence the goal's own attempts returned is not a change; outside evidence is", () => {
-	const ctx = context();
-	const own = context({
-		evidence: [
-			...ctx.evidence,
-			{ ref: "read:1", version: "2", summary: "再読" },
-		],
-	});
-	expect(seenDigest(own)).toBe(
-		seenDigest(context({ evidence: [{ ...ctx.evidence[0]!, version: "2" }] })),
-	);
-	const outside = context({
-		evidence: [
-			...ctx.evidence,
-			{ ref: "note:1", version: "1", summary: "調査メモ" },
-		],
-	});
-	expect(seenDigest(outside)).not.toBe(seenDigest(ctx));
-});
-
-test("a failed check of a returned result counts as a failure of the turn before", async () => {
-	const ctx = context({
-		attempts: [{ ...context().attempts[0]!, outcome: "succeeded" }],
-	});
-	const { planInputs } = await import("./goal-deliberation");
-	const inputs = planInputs(
-		snapshot(ctx),
-		cycle({ seen: seenDigest(ctx), stalled: 2 }),
-		false,
-		true,
-	);
-	expect(inputs.history.lastOutcome).toBe("failed");
-	expect(inputs.history.mustPause).toBe(true);
-	expect(inputs.history.attempts.at(-1)).toMatchObject({ outcome: "failed" });
-});
-
-test("a goal with much evidence still thinks: the goal's words and the newest evidence fit the turn", async () => {
+test("a goal with much evidence still thinks: the goal's words and the newest evidence fit the first stage", () => {
 	const evidence = [
 		{ ref: "words", version: "1", summary: goalText },
 		...Array.from({ length: 80 }, (_, n) => ({
@@ -378,39 +457,13 @@ test("a goal with much evidence still thinks: the goal's words and the newest ev
 			summary: `読取結果${80 - n}：${"背景色".repeat(300)}`,
 		})),
 	];
-	const ctx = context({ evidence });
-	const { planInputs } = await import("./goal-deliberation");
-	const inputs = planInputs(snapshot(ctx), cycle(), true);
+	const inputs = planInputs(snapshot(context({ evidence })));
 	const refs = inputs.evidence.map(({ ref }) => ref);
 	expect(JSON.stringify(inputs).length).toBeLessThanOrEqual(36_000);
 	expect(refs[0]).toBe("words");
 	expect(refs).toContain("read:1");
 	expect(refs).not.toContain("read:80");
-	const { llm, asked } = model({
-		review: review("continue"),
-		plan: verifyPlan(),
-	});
-	const result = await turn(llm, ctx, cycle());
-	expect(asked).toEqual(["review", "plan"]);
-	expect(result).toMatchObject({ kind: "step", step: { kind: "verify" } });
-});
-
-test("the same turn input reuses the last conclusion without a model call", async () => {
-	const ledger = createLedger(openLedgerStore(":memory:"));
-	const ctx = context();
-	const { llm, asked } = model({
-		review: review("continue"),
-		plan: verifyPlan(),
-	});
-	await turn(llm, ctx, cycle(), ledger);
-	const second = await turn(llm, ctx, cycle(), ledger);
-	expect(asked).toEqual(["review", "plan"]);
-	expect(second).toMatchObject({ kind: "step", step: { kind: "verify" } });
-	expect(
-		ledger
-			.listRuns({ subjectRef: "goal:goal-1" })
-			.map(({ reusedRunId }) => !!reusedRunId),
-	).toEqual([true, false]);
+	expect(inputs.waits.at(-1)?.ref).toBe("recheck-later");
 });
 
 test("a step outside what the turn was shown is never applied", () => {
@@ -491,18 +544,6 @@ test("a goal thinks only once the foreground has been quiet for two minutes", ()
 	expect(createIdleWatch(undefined).until()).toBeNull();
 });
 
-test("three turns in a row that went nowhere may only wait or ask", async () => {
-	const ctx = context();
-	const seen = seenDigest(ctx);
-	const keepsGoing = model({ review: review("continue"), plan: verifyPlan() });
-	expect(
-		await turn(keepsGoing.llm, ctx, cycle({ stalled: 1, seen })),
-	).toMatchObject({ kind: "step", stalled: 2 });
-	await expect(
-		turn(keepsGoing.llm, ctx, cycle({ stalled: 2, seen })),
-	).rejects.toMatchObject({ code: "goal_cycle_stage_output_inconsistent" });
-});
-
 test("a goal does not think while the foreground is busy; it waits until idling can begin", async () => {
 	const { fixture } = await import("./goal-progress.fixture");
 	let idleAt: number | null = 10_000;
@@ -528,23 +569,67 @@ test("a goal does not think while the foreground is busy; it waits until idling 
 	}
 });
 
-test("an ordinary workspace treats an execution question as waiting", async () => {
-	const { llm } = model({
-		review: review("ask", {
-			questionKind: "execution",
-			missing: "tool access",
-			question: "Which checkout?",
+test("a run that failed after reaching the model counts; one that never sent a call does not", () => {
+	expect(thoughtCounted("goal_cycle_stage_output_inconsistent")).toBe(true);
+	expect(thoughtCounted("goal_cycle_llm_timeout")).toBe(true);
+	expect(thoughtCounted("goal_cycle_stage_input_too_large")).toBe(false);
+	expect(thoughtCounted("goal_cycle_llm_preempted")).toBe(false);
+	expect(thoughtCounted("goal_worker_unavailable")).toBe(false);
+});
+
+test("a next step no longer offered, or a step that never ran, goes back to the session instead of an old result", async () => {
+	const store = openLedgerStore(":memory:");
+	const ledger = createLedger(store);
+	const ctx = context({
+		attempts: [{ ...context().attempts[0]!, outcome: "succeeded" }],
+	});
+	const { llm, asked, requests } = model({
+		recall,
+		judge: judge("continue"),
+		devise: [procedure(read, verify), procedure(verify)],
+		reflect: reflect("replan"),
+	});
+	const first = await turn(llm, ctx, cycle(), ledger);
+	expect(first).toMatchObject({
+		cycle: { consumed: "attempt-1", remaining: [verify] },
+	});
+	// The read was taken but no newer attempt came back: the old success is not read as its result.
+	const next = await turn(llm, ctx, after(cycle(), first), ledger);
+	expect(asked).toEqual(["recall", "judge", "devise", "reflect", "devise"]);
+	expect(JSON.parse(requests[3]!.prompt)).toMatchObject({
+		result: { outcome: "rejected" },
+	});
+	expect(next).toMatchObject({ step: { kind: "verify" } });
+
+	// A next step whose check is no longer offered is not taken; the session hears it could not run.
+	const later = context({
+		checks: [],
+		attempts: [
+			...ctx.attempts,
+			{ ...ctx.attempts[0]!, ref: "attempt-2", outcome: "succeeded" },
+		],
+	});
+	const blocked = model({
+		reflect: reflect("ask", {
+			question: "検査を用意できますか？",
+			missing: "検査",
 		}),
 	});
-	const result = await deliberateGoal({
-		llm,
-		ledger: createLedger(null, "off"),
-		snapshot: { ...snapshot(context()), ordinaryWorkspace: true },
-		cycle: cycle(),
-		signal: new AbortController().signal,
+	const asking = await turn(
+		blocked.llm,
+		later,
+		cycle({
+			runId: first.cycle!.runId!,
+			current: { step: "act read", kind: "act" },
+			remaining: [verify as never],
+			consumed: "attempt-1",
+		}),
+		ledger,
+	);
+	expect(blocked.asked).toEqual(["reflect"]);
+	expect(JSON.parse(blocked.requests[0]!.prompt)).toMatchObject({
+		result: { step: `verify ${checkRef} (root)`, outcome: "rejected" },
 	});
-	expect(result).toMatchObject({
-		kind: "pause",
-		reason: "goal_execution_wait",
-	});
+	expect(asking).toMatchObject({ step: { kind: "ask" } });
+	store.close();
 });

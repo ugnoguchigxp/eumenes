@@ -7,7 +7,7 @@ import type {
 
 /**
  * Persisted compacted summaries (`## Summary`) for cache-first conversation compaction
- * (`spec/conversation-cache-compaction-and-history-design-2026-11-22.md`, §6.1).
+ * (`spec/.todo/conversation-cache-compaction-and-history-design-2026-11-22.md`, §6.1).
  */
 export const conversationSummaryMigration = {
 	id: "conversation/0020-conversation-summaries",

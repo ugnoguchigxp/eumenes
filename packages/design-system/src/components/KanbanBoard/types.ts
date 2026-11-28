@@ -1,5 +1,5 @@
 /*
- * Fixed props contract of KanbanBoard (spec/kanban-claude-code-plan-2026-10-14.md §3.10).
+ * Fixed props contract of KanbanBoard (spec/.todo/kanban-claude-code-plan-2026-10-14.md §3.10).
  * The component owns layout, forms, keyboard moves, dialogs and wording of its own controls; the
  * host owns data, status wording and every business decision (which actions a card allows).
  */

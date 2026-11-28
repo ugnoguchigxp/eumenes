@@ -73,7 +73,7 @@
 
 このため「次の一手を選ぶ→操作一件→結果を見てまた次を選ぶ」という細かい往復が、時間を積み上げる構造だと考えられる。検索・URL読取りをまとめる案には検討価値があるが、独立性や品質を保てるかの比較は未実施。一定の回数や時間へ強制的に短縮する案、意味判断を語句で置き換える案を今回実装していない。
 
-根拠となる実装: `api/domains/pursuit/service/tools.ts:18`、`node_modules/eumenes-pursuit/dist/domains/generation/prompts.js:37`、`api/domains/pursuit/service/core.ts`、`api/application/server-core.ts:92`。取り込まれた設計は[既存設計](../../pursuit-web-research-integration-2026-11-06.md)。
+根拠となる実装: `api/domains/pursuit/service/tools.ts:18`、`node_modules/eumenes-pursuit/dist/domains/generation/prompts.js:37`、`api/domains/pursuit/service/core.ts`、`api/application/server-core.ts:92`。取り込まれた設計は[既存設計](../../.archived/pursuit-web-research-integration-2026-11-06.md)。
 
 次に分析の優先度が高いのは、取得後の43回のモデル呼出しで、何の操作が選ばれ、どの新しい根拠や報告更新につながったかである。独立した最終検証は、その必要性と役割を保ったまま別に評価する。
 

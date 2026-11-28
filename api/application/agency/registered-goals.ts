@@ -8,6 +8,7 @@ import type { Database } from "bun:sqlite";
 import type { GoalStore } from "eumenes-agency/agenda/runtime";
 import type { Capabilities } from "../../domains/capabilities";
 import type { ConversationService } from "../../domains/conversation";
+import type { Messages } from "../../domains/inference";
 import {
 	adapterRef as supervisionAdapter,
 	type DevelopmentSupervisionService,
@@ -28,7 +29,7 @@ import { createGoalSupervision } from "../work/goal-supervision";
 import { captureGoalSources } from "./goal-input-sources";
 import { createGoalDesignDocuments } from "./goal-design-documents";
 import { createGoalReplyWork } from "./goal-permission";
-import { createGoalReportDelivery } from "./goal-report-delivery";
+import { createGoalWork } from "./goal-work";
 import { goalQuestionMessageId } from "./goal-question-delivery";
 import { recoverGoalWorkspaceChecks } from "./goal-workspace-verification";
 import { goalSubject } from "./goal-deliberation";
@@ -45,7 +46,14 @@ import { recordPrefix, type AgencyRecordInputDeps } from "./input";
 import { createGoalNoteAdopter } from "./goal-note-adoption";
 import { createAgencyLlmPort } from "./llm-port";
 
-type Inference = Parameters<typeof createAgencyLlmPort>[0]["inference"];
+type Inference = Parameters<typeof createAgencyLlmPort>[0]["inference"] & {
+	usage?(): Array<{
+		id: string;
+		model: string | null;
+		inputTokens: number | null;
+		outputTokens: number | null;
+	}>;
+};
 const access = { principal: PRINCIPAL, scopeKeys: [PROFILE_SCOPE] };
 
 export function registeredDevelopmentBinding(
@@ -109,6 +117,26 @@ export function createIdleWatch(
 	};
 }
 
+/** The receipt of a control call carries no token counts: the goal's turns read them from the attempt record. */
+function attemptUsage(inference: Inference) {
+	const usage = inference.usage;
+	return usage
+		? {
+				attemptUsage: (attemptId: string) => {
+					const used = usage().find(({ id }) => id === attemptId);
+					return used
+						? {
+								model: used.model,
+								inputTokens: used.inputTokens,
+								outputTokens: used.outputTokens,
+								cacheReadTokens: null,
+							}
+						: null;
+				},
+			}
+		: {};
+}
+
 export function createRegisteredGoals(ports: {
 	store: SqliteStore;
 	goals: GoalStore;
@@ -154,13 +182,21 @@ export function createRegisteredGoals(ports: {
 		createAgencyLlmPort({
 			store,
 			inference,
-			next: () => {
+			...attemptUsage(inference),
+			next: (request) => {
 				const resourceId = settings.get().agency.thinkResourceId;
+				// A goal's thinking comes as one session: its earlier exchanges as messages, under its id.
+				const { messages, session } = request as {
+					messages?: Messages;
+					session?: { id: string };
+				};
 				return {
 					decisionId: crypto.randomUUID(),
 					independent: true,
 					generation,
 					...(resourceId ? { resourceId } : {}),
+					...(messages && { messages }),
+					...(session && { sessionId: session.id }),
 				};
 			},
 		});
@@ -326,7 +362,11 @@ export function createRegisteredGoals(ports: {
 		binding,
 		reconcileConfiguration,
 	});
-	const reports = createGoalReportDelivery({ ...ports, enabled });
+	const work = createGoalWork({
+		...ports,
+		enabled,
+		reply: (conversationId) => reply(conversationId),
+	});
 	function forgetInTransaction(db: Database, purge: ForgetPurge) {
 		const messages = new Set(purge.messageIds);
 		for (const {
@@ -379,7 +419,7 @@ export function createRegisteredGoals(ports: {
 		recoverWorkspaceChecks: () => store.write(recoverGoalWorkspaceChecks),
 		reply,
 		list: reply.list,
-		reports,
+		work,
 		quiet: (input: Parameters<typeof updateGoalQuiet>[3]) =>
 			updateGoalQuiet(store, goals, progress, input),
 		readDesign: (db: Database, id: string) =>
@@ -389,25 +429,20 @@ export function createRegisteredGoals(ports: {
 		forgetInTransaction,
 		adoptNote,
 		authority: execution?.authority,
-		/**
-		 * At start: a turn left running belongs to a process that is gone, and turns finished more than
-		 * `THOUGHT_RETENTION_MS` ago leave the ledger.
-		 */
-		thoughts: {
-			recover: () =>
-				store.write((db) => {
-					const nowMs = Date.now();
-					abandonRunsInTransaction(db, {
-						idleSinceMs: nowMs,
-						mode: "library",
-						nowMs,
-					});
-					pruneRunsInTransaction(db, {
-						finishedBeforeMs: nowMs - THOUGHT_RETENTION_MS,
-					});
-				}),
-		},
+		thoughts: { recover: () => store.write(recoverThoughts) },
 	};
+}
+
+/**
+ * At start: a turn left running belongs to a process that is gone, and turns finished more than
+ * `THOUGHT_RETENTION_MS` ago leave the ledger.
+ */
+function recoverThoughts(db: Database) {
+	const nowMs = Date.now();
+	abandonRunsInTransaction(db, { idleSinceMs: nowMs, mode: "library", nowMs });
+	pruneRunsInTransaction(db, {
+		finishedBeforeMs: nowMs - THOUGHT_RETENTION_MS,
+	});
 }
 
 function updateGoalQuiet(

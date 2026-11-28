@@ -3,7 +3,7 @@
 - 日付: 2026-11-22
 - 基準コミット: `dac16e45`（作業ツリー）
 - 実施環境: 独立した固定コピー `/tmp/eumenes-b0-verify-2026-11-22`（製品 DB・鍵・`.env`・ログは非複製、`@eumenes/*` と `packages/design-system/dist` をコピー内で独立ビルド）。Bun 1.4.4 / Vite 8.3.5 / Chromium headless（Playwright）。
-- 関連計画: [品質ガードレール適正化・軽量化・運用持続可能性 改善計画書](../quality-guardrails-and-sustainability-plan-2026-11-22.md)（§3.4 `B0`〜`B3`・§6 論点 3）、[EUM010](../project-issues-2026-11-06.md#eum010-初期javascript容量の超過記録を閉じていない)
+- 関連計画: [品質ガードレール適正化・軽量化・運用持続可能性 改善計画書](../.archived/quality-guardrails-and-sustainability-plan-2026-11-22.md)（§3.4 `B0`〜`B3`・§6 論点 3）、[EUM010](../project-issues-2026-11-06.md#eum010-初期javascript容量の超過記録を閉じていない)
 
 ## 1. B0: 初期チャンク内訳と分類（`B1` 適用前、source map なし `initialGzip = 324,127 B`）
 

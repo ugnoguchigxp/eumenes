@@ -153,6 +153,7 @@ function buildServerAgency(
 			steward,
 			noteDocuments,
 			goalResearchNoteInTransaction: registeredGoals.adoptNote,
+			goalWork: registeredGoals.work,
 			agendaGoals: agendaGoalDeps({
 				store: agendaGoalStore,
 				goals: goals,

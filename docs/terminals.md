@@ -14,7 +14,7 @@
 
 ## 専任担当の作業を見守る（読み取り専用ペイン）
 
-2026年11月25日。会話から Claude Code に頼んだ作業（`claude-code.request@7` 以降、専任担当が SDK runner を監督する方式。[設計](../spec/claude-code-task-terminal-view-2026-11-25.md)）は、PTY ではなく画面の無い runner で動く。その経過を、この画面に **読み取り専用のペイン** として並べる。
+2026年11月25日。会話から Claude Code に頼んだ作業（`claude-code.request@7` 以降、専任担当が SDK runner を監督する方式。[設計](../spec/.archived/claude-code-task-terminal-view-2026-11-25.md)）は、PTY ではなく画面の無い runner で動く。その経過を、この画面に **読み取り専用のペイン** として並べる。
 
 | 項目 | 動作 |
 | --- | --- |
@@ -32,7 +32,7 @@
 
 ## 作業依頼（会話からの直接依頼と Kanban の土台）
 
-Claude Code への依頼は、PTY に直接書かずに **作業依頼表（SQLite の `terminal_requests`）** に保存し、commit した後に送信器が送る。会話からの依頼は `claude-code.request`（write）が呼び出し側の writer transaction の中で `enqueueInTransaction`（`owner: direct`、`mode: work`、`target: current` か `new`）を呼ぶだけで、PTY には何も書かない。Kanban（計画 [P2b](../spec/kanban-claude-code-plan-2026-10-14.md)）は同じ公開操作を `owner: kanban:<cardId>` で使う。
+Claude Code への依頼は、PTY に直接書かずに **作業依頼表（SQLite の `terminal_requests`）** に保存し、commit した後に送信器が送る。会話からの依頼は `claude-code.request`（write）が呼び出し側の writer transaction の中で `enqueueInTransaction`（`owner: direct`、`mode: work`、`target: current` か `new`）を呼ぶだけで、PTY には何も書かない。Kanban（計画 [P2b](../spec/.todo/kanban-claude-code-plan-2026-10-14.md)）は同じ公開操作を `owner: kanban:<cardId>` で使う。
 
 | 状態 | 意味 |
 | --- | --- |

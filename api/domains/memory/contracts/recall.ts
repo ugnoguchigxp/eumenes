@@ -1,4 +1,4 @@
-/** The memory's ranked recall and the input budget (spec/memory-recall-implementation-2026-11-23.md §2.1). */
+/** The memory's ranked recall and the input budget (spec/.archived/memory-recall-implementation-2026-11-23.md §2.1). */
 
 export type MemoryRecallInput = {
 	/** The user's utterance, or read_memory's query. Empty means every record. */

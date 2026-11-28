@@ -1,6 +1,6 @@
 # 文書一覧・保存アイコン・SSD cacheの検証
 
-2026-11-07。[設計](../../markdown-file-browser-ui-design-2026-11-07.md)に従う。画像案を先に生成して提示し、その後に実装した。
+2026-11-07。[設計](../../.archived/markdown-file-browser-ui-design-2026-11-07.md)に従う。画像案を先に生成して提示し、その後に実装した。
 
 ## 実装
 

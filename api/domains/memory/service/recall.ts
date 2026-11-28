@@ -12,7 +12,7 @@ import { queryTerms, scoreOf } from "./recall-score";
 const MAX_LIMIT = 21;
 
 /**
- * The memory's ranked read (spec/memory-recall-implementation-2026-11-23.md section 2.1): the current records and
+ * The memory's ranked read (spec/.archived/memory-recall-implementation-2026-11-23.md section 2.1): the current records and
  * tendencies the query matches, best first, with what the input shows already left out or marked. The work of
  * SQLite and code alone: no model, no embedding. Reading changes nothing.
  */

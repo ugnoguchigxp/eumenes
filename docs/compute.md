@@ -1,6 +1,6 @@
 # Python計算
 
-チャットからCPUで数値計算・記号計算・統計・回帰・作図を依頼できる。公開関数は `compute_python`、担当が選べる操作は次の4本。登録は `api/domains/capabilities/bundles/compute.bundle.json`、設計の正本は [CPU計算の統合設計](../spec/compute-cpu-integration-design-2026-10-21.md)。
+チャットからCPUで数値計算・記号計算・統計・回帰・作図を依頼できる。公開関数は `compute_python`、担当が選べる操作は次の4本。登録は `api/domains/capabilities/bundles/compute.bundle.json`、設計の正本は [CPU計算の統合設計](../spec/.todo/compute-cpu-integration-design-2026-10-21.md)。
 
 | tool | 引数 | 返るもの |
 | --- | --- | --- |
@@ -15,7 +15,7 @@ IDは担当へ渡したsnapshotのものを使う。Pythonは `inputs` を読み
 
 ## 接続
 
-保存済みの接続設定があると、環境の確認前でも会話の候補に出ます。担当を呼ぶか計算の投入APIを使ったときに、初めて環境を確認します。確認から1分経過した後の依頼では再確認し、投入時は2分以内の確認結果を検査します。失敗後は同じ接続先で1分間の再試行間隔を取ります。 [初回利用の設計](../spec/toolchain-on-demand-startup-design-2026-11-26.md)
+保存済みの接続設定があると、環境の確認前でも会話の候補に出ます。担当を呼ぶか計算の投入APIを使ったときに、初めて環境を確認します。確認から1分経過した後の依頼では再確認し、投入時は2分以内の確認結果を検査します。失敗後は同じ接続先で1分間の再試行間隔を取ります。 [初回利用の設計](../spec/.archived/toolchain-on-demand-startup-design-2026-11-26.md)
 
 保存済みLARM Control設定と既存のbackend Control Bearerを使用する。catalogのルートとprofile別servicesからcapability `compute.python.execute`、protocol `larm.compute.v1` を探す。サービス名やモデル名は固定しない。広告のurl・相対endpointとdescriptionを読み、environment取得まで成功したときに新規実行を提供する。相対endpointがあれば保存済みControlへ解決し、urlもある場合はパスの一致を確認する。相対endpointがない絶対urlは同一originに限る。保存済みControlと異なるoriginやredirectへ資格情報を送らない。
 

@@ -4,7 +4,7 @@
 
 ## 対象と状態
 
-[承認済み設計](../asr-input-session-redesign-2026-11-15.md) のEumenes側を実装。旧preview APIと定期再認識を削除し、受付・認識結果の直接通知・下書き所有権を統一した。現行LARMのbatch認識契約を使う。発話中の文字生成は未実装で、[LARM向け追加仕様](../larm-asr-streaming-contract-request-2026-11-15.md) を作成済み。
+[承認済み設計](../.todo/asr-input-session-redesign-2026-11-15.md) のEumenes側を実装。旧preview APIと定期再認識を削除し、受付・認識結果の直接通知・下書き所有権を統一した。現行LARMのbatch認識契約を使う。発話中の文字生成は未実装で、[LARM向け追加仕様](../.todo/larm-asr-streaming-contract-request-2026-11-15.md) を作成済み。
 
 別作業による画像・音楽連携等の変更が同時進行しているため、基準commitに今回の所有ファイルだけを重ねた一時コピーで検証した。製品DB・設定・秘密はコピーしていない。最終照合では `settings-integration.test.ts` のASRモデル切替試験追加と `useWorkspace.ts` のASR設定を開く操作が別作業で追加されており、保持した。これらの追加は固定コピーの試験件数に含めない。作業場所全体の型検査も別途通過した。
 

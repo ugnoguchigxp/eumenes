@@ -381,6 +381,19 @@ export function createAgendaPumpScheduler(ctx: {
 	let requested = false;
 	/** What the database held for each conversation when the last pump began (see `commitDue`). */
 	const observed = new Map<string, string>();
+	/** What the conversation's registered goals show (their progress, question and report): a change is news to it. */
+	const goalSignature = (db: Database, c: AgendaScope) =>
+		JSON.stringify(
+			(ctx.deps.goalWork?.viewsInTransaction(db) ?? [])
+				.filter(({ conversationId }) => conversationId === c.id)
+				.map((view) => [
+					view.goalId,
+					view.revision,
+					view.progress,
+					view.question?.ref ?? null,
+					view.report?.id ?? null,
+				]),
+		);
 	const dbSignature = (
 		db: Database,
 		c: AgendaScope,
@@ -391,7 +404,31 @@ export function createAgendaPumpScheduler(ctx: {
 			ctx.deps.conversationBusy(db, c.id),
 			!!ctx.deps.backgroundPaused?.(db, c.id),
 			work,
+			goalSignature(db, c),
 		].join(":");
+	/** A goal question the goals' own quiet holds back is taken up when that quiet ends, with no commit to wake it. */
+	let quietTimer: ReturnType<typeof setTimeout> | undefined;
+	const armGoalQuiet = () => {
+		const work = ctx.deps.goalWork;
+		if (!work) return;
+		let until: number | null;
+		try {
+			until = ctx.deps.store.read((db) => work.heldUntilInTransaction(db));
+		} catch {
+			return;
+		}
+		if (quietTimer) clearTimeout(quietTimer);
+		quietTimer = undefined;
+		if (until === null) return;
+		quietTimer = setTimeout(
+			() => {
+				quietTimer = undefined;
+				schedule();
+			},
+			Math.max(1_000, until - ctx.now()),
+		);
+		(quietTimer as { unref?: () => void }).unref?.();
+	};
 	/**
 	 * Whether a commit the host did not make itself may change what a pump does. A pump acts on: the outbox past the
 	 * cursor, the results of the work ledger, a conversation whose epoch moved (a forget or a revoke), a
@@ -482,6 +519,7 @@ export function createAgendaPumpScheduler(ctx: {
 				.finally(() => {
 					pumping = null;
 					if (requested && ctx.on()) schedule();
+					else if (ctx.on()) armGoalQuiet();
 				}),
 		);
 	}

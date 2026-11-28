@@ -1,6 +1,6 @@
 # 担当への依頼と結果の報告（assignments）
 
-会話エージェントが担当（ツールチェーン）へ頼んだ仕事は、会話エージェント自身の担当（assignment）になる。Web 調べもの（`start_preparation` → 調べもの担当 → メモ → 自分から知らせる）と同じ流れで、TODO・確認 `c<n>`・`work` ツールは使わない。設計は [担当への依頼を調べものと同じ流れにする](../spec/toolchain-assignment-as-research-2026-11-25.md)、第2段の実装設計は [第2段の実装設計](../spec/toolchain-assignment-stage2-implementation-2026-11-25.md)。
+会話エージェントが担当（ツールチェーン）へ頼んだ仕事は、会話エージェント自身の担当（assignment）になる。Web 調べもの（`start_preparation` → 調べもの担当 → メモ → 自分から知らせる）と同じ流れで、TODO・確認 `c<n>`・`work` ツールは使わない。設計は [担当への依頼を調べものと同じ流れにする](../spec/.todo/toolchain-assignment-as-research-2026-11-25.md)、第2段の実装設計は [第2段の実装設計](../spec/.todo/toolchain-assignment-stage2-implementation-2026-11-25.md)。
 
 ## 流れ
 
@@ -171,7 +171,7 @@ refused: invalid_answer（回答の形: {"type":"object","properties":{…}}）
 
 ## 担当の画面を開く
 
-利用者の言葉から担当へ依頼すると、その担当の登録済みの画面（担当の binding の `adapterRef` を `sourceBindings` に持つ artifact）も Web のワークスペースに開く（[設計 §13](../spec/toolchain-assignment-as-research-2026-11-25.md)）。
+利用者の言葉から担当へ依頼すると、その担当の登録済みの画面（担当の binding の `adapterRef` を `sourceBindings` に持つ artifact）も Web のワークスペースに開く（[設計 §13](../spec/.todo/toolchain-assignment-as-research-2026-11-25.md)）。
 
 | 事柄 | 規則 |
 | --- | --- |
@@ -206,7 +206,8 @@ refused: invalid_answer（回答の形: {"type":"object","properties":{…}}）
 | 失敗 | 担当の失敗・期限切れ・権限の取消は `やり遂げられなかった`。取消（`やめた`）とは別に扱い、エージェントが失敗を話す |
 | 旧 TODO の記録 | 表ごと消した（2026-11-26、`dialogue/0049-drop-retired-todos`）。TODO・確認・コマンドの質問フォーム・TODO を鍵にした最初の画像の表が対象。TODO が作ったものも一緒に消す。古い発言の添付チップは非表示にし、短期記憶の TODO 結果は「あったこと」だけにし、旧調べもの報告は Web の調べものごと消す。チップと報告はマイグレーションと次の起動で一度だけ消え（`retired-todo-traces.ts`）、画像・音楽・文書そのものは各画面に残る |
 | 通知 | TODO の通知 API（`/api/todo-notices*`）・TODO 画面・質問フォーム（`/api/toolchain-interactions*`）は廃止した。完了と質問の知らせは、エージェントの発言だけ |
-| 登録目標・自律行動 | 変更しない。登録目標の実作業（`goalWork.delegation`）と、agency が自分で始める作業の上限と承認はそのまま |
+| 登録目標 | 自発行動中の登録目標も、担当「登録目標」の項目として `assignments` に出る（[設計](../spec/.archived/goal-results-as-assignments-2026-11-26.md)）。目標の質問は `question` に出て、答えは `assignment(answer)`、取下げは `cancel`、改訂は `amend`。達成したら作業報告メモになり、エージェントが自分から知らせる。ホストが会話に決まった文を書き足すことはない。思考と実行は目標の側（サブエージェント）で行う |
+| 自律行動 | agency が自分で始める作業の上限と承認はそのまま |
 
 ## 検証
 
