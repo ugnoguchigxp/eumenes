@@ -18,7 +18,6 @@ import { createOcr } from "../domains/ocr";
 import type { createScheduler } from "../domains/scheduler";
 import type { createTimers } from "../domains/timers";
 import { createUiCompositions } from "../domains/ui-compositions";
-import { createConversationLookup } from "../domains/web-note";
 import type { Config } from "../infrastructure/config";
 import type { getLogger } from "../infrastructure/logger";
 import type { assembleAgency } from "./agency/assembly";
@@ -322,7 +321,6 @@ export function buildDialogueService(
 		agency: deps.agency.dialoguePort,
 		memoryTargets: deps.agency.memoryTargets,
 		conversationAgent: deps.agency.conversationAgent,
-		lookup: createConversationLookup(deps.webNote),
 		logFile: () => config.logFile,
 		objectRecognition: enabled
 			? deps.media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
@@ -358,6 +356,7 @@ export function buildDialogueService(
 }
 
 export function wireToolchainExecution(deps: {
+	works?: import("../domains/claude-code").Host["works"];
 	goalWorkspaces?: import("./agency/goal-workspaces").GoalWorkspaceRegistry;
 	goalAuthority?: NonNullable<
 		import("../domains/development-supervision").SupervisionHost["goal"]
@@ -383,6 +382,7 @@ export function wireToolchainExecution(deps: {
 	world: ReturnType<typeof assembleCuration>["world"];
 }) {
 	const execution = configureTaskExecution({
+		works: deps.works,
 		settings: deps.settings,
 		...deps.workflowPorts,
 		webNote: deps.toolchain.webNote,
@@ -449,6 +449,7 @@ export async function buildHostToolchainService(
 	deps: {
 		core: CoreServices;
 		goalWorkspaces?: import("./agency/goal-workspaces").GoalWorkspaceRegistry;
+		worksEnabled?: boolean;
 		workspace: ReturnType<typeof buildWorkspaceServices>;
 		lateResources: ReturnType<typeof createLateResources>;
 		tasks: Awaited<ReturnType<typeof buildTasks>>;
@@ -547,6 +548,7 @@ export async function buildHostToolchainService(
 		webResearchEnabled: config.webResearchToolsEnabled,
 		webNote,
 		claudeRunner,
+		worksEnabled: deps.worksEnabled,
 		goalClaudeRunners,
 		embed: deps.embedder,
 		terminalHooks: {

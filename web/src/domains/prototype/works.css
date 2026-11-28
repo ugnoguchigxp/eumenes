@@ -1,0 +1,75 @@
+.works-page {
+	height: 100dvh;
+	overflow-y: auto;
+	max-width: 90rem;
+	margin: 0 auto;
+	padding: 1.5rem;
+}
+.works-heading,
+.works-preview header {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+.works-heading h1,
+.works-preview h2 {
+	margin: 0 auto 0 0;
+}
+.works-forms,
+.works-previews {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 27rem), 1fr));
+	gap: 1rem;
+	margin-block: 1rem;
+}
+.works-forms label {
+	display: block;
+	margin-bottom: 0.35rem;
+}
+.works-forms form div,
+.works-list li,
+.works-list li form {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.works-forms input {
+	flex: 1;
+	min-width: min(16rem, 100%);
+	min-height: 2.35rem;
+	padding-inline: 0.6rem;
+}
+.works-list {
+	list-style: none;
+	padding: 0;
+}
+.works-list li,
+.works-preview {
+	border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+	border-radius: 0.5rem;
+	padding: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+.works-list li > div {
+	margin-right: auto;
+	min-width: 0;
+}
+.works-list small {
+	display: block;
+	overflow-wrap: anywhere;
+}
+.works-preview iframe {
+	border: 0;
+	display: block;
+	width: 100%;
+	min-height: 23rem;
+	margin-top: 0.75rem;
+	background: white;
+}
+.works-diagnostics {
+	overflow-wrap: anywhere;
+	max-height: 12rem;
+	overflow: auto;
+}

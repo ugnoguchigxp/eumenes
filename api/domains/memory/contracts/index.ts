@@ -18,7 +18,7 @@ export {
 export const settingsSchema = z
 	.object({
 		enabled: z.boolean().optional(),
-		alwaysTokens: z.number().int().min(200).max(8000).optional(),
+		alwaysTokens: z.number().int().min(50).max(8000).optional(),
 		alwaysScope: z.enum(["responses", "leanings", "facts"]).optional(),
 	})
 	.refine((settings) =>

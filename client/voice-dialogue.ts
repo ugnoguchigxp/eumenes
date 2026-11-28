@@ -102,19 +102,21 @@ export function voiceDialogueClient(transport: Transport) {
 					...(timing ? { timing } : {}),
 				}),
 			),
-		voiceTurn: async (id: string) =>
+		voiceTurn: async (id: string, signal?: AbortSignal) =>
 			callJson(
 				transport,
 				voiceTurnSchema,
 				`/api/voice/turns/${encodeURIComponent(id)}`,
+				{ signal },
 			),
-		voiceAudio: async (id: string, index?: number) =>
+		voiceAudio: async (id: string, index?: number, signal?: AbortSignal) =>
 			new Uint8Array(
 				await (
 					await transport.call(
 						withQuery(`/api/voice/turns/${encodeURIComponent(id)}/audio`, {
 							index,
 						}),
+						{ signal },
 					)
 				).arrayBuffer(),
 			),
@@ -122,6 +124,7 @@ export function voiceDialogueClient(transport: Transport) {
 			id: string,
 			index?: number,
 			gap?: Partial<ChunkGap> & { audible?: boolean },
+			signal?: AbortSignal,
 		) =>
 			callJson(
 				transport,
@@ -129,7 +132,7 @@ export function voiceDialogueClient(transport: Transport) {
 				withQuery(`/api/voice/turns/${encodeURIComponent(id)}/played`, {
 					index,
 				}),
-				json(gap ?? {}),
+				{ ...json(gap ?? {}), signal },
 			),
 		replaySentences: async (text: string): Promise<string[]> =>
 			(

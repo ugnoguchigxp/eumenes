@@ -5,7 +5,7 @@ import {
 	createExcalidraw,
 	registerDrawingOperations,
 } from "../domains/excalidraw";
-import { createImage } from "../domains/image";
+import { createImage, type PrototypeImageGuard } from "../domains/image";
 import type { ConversationService } from "../domains/conversation";
 import { sharedImageImports } from "./scratch/shared-image-import";
 import { createModel3d } from "../domains/model3d";
@@ -29,6 +29,7 @@ export function buildMedia(
 	deps: {
 		core: Pick<Core, "store" | "queue" | "inference" | "settings">;
 		capabilities: Capabilities;
+		prototypeGuard?: PrototypeImageGuard;
 		agents?: import("../domains/agent-runtime").AgentRuntime;
 	},
 ) {
@@ -53,7 +54,10 @@ export function buildMedia(
 		gateway: mediaGateway,
 	};
 	const music = createMusic(mediaDependencies);
-	const image = createImage(mediaDependencies);
+	const image = createImage({
+		...mediaDependencies,
+		prototypeGuard: deps.prototypeGuard,
+	});
 	const excalidraw = createExcalidraw({
 		store,
 		webOrigin: config.origin,

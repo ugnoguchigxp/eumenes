@@ -276,6 +276,10 @@ export const hostAdapterDescriptions: Array<
 		ref: "adapter:claude-code-task@1",
 		describe: describeClaudeCodeTaskAdapter,
 	},
+	{
+		ref: "adapter:prototype-task@1",
+		describe: () => describeClaudeCodeTaskAdapter(true),
+	},
 	{ ref: ARCHIVE_RESEARCH_ADAPTER, describe: describeArchiveResearchAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },

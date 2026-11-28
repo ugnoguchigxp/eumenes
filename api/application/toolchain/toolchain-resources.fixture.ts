@@ -24,6 +24,7 @@ export function fixtureResources(
 						capabilities.resourceKindsInTransaction(db),
 					) as ResourceKind[],
 				adapters: [
+					...(options.works ? [options.works.resource] : []),
 					createPursuitReportResourceAdapter(store),
 					...(options.markdown
 						? [

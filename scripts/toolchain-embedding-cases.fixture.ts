@@ -253,18 +253,6 @@ export const diverseCases = [
 		"今朝のリマインダー予約が実行されたか確認して",
 	],
 	[
-		"read-agents-explicit",
-		"機能名・用語",
-		"read_agents",
-		"調べものを担当したサブエージェントの作業記録を見せて",
-	],
-	[
-		"read-agents-request",
-		"日常の依頼",
-		"read_agents",
-		"さっきの担当が使ったツールを確認したい",
-	],
-	[
 		"resource-explicit",
 		"機能名・用語",
 		"resource.research",

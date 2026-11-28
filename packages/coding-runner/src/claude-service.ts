@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, realpathSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import type { ClaudeEngineInput, runClaudeExecution } from "./claude-engine";
 import {
@@ -22,6 +21,8 @@ import {
 	optionalJson,
 	privateDirectory,
 } from "./storage";
+import { idleRetirement } from "./claude-idle";
+import { hostBoot } from "./claude-host-boot";
 import { readNarration, recordNarration } from "./claude-narration";
 
 type Receipt = {
@@ -84,28 +85,6 @@ function observedEvidence(previous: ClaudeEvidence[], next: ClaudeEvidence) {
 	return events.filter((event) => retained.has(event));
 }
 
-function hostBoot() {
-	try {
-		const platform = process.platform;
-		const mac = platform === "darwin";
-		const boot = mac
-			? execFileSync("/usr/sbin/sysctl", ["-n", "kern.bootsessionuuid"], {
-					encoding: "utf8",
-				}).trim()
-			: readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();
-		const host = mac
-			? execFileSync(
-					"/usr/sbin/ioreg",
-					["-rd1", "-c", "IOPlatformExpertDevice"],
-					{ encoding: "utf8" },
-				).match(/"IOPlatformUUID" = "([\w-]+)"/)?.[1]
-			: readFileSync("/etc/machine-id", "utf8").trim();
-		if (host && boot) return { host: digest(host), boot };
-	} catch {
-		// No boot identity means restart is never evidence of an exit.
-	}
-}
-
 function effectiveInput(
 	input: ReturnType<Prepare>,
 	spec: ClaudeStart,
@@ -158,6 +137,11 @@ function effectiveInput(
 						input.projectInstructions,
 						"Follow the registered tool scope below. The workspace reference names the registration. Use the physical working directory and the listed absolute paths for tool arguments.",
 						"Read within a listed readable directory or open a listed file directly. When only files are listed, use their exact absolute paths instead of searching the checkout root.",
+						...(authority?.worksRuntime
+							? [
+									"For Works, open files with Read and edit only the listed source paths. Do not install packages or use Git. After the final edit run BOTH of the exact registered verification commands below, one Bash call per command, and report their results.",
+								]
+							: []),
 						JSON.stringify({
 							workspaceRef: authority?.workspaceRef,
 							workingDirectory: workspace,
@@ -184,7 +168,10 @@ export class ClaudeService {
 	private readonly active = new Map<string, Active>();
 	private readonly unknown = new Set<string>();
 	private readonly confirmStopped = new Map<string, () => boolean>();
+	private readonly recoveryCleanups = new Map<string, () => void>();
 	private readonly boot = hostBoot();
+	private readonly instance = crypto.randomUUID();
+	private readonly retirement: ReturnType<typeof idleRetirement>;
 	private closing?: Promise<void>;
 
 	constructor(
@@ -192,7 +179,13 @@ export class ClaudeService {
 		workspace: string,
 		private readonly prepare: Prepare,
 		private readonly engine: Engine,
+		idle?: { ms: number; exit(): void },
 	) {
+		this.retirement = idleRetirement(
+			idle,
+			this.instance,
+			() => !!(this.active.size || this.unknown.size || this.closing),
+		);
 		this.workspace = realpathSync(workspace);
 		this.root = privateDirectory(root);
 		this.unlock = lock(join(root, "claude-runner.lock"));
@@ -247,10 +240,15 @@ export class ClaudeService {
 		switch (input.operation) {
 			case "health":
 				return {
-					ready: !this.closing && !this.unknown.size,
+					ready:
+						!this.retirement.closing() && !this.closing && !this.unknown.size,
 					workspace: this.workspace,
 					supervised: true,
+					instance: this.instance,
+					retiring: this.retirement.closing(),
 				};
+			case "retire_idle":
+				return this.retirement.request(input.instance);
 			case "inspect":
 				return this.read(input.id)?.observation ?? null;
 			case "start":
@@ -292,6 +290,8 @@ export class ClaudeService {
 	}
 
 	private start(spec: ClaudeStart): ClaudeObservation {
+		if (this.retirement.closing() || this.closing)
+			throw new Error("claude_runner_unavailable");
 		const fingerprint = digest(canonical(spec));
 		const existing = this.read(spec.id);
 		if (existing) {
@@ -319,7 +319,7 @@ export class ClaudeService {
 			)
 				throw new Error("claude_delegation_invalid");
 		}
-		if (this.closing) throw new Error("claude_runner_unavailable");
+		this.retirement.reset();
 		const incompatible = [...this.active.values()].some(({ receipt }) => {
 			const activeLease = receipt.spec.supervised?.lease;
 			const activeSlot = activeLease?.slot ?? "exclusive";
@@ -412,8 +412,11 @@ export class ClaudeService {
 		active.done = this.run(saved, input, active).finally(() => {
 			active.controller.abort();
 			this.active.delete(spec.id);
-			if (saved.observation.managedExecutionStopped)
-				input.supervisedTools?.cleanup?.();
+			const cleanup = input.supervisedTools?.cleanup;
+			if (cleanup) {
+				if (saved.observation.managedExecutionStopped) cleanup();
+				else this.recoveryCleanups.set(spec.id, cleanup);
+			}
 		});
 		return structuredClone(saved.observation);
 	}
@@ -714,6 +717,8 @@ export class ClaudeService {
 		});
 		this.unknown.delete(input.id);
 		this.confirmStopped.delete(input.id);
+		this.recoveryCleanups.get(input.id)?.();
+		this.recoveryCleanups.delete(input.id);
 		return result;
 	}
 
@@ -771,6 +776,7 @@ export class ClaudeService {
 
 	close() {
 		if (this.closing) return this.closing;
+		this.retirement.reset();
 		const active = [...this.active.values()];
 		this.closing = Promise.allSettled(active.map(({ done }) => done)).then(() =>
 			this.unlock(),

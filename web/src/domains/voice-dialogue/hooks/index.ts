@@ -11,7 +11,7 @@ import {
 	type CreateAudio,
 } from "../../audio";
 import type { AvatarCue } from "../../avatar";
-import { type ChunkQueue } from "./chunk-player";
+import { clearChunkQueue, type ChunkQueue } from "./chunk-player";
 import { commitIdleInput } from "./input-commit";
 import { createInputLedger } from "./input-timing";
 import { createVoiceMachine, isCurrent } from "./machine";
@@ -30,6 +30,8 @@ export type VoiceIssue =
 	| {
 			cause: unknown;
 			turn?: Pick<VoiceTurn, "utteranceId" | "sessionId" | "runId">;
+			/** Present on playback failures. Null means this screen did not confirm a completed clause. */
+			playbackPosition?: string | null;
 	  };
 /** `noticeQuiet` holds a reply chunk while a notice sounds on the screen (spec tts-single-lane §4.4). */
 export function useVoiceDialogue(
@@ -68,7 +70,7 @@ export function useVoiceDialogue(
 	} | null>(null);
 	const [recognitionId, setRecognitionId] = useState<string | null>(null);
 	const cancelPlayback = useCallback(() => {
-		queue.current = null;
+		clearChunkQueue(queue);
 		machine.dispatch({ type: "playback_cancelled" });
 		setSubtitle(null);
 		setAvatarCue(null);

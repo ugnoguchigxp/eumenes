@@ -7,7 +7,7 @@ import { queryRoots } from "../../../queryKeys";
 import { type AudioController } from "../../audio";
 import type { AvatarCue } from "../../avatar";
 import { invalidateDialogueViews } from "../../dialogue";
-import { queueChunks, type ChunkQueue } from "./chunk-player";
+import { clearChunkQueue, queueChunks, type ChunkQueue } from "./chunk-player";
 import { createVoiceMachine, isCurrent } from "./machine";
 import { useVoiceTurn } from "./turn";
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -98,6 +98,21 @@ export function followVoicePlayback(deps: {
 		valid()
 	) {
 		if (["failed", "cancelled", "interrupted"].includes(value.status)) {
+			if (
+				value.status === "interrupted" &&
+				value.error === "backend_restarted"
+			) {
+				const previous = queue.current;
+				setError({
+					cause: value.error,
+					turn: value,
+					playbackPosition:
+						previous?.id === value.utteranceId
+							? (previous.lastCompletedClause ?? null)
+							: null,
+				});
+				machine.dispatch({ type: "turn_released" });
+			}
 			controller.current?.stopPlayback();
 			cancelPlayback();
 			return;
@@ -113,6 +128,7 @@ export function followVoicePlayback(deps: {
 			playback = null;
 		}
 		if (playback?.id !== value.utteranceId) {
+			clearChunkQueue(queue);
 			const installed = machine.dispatch({
 				type: "player_installed",
 				id: value.utteranceId,
@@ -120,6 +136,7 @@ export function followVoicePlayback(deps: {
 			playback = {
 				id: value.utteranceId,
 				epoch: installed.player!.epoch,
+				abort: new AbortController(),
 				audioGeneration,
 				tail: Promise.resolve(),
 			};
@@ -140,7 +157,11 @@ export function followVoicePlayback(deps: {
 			noticeQuiet,
 			fail: (e) => {
 				if (!valid()) return;
-				setError({ cause: e, turn: value });
+				setError({
+					cause: e,
+					turn: value,
+					playbackPosition: playback.lastCompletedClause ?? null,
+				});
 				controller.current?.stopPlayback();
 				cancelPlayback();
 				machine.dispatch({ type: "turn_released" });

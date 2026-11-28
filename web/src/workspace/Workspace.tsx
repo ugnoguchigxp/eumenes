@@ -141,6 +141,12 @@ export function Workspace({
 			)}
 			<ArtifactLauncher
 				entries={[
+					{
+						label: "Works",
+						onSelect: () => {
+							window.location.hash = "works";
+						},
+					},
 					{ label: "図を描く・編集する", onSelect: openDrawing },
 					{ label: "音楽プレイリスト", onSelect: openPlaylist },
 					...menuEntries(toolchain.entries).map((entry) => ({

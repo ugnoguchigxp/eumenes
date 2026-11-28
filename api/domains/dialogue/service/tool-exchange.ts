@@ -7,7 +7,6 @@ import {
 } from "eumenes-agency/agenda";
 import { goalReplyToolNames } from "eumenes-agency/agenda/runtime";
 import { TOOL_NAMES } from "./generation-tools";
-import { jstNowLine } from "./input-text";
 
 /**
  * The tools whose calls and normalized results stay in the working conversation epoch until compaction
@@ -24,10 +23,8 @@ const READ_TOOL_NAMES = new Set<string>([
 	"read_memory",
 	"read_history",
 	"read_runs",
-	"read_agents",
 	"read_world",
 ]);
-const LOOKUP_TOOL = "lookup_public_information";
 const WORK_CONTROL_TOOLS = new Set<string>([
 	"discard_for_pending_switch",
 	TOOL_NAMES.memory,
@@ -40,7 +37,6 @@ const CARRIED = new Set<string>([
 	...AGENDA_TOOLS,
 	...GOAL_TOOLS,
 	...READ_TOOL_NAMES,
-	LOOKUP_TOOL,
 	...WORK_CONTROL_TOOLS,
 	TOOL_NAMES.search,
 	TOOL_NAMES.delegate,
@@ -58,7 +54,6 @@ const RESULT_CHARS = {
 	agendaOther: 800,
 	readTool: 2000,
 	goal: 1500,
-	lookup: 1500,
 	searchDelegate: 1200,
 	workControl: 1000,
 	turnTotal: 6000,
@@ -267,7 +262,6 @@ function carriedArguments(raw: string): string {
 
 function normalizeStepResult(
 	step: ExchangeStep,
-	nowMs: number,
 	maxCharsOverride?: number,
 ): string {
 	const cap = (base: number) =>
@@ -298,18 +292,6 @@ function normalizeStepResult(
 			return boundedJson(parsed, cap(RESULT_CHARS.goal));
 		return clipText(String(step.result ?? ""), cap(RESULT_CHARS.goal));
 	}
-	if (step.name === LOOKUP_TOOL) {
-		const parsed =
-			typeof step.result === "string" ? tryParseJson(step.result) : step.result;
-		const value =
-			parsed && typeof parsed === "object" && !Array.isArray(parsed)
-				? {
-						fetchedAt: jstNowLine(nowMs),
-						...(parsed as Record<string, unknown>),
-					}
-				: { fetchedAt: jstNowLine(nowMs), text: String(step.result ?? "") };
-		return boundedJson(value, cap(RESULT_CHARS.lookup));
-	}
 	if (WORK_CONTROL_TOOLS.has(step.name)) {
 		const parsed =
 			typeof step.result === "string" ? tryParseJson(step.result) : step.result;
@@ -324,13 +306,12 @@ function normalizeStepResult(
 /** The exchange of a turn to keep with the agent's utterance that ends it, bounded per-tool and per-turn. */
 export function carriedToolCalls(
 	steps: readonly ExchangeStep[],
-	nowMs = Date.now(),
 ): UtteranceToolCall[] {
 	const kept = steps.filter((step) => carriesExchange(step.name));
 	const calls = kept.map((step) => ({
 		name: step.name,
 		arguments: carriedArguments(step.arguments),
-		result: normalizeStepResult(step, nowMs),
+		result: normalizeStepResult(step),
 	}));
 	let total = calls.reduce((sum, c) => sum + c.result.length, 0);
 	// Enforce per-turn result cap from the newest steps backwards, preserving valid JSON on JSON tools.
@@ -342,11 +323,58 @@ export function carriedToolCalls(
 		const excess = total - RESULT_CHARS.turnTotal;
 		const current = calls[i]!;
 		const target = Math.max(120, current.result.length - excess);
-		const shrunk = normalizeStepResult(kept[i]!, nowMs, target);
+		const shrunk = normalizeStepResult(kept[i]!, target);
 		total -= current.result.length - shrunk.length;
 		current.result = shrunk;
 	}
 	return calls;
+}
+
+/** How many calls and found candidates one mark names. */
+const MARKED_CALLS = 3;
+
+/**
+ * One line naming the calls a reply made: all that later turns see of them (spec conversation-input-size-budget-
+ * design-2026-11-28, section 7). A search keeps the ids it found, since the next turn may hand work to one of them;
+ * a hand-over keeps where the work went. A result is read again with the read tools when it is needed.
+ */
+export function callsMark(calls: readonly UtteranceToolCall[]): string {
+	if (!calls.length) return "";
+	const word = (value: unknown, max: number) =>
+		typeof value === "string"
+			? clipText(value.replace(/[\s[\]]+/g, " ").trim(), max, "…")
+			: "";
+	const labels = calls.slice(0, MARKED_CALLS).map((call) => {
+		const args = recordOf(tryParseJson(call.arguments));
+		const result = recordOf(tryParseJson(call.result));
+		if (call.name === TOOL_NAMES.search) {
+			const found = (Array.isArray(result.candidates) ? result.candidates : [])
+				.slice(0, MARKED_CALLS)
+				.flatMap((candidate) => {
+					const c = recordOf(candidate);
+					const id = word(c.id, 80);
+					const title = word(c.title, 20);
+					return id ? [title ? `${id}「${title}」` : id] : [];
+				});
+			return `${call.name}→${found.length ? found.join("、") : "なし"}`;
+		}
+		if (call.name === TOOL_NAMES.delegate) {
+			const to = word(args.toolchain, 80);
+			const outcome =
+				word(result.assignment, 40) ||
+				(result.delegated === true
+					? "受付"
+					: typeof result.answered === "boolean"
+						? "即答"
+						: result.refused === true
+							? "拒否"
+							: word(result.code, 40));
+			return `${call.name}${to ? `(${to})` : ""}${outcome ? `→${outcome}` : ""}`;
+		}
+		return result.refused === true ? `${call.name}→拒否` : call.name;
+	});
+	const more = calls.length - labels.length;
+	return `[道具: ${labels.join("、")}${more > 0 ? ` ほか${more}件` : ""}]`;
 }
 
 /** The agenda tool calls an agent utterance carries (legacy subset helper). */

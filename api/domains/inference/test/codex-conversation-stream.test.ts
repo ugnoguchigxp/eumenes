@@ -111,3 +111,103 @@ test("a Codex tool preamble reaches the user before the tool and remains in the 
 		await codex.cleanup();
 	}
 });
+
+test("a Codex call whose arguments are not a JSON object reaches the host's tool, and the repaired call continues the same thread", async () => {
+	const lines: string[] = [];
+	configureLogging({
+		level: "warn",
+		destination: { write: (line) => void lines.push(line) },
+	});
+	const codex = await fakeCodex();
+	try {
+		const agents = codex.agents(codex.host());
+		const answer = "調べた結果です。";
+		const seen: string[] = [];
+		await codex.behave({
+			text: JSON.stringify({
+				reply: null,
+				// The model put the query itself where the JSON object belongs.
+				tool: { name: "lookup", arguments: "2005年の記録" },
+			}),
+		});
+		const reply = await runRespond({
+			messages: [
+				{ role: "system", content: "Use the lookup." },
+				user("調べて。"),
+			],
+			chat: {
+				async complete(request, onDelta, signal) {
+					const result = await agents.run({
+						...codexCall([], { signal, onDelta, requestId: "repair-request" }),
+						messages: request.messages.map((message) => ({
+							...message,
+							tool_calls: message.tool_calls?.map((call) => ({ ...call })),
+						})),
+						tools: request.tools.map((tool) => ({
+							type: "function" as const,
+							function: tool,
+						})),
+					});
+					return { text: result.text, toolCalls: result.toolCalls ?? [] };
+				},
+			},
+			tools: {
+				tools: [
+					{
+						name: "lookup",
+						description: "Look up",
+						parameters: {
+							type: "object",
+							additionalProperties: false,
+							required: ["query"],
+							properties: { query: { type: "string" } },
+						},
+					},
+				],
+				async call(call) {
+					seen.push(call.arguments);
+					let valid = false;
+					try {
+						valid = typeof JSON.parse(call.arguments).query === "string";
+					} catch {
+						// The host refuses what it cannot read.
+					}
+					await codex.behave({
+						text: JSON.stringify(
+							valid
+								? { reply: answer, tool: null }
+								: {
+										reply: null,
+										tool: {
+											name: "lookup",
+											arguments: '{ "query": "2005年の記録" }',
+										},
+									},
+						),
+					});
+					return { content: valid ? "found" : "refused: invalid_tool_call" };
+				},
+			},
+			emotion: false,
+			// The refused call counts: the answer after the repaired one still offers the tool.
+			maxToolCalls: 3,
+			signal: new AbortController().signal,
+			onDelta: () => {},
+		});
+		expect(seen).toEqual(["2005年の記録", '{"query":"2005年の記録"}']);
+		expect(reply.text).toBe(answer);
+		const turns = await codex.of("turn/start");
+		expect(turns).toHaveLength(3);
+		expect(new Set(turns.map((turn) => turn.params.threadId)).size).toBe(1);
+		expect(turns[1]!.params.input[0].text).toContain("invalid_tool_call");
+		const warned = lines
+			.map((line) => JSON.parse(line))
+			.filter(
+				(entry) => entry.event === "inference.codex_tool_arguments_invalid",
+			);
+		expect(warned.map((entry) => entry.kind)).toEqual(["lookup"]);
+		expect(lines.join("")).not.toContain("2005");
+	} finally {
+		await codex.cleanup();
+	}
+});

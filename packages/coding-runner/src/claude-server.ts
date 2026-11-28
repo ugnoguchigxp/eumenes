@@ -8,12 +8,14 @@ export async function serveClaudeRunner(
 	root: string,
 	workspace: string,
 	prepare: ConstructorParameters<typeof ClaudeService>[2],
+	idle?: { ms: number; exit(): void },
 ) {
 	const service = new ClaudeService(
 		root,
 		workspace,
 		prepare,
 		runClaudeExecution,
+		idle,
 	);
 	try {
 		return await servePrivateRunner(

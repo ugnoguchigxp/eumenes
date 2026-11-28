@@ -95,7 +95,10 @@ export function atomicWrite(path: string, value: unknown) {
 	}
 }
 let flock: ((fd: number, operation: number) => number) | undefined;
-export function lock(path: string): () => void {
+export function lock(
+	path: string,
+	mode: "exclusive" | "shared" = "exclusive",
+): () => void {
 	flock ??= dlopen(
 		process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6",
 		{
@@ -108,7 +111,7 @@ export function lock(path: string): () => void {
 		0o600,
 	);
 	fchmodSync(fd, 0o600);
-	if (flock(fd, 6) !== 0) {
+	if (flock(fd, mode === "exclusive" ? 6 : 5) !== 0) {
 		closeSync(fd);
 		throw new Error("runner_busy");
 	}

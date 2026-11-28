@@ -1,0 +1,22 @@
+{
+  "twoActualClaudeEdits": true,
+  "fourRegisteredChecks": true,
+  "daemons": [
+    {
+      "pid": 18748,
+      "idleBytes": 54199016
+    },
+    {
+      "pid": 19399,
+      "idleBytes": 50266832
+    }
+  ],
+  "hostBytesBefore": 1392397360,
+  "hostBytesAfter": 1482935488,
+  "idleDaemonsAfterClose": 0,
+  "viewMetricsAfterClose": {
+    "watchers": 0,
+    "waiting": 0,
+    "active": 0
+  }
+}

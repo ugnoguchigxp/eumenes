@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { getLogger } from "../../../infrastructure/logger";
 import { fail } from "./cloud-agent-shared";
+import { writeLeanCatalog } from "./codex-catalog";
 import type { CodexHome } from "./codex-home";
 import {
 	disabledFeatures,
@@ -149,9 +150,27 @@ export function createCodexProcesses(
 		const ready = (async () => {
 			await options.home.ready();
 			if (stopRequested) throw fail("incomplete_turn");
+			const overrides = baseOverrides(spec);
+			// A Web search call keeps Codex's own catalog: its search runs through the tools that catalog gives.
+			const catalog = spec.nativeWebSearch
+				? null
+				: await writeLeanCatalog({
+						runtime: options.runtime,
+						home: options.home,
+						overrides: loginOverrides(spec),
+						credential: spec.credential,
+					});
+			if (catalog && "reason" in catalog)
+				log.warn("inference.codex_catalog_unavailable", {
+					reason: catalog.reason,
+				});
+			if (stopRequested) throw fail("incomplete_turn");
 			const spawned = spawnProcess(
 				options,
 				spec,
+				catalog && "path" in catalog
+					? [...overrides, `model_catalog_json=${JSON.stringify(catalog.path)}`]
+					: overrides,
 				(c) => (child = c),
 				(code, signal) => {
 					leave();
@@ -192,24 +211,28 @@ export function createCodexProcesses(
 	}
 }
 
+/** The `-c` overrides that decide which account and host a process (and its catalog) speaks to. */
+const loginOverrides = (spec: CodexConnectionSpec) =>
+	spec.credential ? [`openai_base_url=${JSON.stringify(spec.baseUrl)}`] : [];
+
+const baseOverrides = (spec: CodexConnectionSpec) => [
+	...Object.keys(disabledFeatures).map((name) => `features.${name}=false`),
+	"features.skip_host_skill_discovery=true",
+	"project_doc_max_bytes=0",
+	'history.persistence="none"',
+	...requestHeadOverrides,
+	spec.nativeWebSearch ? 'web_search="live"' : 'web_search="disabled"',
+	...loginOverrides(spec),
+];
+
 /** Owns one child process, its JSON-RPC channels, and the initialize handshake. */
 function spawnProcess(
 	{ runtime, home }: CodexProcessEnvironment,
 	spec: CodexConnectionSpec,
+	overrides: readonly string[],
 	hold: (child: Child) => void,
 	onExit: (code: number | null, signal: string | null) => void,
 ): { rpc: CodexRpc; handshake: Promise<void> } {
-	const overrides = [
-		...Object.keys(disabledFeatures).map((name) => `features.${name}=false`),
-		"features.skip_host_skill_discovery=true",
-		"project_doc_max_bytes=0",
-		'history.persistence="none"',
-		...requestHeadOverrides,
-		spec.nativeWebSearch ? 'web_search="live"' : 'web_search="disabled"',
-		...(spec.credential
-			? [`openai_base_url=${JSON.stringify(spec.baseUrl)}`]
-			: []),
-	];
 	const proc = spawn(
 		runtime.command,
 		["app-server", ...overrides.flatMap((o) => ["-c", o])],

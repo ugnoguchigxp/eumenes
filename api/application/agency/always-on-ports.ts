@@ -66,7 +66,7 @@ const AGENDA_TOOL_SPECS: Record<
 > = {
 	[START_PREPARATION]: {
 		description:
-			"公開情報の調査メモを依頼する（1件ずつ実行、完了後通知）。担当の作業状況は read_agents で確認する。",
+			"公開情報を調べてメモにしてもらう（1件ずつ、できたら知らせる）。request は今回の対象・条件・詳しさ（別件や仮説を足さない）。askedByUser は利用者の明示の依頼なら true。",
 		props: {
 			request:
 				"今回依頼の対象・URL・条件・詳しさを書く。過去発話からは指示語の対象と利用者が今回、明示的に引き継いだ条件のみ補い、別件や仮説を足さない。",
@@ -74,18 +74,16 @@ const AGENDA_TOOL_SPECS: Record<
 		},
 	},
 	[READ_NOTE]: {
-		description:
-			"メモの内容についての質問に答えるため、対象のメモの本文を読む。",
+		description: "メモの本文を読む。",
 		props: { id: "メモID（n1等）" },
 	},
 	[SHOW_NOTE]: {
-		description:
-			"メモの表示依頼や表示の提案への了承を受け、対象が分かったらこのツールを呼ぶ。メモを利用者の Markdown 画面に開く。",
+		description: "メモを利用者の画面に開く（表示を頼まれた・了承されたとき）。",
 		props: { id: "メモID（n1等）" },
 	},
 	[SET_QUIET]: {
 		description:
-			"自発発話・探索の休止を設定。scope: speech=話しかけのみ停止 / all=探索も含め停止。kind: soft=期間未指定の控えめな要望 / asked=期間未指定の明示停止 / said=時間・時刻指定（minutes に分数、0で解除）/ leaving=離席・就寝（minutes に戻り目安）。soft/asked は minutes 不要。話しかけ停止は次発話で自動解除。会話継続中は呼ばない。",
+			"自発の話しかけ・探索を休む。scope: speech=話しかけだけ / all=探索も。kind: soft=控えめな要望 / asked=はっきり頼まれた（どちらも minutes 不要）/ said=長さ・時刻の指定（minutes、0 で解除）/ leaving=離席・就寝（minutes に戻りの目安）。",
 	},
 };
 
@@ -494,6 +492,12 @@ async function executeAgendaReply(
 		for (const id of notesMentioned(text, c.notes.map(noteRef)))
 			c.agent.noteUsed(id, now());
 		remember(c.calls, run.runId, reply.calls);
+		// Which tools a reply used, by name only (never arguments or results): how often each is needed.
+		for (const call of reply.calls)
+			log.info("agency.reply_tool_called", {
+				runId: run.runId,
+				kind: call.name,
+			});
 		ok = true;
 		return { ...reply, text };
 	} finally {

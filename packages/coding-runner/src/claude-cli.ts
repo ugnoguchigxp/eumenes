@@ -10,16 +10,22 @@ const config = claudeDaemonConfigSchema.parse(
 	JSON.parse(readPrivate(location)),
 );
 const { workspace, prepare } = createDefaultClaudePrepare(config);
-const host = await serveClaudeRunner(config.root, workspace, prepare);
-
 let closing = false;
+async function stop() {
+	if (closing) return;
+	closing = true;
+	await host.close();
+	process.exit(0);
+}
+const host = await serveClaudeRunner(
+	config.root,
+	workspace,
+	prepare,
+	config.idleMs ? { ms: config.idleMs, exit: () => void stop() } : undefined,
+);
+
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
-	process.on(signal, async () => {
-		if (closing) return;
-		closing = true;
-		await host.close();
-		process.exit(0);
-	});
+	process.on(signal, stop);
 }
 
 console.log(

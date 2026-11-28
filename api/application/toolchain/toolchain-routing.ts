@@ -212,7 +212,16 @@ export function createToolchainRouting(
 	});
 	/** The card with the instant execution's typed arguments. */
 	const enrich = (db: Database, card: Parameters<typeof instant.card>[1]) =>
-		instant.card(db, card);
+		instant.card(db, card).map((candidate) => {
+			if (candidate.execution !== "task") return candidate;
+			const declared = registeredTask(
+				capabilities,
+				registry,
+				db,
+				candidate.revisionId,
+			)?.inputParameters;
+			return declared ? { ...candidate, taskInputs: declared } : candidate;
+		});
 	const bound = createBoundCommandPort(capabilities, registry, schemas);
 	return {
 		embedQuery,

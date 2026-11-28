@@ -6,7 +6,7 @@ import {
 	type ExecutionView,
 	type OwnedExecutionView,
 } from "../tool-runtime";
-import { codingCanonicalJSON } from "../coding";
+import { claudeInputDigest, codingCanonicalJSON } from "../coding";
 import type {
 	Decision,
 	Host,
@@ -15,12 +15,45 @@ import type {
 	Work,
 } from "./contracts";
 import { terminal } from "./repository";
+import { requestWorksDependency } from "./works-dependency";
 
 export const newId = () => crypto.randomUUID();
+
+function worksChecksPassed(work: Work) {
+	const scope = work.supervision?.authorization;
+	const observed = work.observation;
+	if (!scope || !observed?.managedExecutionStopped || scope.checks.length !== 2)
+		return false;
+	const digest = claudeInputDigest(
+		[...scope.readablePaths, ...scope.writablePaths],
+		undefined,
+		true,
+	);
+	return (
+		!!digest &&
+		scope.checks.every((check) =>
+			observed.structuredEvidence?.some(
+				(evidence) =>
+					evidence.kind === "check" &&
+					evidence.passed &&
+					evidence.exitCode === 0 &&
+					evidence.inputDigest === digest &&
+					codingCanonicalJSON(evidence.check) === codingCanonicalJSON(check),
+			),
+		)
+	);
+}
+const unavailableWorkspace: Host["workspace"] = {
+	hold: () => false,
+	release: () => {},
+};
+
 export function workWorkspace(
 	host: Host,
-	work: Pick<Work, "source" | "supervision">,
+	work: Pick<Work, "source" | "supervision" | "works">,
 ) {
+	if (work.works)
+		return host.works?.workspace(work.works) ?? unavailableWorkspace;
 	const authorization = work.supervision?.authorization;
 	return authorization &&
 		isSupervisedExecutionSource(work.source) &&
@@ -58,7 +91,7 @@ export function commonView(work: Work): Omit<ExecutionView, "conversationId"> {
 
 export function closeQuestion(db: Database, host: Host, work: Work) {
 	if (work.supervision) work.supervision.presentation = undefined;
-	else if (isStandardExecutionSource(work.source)) {
+	if (isStandardExecutionSource(work.source)) {
 		if (work.notice) host.revokeInTransaction(db, work.notice);
 		if (work.deliveredNotice)
 			host.revokeInTransaction(db, work.deliveredNotice);
@@ -123,6 +156,7 @@ export function finish(
 	},
 ) {
 	closeQuestion(db, host, work);
+	delete work.dependency;
 	if (work.supervision?.answerDelivery?.state === "pending")
 		work.supervision.answerDelivery.state = "failed";
 	work.status = status;
@@ -132,13 +166,15 @@ export function finish(
 	work.effect = null;
 	work.decisionId = null;
 	if (work.holdsWorkspace) {
+		const confirmed = !work.executionId || work.stop === "confirmed";
 		workWorkspace(host, work).release(
 			db,
 			work.id,
-			!work.executionId || work.stop === "confirmed",
+			confirmed,
 			work.supervision?.lease,
 		);
 		work.holdsWorkspace = false;
+		if (work.works && work.executions > 0 && confirmed) work.idlePending = true;
 	}
 }
 
@@ -153,6 +189,7 @@ export function requestStop(
 	if (terminal(work)) return;
 	if (work.effect?.kind === "stop" && work.effect.reason === reason) return;
 	closeQuestion(db, host, work);
+	delete work.dependency;
 	work.generation++;
 	work.decisionId = null;
 	if (work.executionId) {
@@ -551,6 +588,10 @@ export function applyDecision(
 			return;
 		}
 		case "ask_user":
+			if (decision.dependency && work.works) {
+				requestWorksDependency(db, host, work, decision.dependency);
+				return;
+			}
 			if (
 				!work.executionId &&
 				work.holdsWorkspace &&
@@ -588,9 +629,11 @@ export function applyDecision(
 						],
 			);
 			const refs = decision.refs.filter((ref) => known.has(ref));
+			const worksVerified = !work.works || worksChecksPassed(work);
 			const verified =
 				decision.status !== "completed" ||
-				(refs.length > 0 &&
+				(worksVerified &&
+					refs.length > 0 &&
 					refs.length === decision.refs.length &&
 					work.observation?.state === "finished");
 			finish(
@@ -606,7 +649,10 @@ export function applyDecision(
 					missing: verified
 						? decision.missing
 						: [...decision.missing, "実行証跡"],
-					refs,
+					refs:
+						work.works && verified && decision.status === "completed"
+							? [`eumenes://prototype/${work.works.id}`, ...refs].slice(0, 12)
+							: refs,
 				},
 			);
 			return;
@@ -646,6 +692,18 @@ export function supervisedAuthority(
 		"operationId" | "questionId" | "parentQuestionId" | "messageId"
 	> = {},
 ) {
+	if (
+		work.works &&
+		work.supervision &&
+		isStandardExecutionSource(work.source)
+	) {
+		return action === "stop" ||
+			action === "view" ||
+			(host.validSourceInTransaction(db, work.source) &&
+				host.works?.current(work.works))
+			? work.supervision.authorization
+			: null;
+	}
 	if (!work.supervision || !isSupervisedExecutionSource(work.source))
 		return null;
 	return (

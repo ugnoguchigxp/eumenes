@@ -1,0 +1,34 @@
+{
+	"react": [
+		"node_modules/react/index.js",
+		"node_modules/@types/react/index.d.ts"
+	],
+	"react/jsx-runtime": [
+		"node_modules/react/jsx-runtime.js",
+		"node_modules/@types/react/jsx-runtime.d.ts"
+	],
+	"react/jsx-dev-runtime": [
+		"node_modules/react/jsx-dev-runtime.js",
+		"node_modules/@types/react/jsx-dev-runtime.d.ts"
+	],
+	"react-dom/client": [
+		"node_modules/react-dom/client.js",
+		"node_modules/@types/react-dom/client.d.ts"
+	],
+	"three": [
+		"node_modules/three/build/three.module.js",
+		"node_modules/@types/three/index.d.ts"
+	],
+	"three/addons/loaders/GLTFLoader.js": [
+		"node_modules/three/examples/jsm/loaders/GLTFLoader.js",
+		"node_modules/@types/three/examples/jsm/loaders/GLTFLoader.d.ts"
+	],
+	"three/addons/controls/OrbitControls.js": [
+		"node_modules/three/examples/jsm/controls/OrbitControls.js",
+		"node_modules/@types/three/examples/jsm/controls/OrbitControls.d.ts"
+	],
+	"cannon-es": [
+		"node_modules/cannon-es/dist/cannon-es.js",
+		"node_modules/cannon-es/dist/cannon-es.d.ts"
+	]
+}

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
+import { getLogger } from "../../../infrastructure/logger";
 import {
 	inputImages,
 	inputMessages,
@@ -17,6 +18,8 @@ import {
 	type CloudAgentResult,
 } from "./cloud-agent-shared";
 import type { CodexHost } from "./codex-host";
+
+const log = getLogger("inference");
 /** Codex has no host-defined functions: a strict output schema chooses reply or call. */
 function codexChoiceSchema(tools: NativeTool[]) {
 	return {
@@ -45,12 +48,73 @@ function codexChoiceSchema(tools: NativeTool[]) {
 		},
 	};
 }
+/**
+ * A JSON Schema as the type the model writes arguments to: property names, which are optional, and the values a
+ * choice allows. Descriptions and bounds are left out: the host checks the arguments and names what to repair.
+ */
+export function argumentType(schema: unknown): string {
+	const s = (schema ?? {}) as Record<string, unknown>;
+	if ("const" in s) return JSON.stringify(s.const);
+	if (Array.isArray(s.enum))
+		return s.enum.map((v) => JSON.stringify(v)).join("|");
+	const options = (s.anyOf ?? s.oneOf) as unknown[] | undefined;
+	if (Array.isArray(options))
+		return [...new Set(options.map(argumentType))].join("|");
+	if (Array.isArray(s.type))
+		return [
+			...new Set(s.type.map((type) => argumentType({ ...s, type }))),
+		].join("|");
+	if (s.type === "object" || s.properties) {
+		const required = new Set(
+			Array.isArray(s.required) ? (s.required as string[]) : [],
+		);
+		const fields = Object.entries(
+			(s.properties ?? {}) as Record<string, unknown>,
+		).map(
+			([name, value]) =>
+				`${name}${required.has(name) ? "" : "?"}: ${argumentType(value)}`,
+		);
+		return fields.length ? `{${fields.join(", ")}}` : "{}";
+	}
+	if (s.type === "array") {
+		const item = argumentType(s.items);
+		return /[|]/.test(item) ? `(${item})[]` : `${item}[]`;
+	}
+	if (s.type === "integer") return "number";
+	return typeof s.type === "string" ? s.type : "unknown";
+}
+
+/** One line per function: its name, the type of its arguments, and what it does. */
+export function codexFunctionLines(tools: NativeTool[]): string {
+	return tools
+		.map(({ function: f }) =>
+			`${f.name}(${argumentType(f.parameters)}) ${(f.description ?? "").replace(/\s*\n\s*/g, " ").trim()}`.trimEnd(),
+		)
+		.join("\n");
+}
+
 function codexFunctions(tools: NativeTool[]) {
 	return (
 		systemContext("inference.contexts.cloud-agents.function-selection", {}) +
 		"\n" +
-		JSON.stringify(tools.map((t) => t.function))
+		codexFunctionLines(tools)
 	);
+}
+/**
+ * The schema fixes `arguments` to a string, not to what the string holds. One JSON object is passed on in its
+ * canonical form. Anything else goes to the host as the model wrote it: the host validates arguments, refuses the
+ * call by its reason, and the model repairs it in the same reply, as with any other provider's tool call.
+ */
+function codexArguments(name: string, text: string) {
+	try {
+		const args: unknown = JSON.parse(text);
+		if (args && typeof args === "object" && !Array.isArray(args))
+			return JSON.stringify(args);
+	} catch {
+		// Not JSON: reported below.
+	}
+	log.warn("inference.codex_tool_arguments_invalid", { kind: name });
+	return text;
 }
 function codexChoice(final: string, tools: NativeTool[]): CloudAgentResult {
 	let value: {
@@ -73,18 +137,12 @@ function codexChoice(final: string, tools: NativeTool[]): CloudAgentResult {
 			typeof call.arguments !== "string"
 		)
 			throw fail("invalid_tool_call");
-		let args: unknown;
-		try {
-			args = JSON.parse(call.arguments);
-		} catch {
-			throw fail("invalid_tool_call");
-		}
-		if (!args || typeof args !== "object" || Array.isArray(args))
-			throw fail("invalid_tool_call");
 		return {
 			// Agency already keeps and speaks a tool preamble before executing it.
 			text: typeof value.reply === "string" ? value.reply : "",
-			toolCalls: [{ id: callId(), name, arguments: JSON.stringify(args) }],
+			toolCalls: [
+				{ id: callId(), name, arguments: codexArguments(name, call.arguments) },
+			],
 		};
 	}
 	if (typeof value?.reply !== "string" || !value.reply.trim())

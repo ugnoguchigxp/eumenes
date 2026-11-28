@@ -15,7 +15,53 @@ import type { Database } from "bun:sqlite";
 import type { GoalTaskView } from "./goal-task";
 
 export const adapterRef = "adapter:claude-code-task@1";
+export const worksAdapterRef = "adapter:prototype-task@1";
+export type WorksTarget = {
+	id: string;
+	generation: number;
+	root: string;
+	environment: string;
+	runtime: string;
+	name: string;
+	include: string[];
+};
+export type WorksChoice = { id: string; generation: number; label: string };
+export class WorksSelectionRequired extends Error {
+	constructor(readonly choices: readonly WorksChoice[]) {
+		super("prototype_target_ambiguous");
+	}
+}
 export const questionAnswer = z.string().trim().min(1).max(2_000);
+export const worksDependencyRequest = z.strictObject({
+	name: z
+		.string()
+		.max(214)
+		.regex(/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/),
+	version: z
+		.string()
+		.max(48)
+		.regex(/^\d+\.\d+\.\d+$/),
+	entry: z
+		.string()
+		.max(240)
+		.regex(/^(?:[\w-][\w.-]*\/)*[\w-][\w.-]*\.[cm]?js$/),
+	types: z
+		.string()
+		.max(240)
+		.regex(/^(?:[\w-][\w.-]*\/)*[\w-][\w.-]*\.d\.[cm]?ts$/),
+	usage: z.string().trim().min(1).max(400),
+	evidenceRef: z.string().max(160),
+});
+export type WorksDependencyRequest = z.infer<typeof worksDependencyRequest>;
+export type WorksDependencyApproval = {
+	id: string;
+	generation: number;
+	request: WorksDependencyRequest;
+	inputDigest: string;
+	sourceDigest: string;
+	manifest: string;
+	jobId?: string;
+};
 const brief = {
 	summary: z.string().trim().min(1).max(320),
 	memo: z.string().max(4_000),
@@ -31,6 +77,7 @@ export const decisionSchema = z.discriminatedUnion("action", [
 		action: z.literal("ask_user"),
 		...brief,
 		question: questionAnswer,
+		dependency: worksDependencyRequest.optional(),
 	}),
 	z.strictObject({
 		action: z.literal("reply"),
@@ -81,6 +128,7 @@ import type {
 export interface Runner {
 	ready(): boolean;
 	probe?(): Promise<boolean>;
+	retireIdle?(): Promise<boolean>;
 	start(operation: Start): Promise<Observation>;
 	inspect(id: string): Promise<Observation | null>;
 	events?(id: string, after: number): Promise<ClaudeEventsResponse>;
@@ -158,8 +206,8 @@ export type SupervisedView = {
 	view: OwnedExecutionView;
 	executionId: string | null;
 	questionExecutionId?: string | null;
-	evidence: ClaudeEvidence[];
-	diagnosticChecks?: ClaudeEvidence[];
+	evidence: (ClaudeEvidence & { kind: "read" | "edit" | "check" })[];
+	diagnosticChecks?: SupervisedView["evidence"];
 	releaseConfirmed: boolean;
 	blocking?: { state: "waiting" | "held"; reason: string };
 	answerDelivery?: {
@@ -169,6 +217,13 @@ export type SupervisedView = {
 };
 
 export type Work = {
+	works?: WorksTarget;
+	worksChoice?: {
+		candidates: readonly WorksChoice[];
+		toolchainRevisionId: string;
+	};
+	dependency?: WorksDependencyApproval;
+	idlePending?: boolean;
 	id: string;
 	source: ExecutionSource | GoalSupervisedExecutionSource | GoalExecutionSource;
 	binding: string;
@@ -276,6 +331,34 @@ export type Host = Pick<
 	};
 	/** Workspace guards for goal-owned work, keyed by the pinned authorization. */
 	goalWorkspace?: (workspaceRef: string) => Host["workspace"];
+	works?: {
+		select(input: {
+			name?: string;
+			references: Work["references"];
+		}): WorksTarget;
+		pick?(choice: WorksChoice): WorksTarget;
+		current(target: WorksTarget): boolean;
+		workspace(target: WorksTarget): Host["workspace"];
+		runner(target: WorksTarget): Runner;
+		dependencies?: {
+			publish(input: {
+				target: WorksTarget;
+				approval: WorksDependencyApproval;
+				signal: AbortSignal;
+				assertCurrent(alreadyPublished?: string): void;
+			}): Promise<string>;
+			advance(
+				target: WorksTarget,
+				manifest: string,
+				version: string,
+			): WorksTarget;
+			advanced?(
+				target: WorksTarget,
+				manifest: string,
+				version: string,
+			): boolean;
+		};
+	};
 	workspace: {
 		hold(
 			db: Database,

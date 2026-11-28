@@ -50,7 +50,7 @@ const found = (inputId: string) => ({
 	})),
 });
 
-test("a hand-over's search and delegation are kept and replayed in the main conversation, while background calls stay text-only without tool roles", async () => {
+test("a hand-over's search and delegation are kept with the reply and marked under its words; background calls read the words only", async () => {
 	h = await setup({ agency: agencyOf().agency });
 	h.state.steps.push(choice({ choice: IMAGE.id }), { text: "頼みました。" });
 	const asked = await h.say("猫の絵を描いて");
@@ -59,15 +59,13 @@ test("a hand-over's search and delegation are kept and replayed in the main conv
 	});
 	await h.say("ありがとう");
 	const said = "頼みました。";
-	// The main conversation replays the normalized search and delegation tool exchange before the reply.
-	const replayed = recent();
-	expect(replayed.map((m) => String(m.role))).toEqual([
-		"assistant",
-		"tool",
-		"tool",
-		"assistant",
+	// The main conversation shows the reply and one line naming what the search found and where the work went.
+	expect(recent()).toEqual([
+		{
+			role: "assistant",
+			content: `${said}\n[道具: find_toolchain→${IMAGE.id}「${IMAGE.title}」、${INSTANT.id}「${INSTANT.title}」、delegate(${IMAGE.id})→a1]`,
+		},
 	]);
-	expect(replayed.at(-1)).toEqual({ role: "assistant", content: said });
 	expect(
 		kept(said).toolCalls.map(({ name, arguments: args, result }) => ({
 			name,

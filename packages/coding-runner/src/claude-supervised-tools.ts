@@ -9,14 +9,21 @@ import {
 	rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	join,
+	relative,
+	resolve,
+} from "node:path";
 import { claudeInputDigest } from "./claude-input-digest";
 import type {
 	ClaudeCheck,
 	ClaudeEvidence,
 	ClaudeStart,
 } from "./claude-contracts";
-import { digest, readPrivate } from "./storage";
+import { digest, lock, readPrivate } from "./storage";
 
 type DelegatedStart = ClaudeStart & {
 	supervised: NonNullable<ClaudeStart["supervised"]>;
@@ -66,6 +73,11 @@ export function createCheckSandbox(
 		writablePaths?: readonly string[];
 		protectedPaths?: readonly string[];
 		path?: string;
+		works?: {
+			runtime: string;
+			readable: readonly string[];
+			executable: string;
+		};
 	},
 ) {
 	if (process.platform !== "darwin" || !existsSync(sandboxExecutable))
@@ -88,9 +100,22 @@ export function createCheckSandbox(
 	}
 	const files = join(temporary, "files");
 	mkdirSync(files, { mode: 0o700 });
+	const works = options?.works;
+	const literal = (value: string) => `(literal ${JSON.stringify(value)})`;
+	const subpath = (value: string) => `(subpath ${JSON.stringify(value)})`;
+	const worksRules = works
+		? [
+				"(deny file-read-data)",
+				`(allow file-read-data ${["/", workspace, "/usr/bin/true", "/usr/bin/env", works.executable].map(literal).join(" ")} ${["/System", "/usr/lib", "/private/preboot", files, works.runtime, ...works.readable].map(subpath).join(" ")})`,
+				`(deny file-read-data (regex #"/\\.env[^/]*($|/)") (regex #"/\\.git($|/)"))`,
+				"(deny process-exec)",
+				`(allow process-exec ${["/usr/bin/true", "/usr/bin/env", works.executable].map(literal).join(" ")})`,
+			]
+		: [];
 	const profile = [
 		"(version 1)",
 		"(allow default)",
+		...worksRules,
 		"(deny network*)",
 		"(deny file-write*)",
 		'(allow file-write-data (literal "/dev/null"))',
@@ -133,6 +158,7 @@ export function createCheckSandbox(
 			`HOME=${files}`,
 			`TMPDIR=${files}`,
 			`XDG_CACHE_HOME=${files}`,
+			...(works ? ["EUMENES_WORKS_CHECK=1"] : []),
 			executable,
 			...check.args,
 		])}`;
@@ -174,7 +200,33 @@ export function supervisedTools(
 		writable.some((path) => contained(path, join(workspace, ".git")))
 	)
 		throw new Error("claude_scope_invalid");
-	let currentDigest = claudeInputDigest(readable);
+	const works =
+		authorization.worksRuntime && resolvePath(authorization.worksRuntime);
+	const digestInputs = (exclude?: string) =>
+		claudeInputDigest(readable, exclude, !!works);
+	const executable = works ? realpathSync(process.execPath) : "";
+	if (
+		works &&
+		(contained(workspace, works) ||
+			contained(works, workspace) ||
+			authorization.checks.some(
+				(check) =>
+					check.cwd !== workspace ||
+					realpathSync(check.executable) !== executable ||
+					check.args.length !== 9 ||
+					check.args[0] !== "--no-env-file" ||
+					check.args[1] !== "--no-install" ||
+					check.args[2] !== "--no-macros" ||
+					check.args[3] !== `--config=${join(works, "bunfig.toml")}` ||
+					check.args[4] !== `--cwd=${works}` ||
+					check.args[5] !== join(works, "check.ts") ||
+					!["typecheck", "build"].includes(check.args[6]!) ||
+					!/^\d+\.\d+$/.test(check.args[7]!) ||
+					check.args[8] !== workspace,
+			))
+	)
+		throw new Error(verificationUnavailable);
+	let currentDigest = digestInputs();
 	const baseline = priorInputDigest ?? authorization.baselineInputDigest;
 	if (
 		(baseline && currentDigest !== baseline) ||
@@ -183,10 +235,16 @@ export function supervisedTools(
 		throw new Error(workspaceInputsChanged);
 	let commands = new Map<string, { check: ClaudeCheck; wrapped: string }>();
 	const sandbox = authorization.checks.length
-		? createCheckSandbox(workspace, spec.id)
+		? createCheckSandbox(
+				workspace,
+				spec.id,
+				works ? { works: { runtime: works, readable, executable } } : undefined,
+			)
 		: undefined;
+	let unpin: (() => void) | undefined;
 	if (sandbox) {
 		try {
+			if (works) unpin = pinCheckRuntime(works, authorization.checks);
 			commands = new Map(
 				authorization.checks.map((check) => [
 					claudeCheckRequest(check),
@@ -194,7 +252,11 @@ export function supervisedTools(
 				]),
 			);
 		} catch (error) {
-			sandbox.cleanup();
+			try {
+				sandbox.cleanup();
+			} finally {
+				unpin?.();
+			}
 			throw error;
 		}
 	}
@@ -214,7 +276,7 @@ export function supervisedTools(
 				input.run_in_background
 			)
 				return;
-			const inputDigest = claudeInputDigest(readable);
+			const inputDigest = digestInputs();
 			if (!inputDigest || inputDigest !== currentDigest) return;
 			const witnessed = sandbox.withExitStatus(command.wrapped);
 			return {
@@ -234,6 +296,7 @@ export function supervisedTools(
 		}
 		const edit = tool === "Write" || tool === "Edit";
 		const search = tool === "Glob" || tool === "Grep";
+		if (works && search) return;
 		if ((!edit && !search && tool !== "Read") || (edit && mode !== "edit"))
 			return;
 		const rawPath = search ? (input.path ?? workspace) : input.file_path;
@@ -252,17 +315,29 @@ export function supervisedTools(
 		} catch {
 			return;
 		}
+		const inRuntime =
+			!edit && !!works && contained(works, path) && /\.d\.[cm]?ts$/.test(path);
 		if (
-			!contained(workspace, path) ||
-			contained(join(workspace, ".git"), path) ||
-			!(edit ? writable : readable).some((parent) => contained(parent, path))
+			!inRuntime &&
+			(!contained(workspace, path) ||
+				contained(join(workspace, ".git"), path) ||
+				(!!works &&
+					relative(workspace, path)
+						.split("/")
+						.some(
+							(name) =>
+								name.startsWith(".") ||
+								name === "node_modules" ||
+								name === "dist",
+						)) ||
+				!(edit ? writable : readable).some((parent) => contained(parent, path)))
 		)
 			return;
-		const inputDigest = claudeInputDigest(readable);
+		const inputDigest = digestInputs();
 		let editGuard: ToolRequest["editGuard"];
 		if (edit) {
 			if (!inputDigest || inputDigest !== currentDigest) return;
-			const unrelatedDigest = claudeInputDigest(readable, path);
+			const unrelatedDigest = digestInputs(path);
 			const contentDigest = editedContentDigest(tool, input, path);
 			if (!unrelatedDigest || !contentDigest) return;
 			editGuard = { unrelatedDigest, contentDigest };
@@ -280,7 +355,7 @@ export function supervisedTools(
 		success: boolean,
 	): ToolEvidence | undefined {
 		if (fact.kind === "check") {
-			const after = claudeInputDigest(readable);
+			const after = digestInputs();
 			const result =
 				output && typeof output === "object"
 					? (output as Record<string, unknown>)
@@ -311,7 +386,7 @@ export function supervisedTools(
 			};
 		}
 		if (!success) return;
-		const after = claudeInputDigest(readable);
+		const after = digestInputs();
 		if (
 			!after ||
 			(fact.kind === "read" && after !== fact.inputDigest) ||
@@ -322,7 +397,7 @@ export function supervisedTools(
 			if (
 				!fact.path ||
 				!editGuard ||
-				editGuard.unrelatedDigest !== claudeInputDigest(readable, fact.path)
+				editGuard.unrelatedDigest !== digestInputs(fact.path)
 			)
 				return;
 			try {
@@ -339,15 +414,87 @@ export function supervisedTools(
 		};
 	}
 
+	function editConflict(
+		tool: string,
+		input: Record<string, unknown>,
+	): ToolEvidence | undefined {
+		if (
+			!works ||
+			mode !== "edit" ||
+			(tool !== "Write" && tool !== "Edit") ||
+			typeof input.file_path !== "string"
+		)
+			return;
+		try {
+			const path = resolvePath(resolve(workspace, input.file_path));
+			if (
+				!writable.some((parent) => contained(parent, path)) ||
+				relative(workspace, path)
+					.split("/")
+					.some(
+						(name) =>
+							name.startsWith(".") ||
+							name === "node_modules" ||
+							name === "dist",
+					) ||
+				digestInputs() === currentDigest
+			)
+				return;
+			const proposal =
+				tool === "Edit"
+					? { before: input.old_string, after: input.new_string }
+					: { replacement: input.content };
+			return {
+				kind: "edit_conflict",
+				targetRevision,
+				path,
+				text: `workspace_inputs_changed: unapplied edit to ${relative(workspace, path)}\n${JSON.stringify(proposal)}`.slice(
+					0,
+					1_024,
+				),
+			};
+		} catch {
+			return;
+		}
+	}
+
 	return {
 		toolRequest,
 		toolEvidence,
+		editConflict,
 		inputDigest: () => currentDigest,
 		commands: [...commands.keys()],
 		readablePaths: [...new Set(readable)],
 		writablePaths: writable,
-		cleanup: sandbox?.cleanup,
+		cleanup: sandbox
+			? () => {
+					try {
+						sandbox.cleanup();
+					} finally {
+						unpin?.();
+						unpin = undefined;
+					}
+				}
+			: undefined,
 	};
+}
+
+function pinCheckRuntime(runtime: string, checks: readonly ClaudeCheck[]) {
+	const parent = dirname(runtime);
+	const version = basename(runtime);
+	if (
+		basename(parent) !== "releases" ||
+		!/^[1-9]\d*\.\d+$/.test(version) ||
+		checks.some((check) => check.args[7] !== version)
+	)
+		throw new Error(verificationUnavailable);
+	const path = join(dirname(parent), "locks", version);
+	if (!existsSync(path)) throw new Error(verificationUnavailable);
+	try {
+		return lock(path, "shared");
+	} catch {
+		throw new Error(verificationUnavailable);
+	}
 }
 
 function editedContentDigest(

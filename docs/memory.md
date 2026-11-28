@@ -241,7 +241,7 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 
 | 段 | 置き場所 | 中身と枠 |
 | --- | --- | --- |
-| 常時の区画 `## Memory` | 入力の先頭側（KV キャッシュの前置き。区切りでだけ並び直す） | 本人の言葉の記録（`user_said`）のうち、`alwaysScope` の種類（`responses`=制約・好み、`leanings`=＋習慣、`facts`=＋本人の事実）。機微・ほかの人の印と抑制された記録は載せない。枠は `alwaysTokens`（既定 2,000 トークン）。超えたら 制約 → 好み → 習慣 → 事実 → 新しい順 で残す |
+| 常時の区画 `## Memory` | 入力の先頭側（KV キャッシュの前置き。区切りでだけ並び直す） | 本人の言葉の記録（`user_said`）のうち、`alwaysScope` の種類（`responses`=制約・好み、`leanings`=＋習慣、`facts`=＋本人の事実）。機微・ほかの人の印と抑制された記録は載せない。枠は `alwaysTokens`（既定 100 トークン、範囲の既定は `responses`。2026-11-28 の移行 `memory/0018-size-first-input-budget` で保存値をこの値に下げた）。超えたら 制約 → 好み → 習慣 → 事実 → 新しい順 で残す |
 | 読む道具 `read_memory` | 道具の結果 | `memory.recall`（`audience: tool`）。常時の区画に載っている記録は省き、関係の強い順に最大 16 件。「ほかに N 件」は当たった残り |
 
 枠と範囲（`alwaysTokens`・`alwaysScope`）は記憶の設定（`memory_host_settings`、`POST /api/memory/settings`、`GET /api/memory/status`）に置く。コードの定数ではない。

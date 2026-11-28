@@ -1,4 +1,5 @@
-import type { QueryClient } from "@tanstack/react-query";
+import type { Query, QueryClient } from "@tanstack/react-query";
+import type { ChangeKind } from "../../client/events";
 
 /** First element of every react-query key. Keys are `[root, identity, ...]`. */
 export const queryRoots = {
@@ -68,6 +69,7 @@ export const changeRoots = [
 	queryRoots.kanban,
 	queryRoots.steward,
 ] as const;
+const savedRoots: ReadonlySet<unknown> = new Set(changeRoots);
 
 /** Roots whose queries call live providers; they are fetched on demand only. */
 const liveProviderRoots: readonly string[] = [
@@ -75,6 +77,63 @@ const liveProviderRoots: readonly string[] = [
 	queryRoots.connectionModels,
 	queryRoots.larmVoices,
 ];
+
+function isLiveProviderQuery(query: Query) {
+	return liveProviderRoots.includes(String(query.queryKey[0]));
+}
+
+/**
+ * A save during an in-flight read needs one later read. Wait separately for
+ * each query so slow or paused reads do not hold up the rest of the screen.
+ */
+export function subscribeQueryRefresh(
+	cache: QueryClient,
+	subscribe: (notify: (kind: ChangeKind) => void) => () => void,
+) {
+	const queries = cache.getQueryCache();
+	const pending = new Set<Query>();
+	let scheduled = false;
+	function schedule() {
+		if (scheduled) return;
+		scheduled = true;
+		queueMicrotask(() => {
+			scheduled = false;
+			const ready = new Set<Query>();
+			for (const query of pending) {
+				if (query.state.fetchStatus !== "idle") continue;
+				pending.delete(query);
+				ready.add(query);
+			}
+			if (ready.size)
+				void cache.invalidateQueries(
+					{ predicate: (query) => ready.has(query) },
+					{ cancelRefetch: false },
+				);
+		});
+	}
+	const unwatch = queries.subscribe((event) => {
+		if (event.type === "removed") pending.delete(event.query);
+		if (
+			event.type === "updated" &&
+			event.query.state.fetchStatus === "idle" &&
+			pending.has(event.query)
+		)
+			schedule();
+	});
+	const unsubscribe = subscribe((kind) => {
+		for (const query of queries.getAll()) {
+			if (kind === "change" && !savedRoots.has(query.queryKey[0])) continue;
+			if (isLiveProviderQuery(query)) query.invalidate();
+			else pending.add(query);
+		}
+		schedule();
+	});
+	return () => {
+		unsubscribe();
+		unwatch();
+		pending.clear();
+	};
+}
 
 /**
  * Refreshes everything except live-provider queries. Those are only marked
@@ -86,8 +145,7 @@ export async function invalidateAllButLive(cache: QueryClient) {
 			cache.invalidateQueries({ queryKey: [root], refetchType: "none" }),
 		),
 		cache.invalidateQueries({
-			predicate: (query) =>
-				!liveProviderRoots.includes(String(query.queryKey[0])),
+			predicate: (query) => !isLiveProviderQuery(query),
 		}),
 	]);
 }

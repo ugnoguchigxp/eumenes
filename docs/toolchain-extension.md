@@ -42,7 +42,7 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 親は `find_toolchain` の候補（種類ごとの枠）からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
-会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`assignment`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_agents`・`read_world`（[設計](../spec/.todo/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
+会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`assignment`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_world`（[設計](../spec/.todo/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
@@ -657,4 +657,4 @@ export const archiveBuiltins: Definition[] = [
 
 ### 会話の外部情報検索
 
-会話エージェントは `lookup_public_information` を通して Codex のライブ検索を使います。調査メモは `web.note` で保存します。 [会話からの外部情報検索](web-research.md)
+公開情報の調査メモは `web.note` が Codex のライブ検索で作り、保存します。 [会話からの外部情報検索](web-research.md)

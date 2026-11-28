@@ -727,3 +727,86 @@ test.skipIf(process.platform !== "darwin")(
 		}
 	},
 );
+
+test("idle retirement is bound to the live instance and refuses an active operation", async () => {
+	const f = fixture();
+	const source = join(f.workspace, "source.txt");
+	writeFileSync(source, "fixture");
+	let retired = 0;
+	let complete!: () => void;
+	const ended = new Promise<void>((resolve) => {
+		complete = resolve;
+	});
+	const live = new ClaudeService(
+		f.root,
+		f.workspace,
+		(input) => ({
+			cwd: f.workspace,
+			executable: "/usr/bin/true",
+			env: {},
+			instruction: input.instruction,
+			projectInstructions: "",
+			deadline: input.deadline,
+			maxTurns: input.maxTurns,
+			tools: ["Read"],
+			authorize: () => true,
+			validateAccount: () => true,
+		}),
+		async () => {
+			await ended;
+			return {
+				result: { text: "finished", turns: 1, ok: true },
+				aborted: false,
+				evidenceCount: 0,
+				managedExecutionStopped: true,
+			};
+		},
+		{
+			ms: 40,
+			exit: () => {
+				retired++;
+			},
+		},
+	);
+	try {
+		const health = live.request({ operation: "health" }) as {
+			instance: string;
+		};
+		expect(
+			live.request({ operation: "retire_idle", instance: crypto.randomUUID() }),
+		).toEqual({ accepted: false });
+		expect(
+			live.request({ operation: "retire_idle", instance: health.instance }),
+		).toEqual({ accepted: true });
+		const first = spec("read", source);
+		live.request({ operation: "start", spec: first });
+		expect(
+			live.request({ operation: "retire_idle", instance: health.instance }),
+		).toEqual({ accepted: false });
+		await Bun.sleep(55);
+		expect(retired).toBe(0);
+		complete();
+		await until(() =>
+			(
+				live.request({
+					operation: "inspect",
+					id: first.id,
+				}) as ClaudeObservation
+			)?.managedExecutionStopped
+				? true
+				: undefined,
+		);
+		expect(
+			live.request({ operation: "retire_idle", instance: health.instance }),
+		).toEqual({ accepted: true });
+		await until(() => (retired ? true : undefined));
+		expect(retired).toBe(1);
+		expect(() =>
+			live.request({ operation: "start", spec: spec("read", source) }),
+		).toThrow("claude_runner_unavailable");
+	} finally {
+		complete();
+		await live.close();
+		f.close();
+	}
+});

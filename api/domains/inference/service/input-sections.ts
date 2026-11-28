@@ -3,6 +3,7 @@ import {
 	TOKEN_ESTIMATE,
 	estimateJsonTokens,
 	estimateMessageTokens,
+	estimateTextTokens,
 } from "../../../infrastructure/context-budget";
 import type { Messages } from "../contracts";
 
@@ -36,7 +37,9 @@ const KNOWN_TAGS: readonly (readonly [prefix: string, label: string])[] = [
 const HEADINGS: ReadonlyMap<string, string> = new Map(
 	[
 		"Memory",
+		"Summary",
 		"Earlier",
+		"Agency",
 		"State",
 		"User",
 		"Host notice",
@@ -111,6 +114,88 @@ export function inputSections(input: {
 		});
 	for (const message of input.messages) sections.push(messageSection(message));
 	return sections;
+}
+
+/** The fields of `## State` the host writes (a line that ends a field's name with `:`), by a fixed word each. */
+const STATE_FIELDS: readonly (readonly [prefix: string, label: string])[] = [
+	["今:", "now"],
+	["仕事:", "work"],
+	["提示中:", "presented"],
+	["共有中:", "shared"],
+	["予定:", "plans"],
+	["目標:", "goals"],
+	["受領した生成画像:", "media"],
+	["あなた自身の関心・問い", "interests"],
+];
+const AGENCY_STATE = /^<あなたの今の状態[^>]*>(.*)<\/あなたの今の状態>$/su;
+
+/**
+ * The parts of the input's last message (what changes with every call): its `## ` sections, the fields of
+ * `## State`, and the top-level keys of the agency's state. Role `part`, a fixed label (`State.work`,
+ * `Agency.notes`, a key of the state's own JSON), estimated tokens and a short hash; never text. Empty when the last
+ * message has none of the product's headings.
+ */
+export function tailSections(messages: Messages): InputSection[] {
+	const last = messages.at(-1);
+	if (!last || last.role !== "user") return [];
+	const parts: InputSection[] = [];
+	const add = (label: string, text: string) => {
+		if (text)
+			parts.push({
+				role: "part",
+				label,
+				tokens: estimateTextTokens(text),
+				hash: hash(text),
+			});
+	};
+	let heading: string | null = null;
+	let body: string[] = [];
+	const close = () => {
+		if (heading === null) return;
+		if (heading === "State") {
+			let field = "other";
+			let lines: string[] = [];
+			const flush = () => {
+				add(`State.${field}`, lines.join("\n"));
+				lines = [];
+			};
+			for (const line of body) {
+				const named = STATE_FIELDS.find(([prefix]) => line.startsWith(prefix));
+				if (named) {
+					flush();
+					field = named[1];
+				}
+				lines.push(line);
+			}
+			flush();
+		} else if (heading === "Agency") {
+			const text = body.join("\n").trim();
+			let state: unknown;
+			try {
+				state = JSON.parse(AGENCY_STATE.exec(text)?.[1] ?? "");
+			} catch {
+				state = null;
+			}
+			if (state && typeof state === "object" && !Array.isArray(state))
+				for (const [key, value] of Object.entries(state))
+					// A key of the package's own state, never a name a user wrote.
+					add(
+						`Agency.${/^[A-Za-z][A-Za-z0-9]{0,40}$/.test(key) ? key : "other"}`,
+						JSON.stringify(value),
+					);
+			else add("Agency", text);
+		} else add(heading, body.join("\n"));
+		body = [];
+	};
+	for (const line of last.content.split("\n")) {
+		const known = HEADINGS.get(line.trimEnd());
+		if (known) {
+			close();
+			heading = known;
+		} else if (heading !== null) body.push(line);
+	}
+	close();
+	return parts;
 }
 
 /** `role:label:tokens:hash` joined by `|`: the form of the `sections` log field (labels hold neither character). */

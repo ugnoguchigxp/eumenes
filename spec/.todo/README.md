@@ -45,7 +45,7 @@
 | [ASR逐次契約依頼](larm-asr-streaming-contract-request-2026-11-15.md) | 未実施の外部契約提案。承認済み依頼書で、送信・実装は未実施。 |
 | [LARM音声ready依頼文](larm-voice-connection-ready-request-prompt-2026-10-25.md) | 外部依頼資料。Eumenes側ではProvider別ready対応と本番API確認を完了したが、依頼先LARM側の原因調査・修正の完了はこの資料から確認できない。 |
 | [Live音声](live-voice-design-2026-10-31.md) | 未完。製品実装と固定検証あり、本人機器での3往復を含む音声MVP受入は未完。 |
-| [TTS初動待ち](tts-ack-latency-2026-11-15.md) | 未完。初回待ちとレビュー指摘が残り、個別変更の結果は別に記録。 |
+| [TTS初動待ち](tts-ack-latency-2026-11-15.md) | 初回待ちと追加レビューの残件あり。[古い確定回答の取得不具合](../.archived/completed-answer-progress-2026-11-28.md)と[保存通知による画面更新の停止](../.archived/workspace-save-notice-refresh-2026-11-28.md)は修正・検証済み。 |
 | [TTS句ごとの先行再生](tts-async-clause-playback-2026-11-15.md) | 一部実施。固定と文字・音声入力の実測済み、遅延改善と本人機器3往復は未完。 |
 | [音声の補修](voice-repair-work-record-2026-10-25.md) | 一部実施。関連domainの固定検証済みだが、15秒超のコールド起動成功と実機器3往復は未確認。 |
 
@@ -71,7 +71,7 @@
 
 | 計画 | 残ること・制約 |
 | --- | --- |
-| [Eumenesの試作環境](instant-project-sandbox-plan-2026-11-28.md) | レビュー用の実装計画。共有依存・プレビュー、Claude Codeによる制作、LARM素材と生成、既存作品の移行と資源計測。実装前。 |
+| [Eumenesの試作環境](instant-project-sandbox-plan-2026-11-28.md) | P0〜P4の実装と隔離検証。独立Gitと共有依存、単体起動、会話からのClaude Code制作、実LARM画像、既存作品の試験導入と資源計測を確認した。正式移行の対象は利用者が選ぶ。[P0](../verification/instant-project-sandbox-2026-11-28/README.md) · [P1](../verification/instant-project-sandbox-p1-2026-11-28/README.md) · [P2](../verification/instant-project-sandbox-p2-2026-11-28/README.md) · [P3](../verification/instant-project-sandbox-p3-2026-11-28/README.md) · [P4](../verification/instant-project-sandbox-p4-2026-11-28/README.md) |
 | [Canvas改善](canvas-app-improvement-plan-2026-11-23.md) | 一部実施。改善・固定検証済み、保持方針とArtifact正式gateが残る。 |
 | [Canvas統合](canvas-app-integration-2026-11-12.md) | 一部実施。描画・画面操作まで実受入した後、受付票の不具合を修正。修正後の会話通しは未確認。 |
 | [Docling Desk接続](docling-desk-integration-design-2026-10-25.md) | 未完。修正済み上流版の配備・実接続再受入と全体gateが未了。 |
@@ -126,11 +126,12 @@
 | [会話の性能改善](conversation-agent-performance-improvement-plan-2026-11-21.md) | 一部実施。計測準備とCodex追記の固定試験は実施したが、各工程の同条件比較・速度と判断品質の完了条件は未確認。 |
 | [会話のトークン効率・負債](conversation-agent-token-efficiency-and-debt-plan-2026-11-22.md) | 一部実施。複数項目の実装記録がある一方、live計測や設計変更候補が残る。 |
 | [会話のキャッシュ・圧縮](conversation-cache-compaction-and-history-design-2026-11-22.md) | 一部実施。Phase 1〜3とCLI liveの記録あり。ただし追試9ターン中2件が失敗し、先行要約の採用と例外詳細は未確認。実機器も未受入。 |
+| [1回の入力を 2,000 token 以下にする最適化計画](conversation-input-size-budget-design-2026-11-28.md) | 計画。未実装。今は1呼出し平均 約 11,600。ツールを 17 本から 9 本へ（退避 6・削除 2、利用者の決定済み）、Codex 組込み・system・履歴・`## State`・背景呼び出しの上限と進める順。着手は利用者の指示待ち。 |
 | [会話デバッグ診断](conversation-debug-diagnostics-implementation-plan-2026-11-15.md) | 未実施の計画。導入の実施記録を確認できず、既存診断と同一と判断できない。 |
 | [会話の読取りツール](conversation-read-tools-design-2026-10-31.md) | 一部実施。R1〜R3と履歴担当は固定検証済み。§7.1にR4のWorld読取り口、反映後の検索・live測定が未実施と明記。 |
 | [会話サブエージェント整理](conversation-subagent-llm-refactoring-plan-2026-10-17.md) | 一部実施。P2・P3はfixture済み、D項目とP1・P4・P5は未了。 |
 | [ツール呼出しの安定化](conversation-toolcall-reliability-design-2026-10-27.md) | 一部実施・一部撤回。P1・P2はfixture済みで、順序案の一部は利用者判断で撤回。会話入力と呼出し方式は後続設計で変更された。 |
-| [会話からの仕事引継ぎ](conversation-work-handoff-design-2026-11-23.md) | 未実施の設計案。合意前で、現行の訂正試験にも失敗が残る。 |
+| [会話からの仕事引継ぎ](conversation-work-handoff-design-2026-11-23.md) | 担当との引継ぎと句の公開通知が残る。完了記録は[単発の通信失敗](../.archived/voice-playback-transport-retry-2026-11-28.md)、[再試行後の再生位置の表示](../.archived/voice-playback-position-2026-11-28.md)、[再起動後の中断表示](../.archived/voice-playback-restart-notice-2026-11-28.md)。 |
 | [LARM後続計画](eumenes-larm-followup-plan-2026-10-24.md) | 一部実施。A〜CとD切分けは完了、通常配置の受入と接続寿命の追加設計が保留。 |
 | [LARM空き待ち](larm-capacity-wait-design-2026-11-01.md) | 一部実施。各domainの固定検証は成功したがT7・T8の専用試験、live・実機器受入は未了。 |
 | [LARM接続キャッシュ](larm-connection-cache-design-2026-10-25.md) | 一部実施。Q1・Q2は実装済み、Q3は未着手と記載。 |

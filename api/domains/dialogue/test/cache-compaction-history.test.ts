@@ -22,7 +22,7 @@ afterEach(async () => {
 	h = undefined;
 });
 
-test("append-only working epoch keeps prior turns and tool results byte-identical across 6 turns", async () => {
+test("the working epoch keeps prior turns byte-identical across 6 turns, with a read marked and its result left out", async () => {
 	h = await setup({ memory: true });
 	h.state.steps.push(
 		...reply("こんにちは。"),
@@ -48,7 +48,7 @@ test("append-only working epoch keeps prior turns and tool results byte-identica
 	await h.say("ターン5です");
 	await h.say("ターン6です");
 
-	// Turn 3 through Turn 6 must share the exact same prefix (system + memory + turns 1..2 with read_memory tool call).
+	// Turn 3 through Turn 6 must share the exact same prefix (system + memory + turns 1..2 with the read's mark).
 	const talkCalls = h.state.calls.filter((c) =>
 		c.messages.at(-1)?.content.includes("## User\nターン"),
 	);
@@ -59,12 +59,11 @@ test("append-only working epoch keeps prior turns and tool results byte-identica
 	const stableLen = t3.length - 1;
 	expect(stableLen).toBeGreaterThanOrEqual(5);
 	expect(t6.slice(0, stableLen)).toEqual(t3.slice(0, stableLen));
-	// Turn 6 still retains the Turn 2 `read_memory` tool result in its KV prefix.
+	// Turn 6 names the Turn 2 `read_memory` call under the reply that made it; the result is not carried.
+	expect(t6.some((m) => (m.role as string) === "tool")).toBe(false);
 	expect(
-		t6.some(
-			(m) =>
-				(m.role as string) === "tool" &&
-				m.content.includes("鎌倉のカフェが好き"),
+		t6.some((m) =>
+			m.content.includes("鎌倉のカフェがお好きですね。\n[道具: read_memory]"),
 		),
 	).toBe(true);
 });

@@ -15,6 +15,7 @@ import { migrations as interactPackageSql } from "eumenes-interact/sqlite";
 import { migrations as excalidrawMigrations } from "../domains/excalidraw";
 import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
 import { migrations as imageMigrations } from "../domains/image";
+import { imageGrantMigrations } from "../domains/prototype";
 import { migrations as markdownMigrations } from "../domains/markdown";
 import { migrations as uiCompositionsMigrations } from "../domains/ui-compositions";
 import { migrations as pipelinesMigrations } from "../domains/pipelines";
@@ -208,6 +209,7 @@ const catalog: readonly Migration[] = [
 	...serviceTestsMigrations,
 	...musicMigrations,
 	...imageMigrations,
+	...imageGrantMigrations,
 	...uiCompositionsMigrations,
 	...markdownMigrations,
 	...pipelinesMigrations,

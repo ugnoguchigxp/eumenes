@@ -115,7 +115,7 @@ test("a read tool's card carries execution read and the JSON Schema of its argum
 	expect(card).toMatchObject({
 		id: "read_history",
 		functionName: "read_history",
-		revisionId: "host:read_history@2",
+		revisionId: "host:read_history@3",
 		execution: "read",
 	});
 	expect(
@@ -145,8 +145,6 @@ test.each([
 	["さっきの依頼はどうして失敗したの？", "read_runs"],
 	["実行ログを見せて", "read_runs"],
 	["今朝の実行予約が動いたか確認して", "read_runs"],
-	["サブエージェントは何をしたの？", "read_agents"],
-	["さっきの調べものでどのページを見た？", "read_agents"],
 	["World だと Eumenes について何が記録されてる？", "read_world"],
 	// Old conversations and the whole record go to the history investigation (a sub-agent), recent words to the read.
 	["半年前の会話で決めたことを履歴から調べて", "history.research"],

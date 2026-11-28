@@ -1,7 +1,10 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { MemoryInputBudget } from "../contracts/recall";
-import { inputBudgetMigration } from "./input-budget";
+import {
+	inputBudgetMigration,
+	sizeFirstInputBudgetMigration,
+} from "./input-budget";
 import { itemMarksMigration } from "./marks";
 import { seedImportMigration } from "./seeds";
 import { hostInputsMigration } from "./host-inputs";
@@ -325,5 +328,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0017-input-budget",
 		after: ["memory/0016-item-marks"],
 		sql: inputBudgetMigration,
+	},
+	{
+		id: "memory/0018-size-first-input-budget",
+		after: ["memory/0017-input-budget"],
+		sql: sizeFirstInputBudgetMigration,
 	},
 ];

@@ -422,9 +422,7 @@ export function createGenerationSettlement(
 
 /** What later turns see of this turn's searches and hand-overs (the tool-call reliability design, P1). */
 const toolCallsOf = (deps: DialogueDeps, result: GenerationResult) =>
-	result.exchange?.length
-		? carriedToolCalls(result.exchange, Date.parse(deps.clock()))
-		: [];
+	result.exchange?.length ? carriedToolCalls(result.exchange) : [];
 
 /**
  * The agent's utterance as an event (section 8.1). A text-only reply is delivered in full when it is stored; a spoken one waits for its playback's `delivered`.

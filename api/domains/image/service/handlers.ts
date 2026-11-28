@@ -14,7 +14,7 @@ import {
 	type TestOutput,
 } from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
-import type { ImageRecord } from "../contracts";
+import type { StoredImage } from "../repository";
 import { generatedImageVersion } from "./version";
 import {
 	row,
@@ -26,7 +26,7 @@ import {
 import { imageContext } from "./context";
 import type { createImage } from "./index";
 const payload = z.object({ id: z.string() });
-const active = (r: ImageRecord) =>
+const active = (r: StoredImage) =>
 	r.state === "planning" || r.state === "generating";
 const safeError = (error: unknown) =>
 	error instanceof Error && /^[a-z_0-9]{1,80}$/.test(error.message)
@@ -56,9 +56,14 @@ function waitForCapacity(
 		previous: record(r).capacityWait,
 		retryAfterMs,
 		budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
-		limitAt: r.deadline,
+		limitAt: r.hard_deadline ?? r.deadline,
 		expire: () => ports.fail(db, r.id, LARM_CAPACITY_TIMEOUT),
 		schedule(plan) {
+			if (r.origin === "prototype")
+				db.query("UPDATE image_generations SET deadline=? WHERE id=?").run(
+					plan.deadline,
+					r.id,
+				);
 			patch(db, r.id, {
 				phase: LARM_CAPACITY_WAITING,
 				capacityWait: { startedAt: plan.startedAt, count: plan.count },
@@ -117,7 +122,7 @@ export function registerImageHandlers(
 				throw new Error("execution_changed");
 			const capture = {
 				subject: `image:${r.id}:plan`,
-				policySubject: r.run_id,
+				policySubject: r.run_id ?? undefined,
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
 				maxOutputTokens: 4096,
 			};
@@ -194,10 +199,19 @@ export function registerImageHandlers(
 		},
 		cancelInTransaction: cancel,
 	};
+	const authorized = (db: Database, r: Row) => {
+		if (r.origin === "prototype") {
+			if (!deps.prototypeGuard?.(db, r.prototype_id!, r.grant_revision!))
+				throw new Error("prototype_grant_revoked");
+		} else
+			capabilities.validateInTransaction(
+				db,
+				JSON.parse(r.bindings_json) as Prepared,
+			);
+	};
 	type GenerateInput = {
 		id: string;
 		plan: z.infer<typeof imagePlanV2>;
-		prepared: Prepared;
 		deadline: number;
 	};
 	/** LARM had no free memory: the generate stage waits and is queued again, never sent from here. */
@@ -216,8 +230,7 @@ export function registerImageHandlers(
 			const r = row(db, claim.payload.id);
 			if (!r || record(r).state !== "generating" || !r.plan_json)
 				return { status: "stale", reason: "image_not_generating" };
-			const prepared = JSON.parse(r.bindings_json) as Prepared;
-			capabilities.validateInTransaction(db, prepared);
+			authorized(db, r);
 			if (record(r).phase === LARM_CAPACITY_WAITING)
 				patch(db, r.id, { phase: "queued" });
 			return {
@@ -228,7 +241,6 @@ export function registerImageHandlers(
 					plan: {
 						...imagePlanV2.parse(JSON.parse(r.plan_json)),
 					},
-					prepared,
 				},
 			};
 		},
@@ -245,9 +257,11 @@ export function registerImageHandlers(
 				);
 				if (!target || !target.description?.trim())
 					throw new Error("image_service_unavailable");
-				store.read((db) =>
-					capabilities.validateInTransaction(db, input.prepared),
-				);
+				store.read((db) => {
+					const r = row(db, input.id);
+					if (!r || !active(record(r))) throw new Error("image_not_generating");
+					authorized(db, r);
+				});
 				signal.throwIfAborted();
 				const output = await gateway.execute(
 					target,
@@ -264,6 +278,7 @@ export function registerImageHandlers(
 						await store.write((db) => {
 							const r = row(db, input.id);
 							if (!r || !active(record(r)) || signal.aborted) return;
+							authorized(db, r);
 							patch(db, input.id, {
 								phase: p.phase,
 								...(p.artifact
@@ -308,7 +323,7 @@ export function registerImageHandlers(
 				"capacityWait" in outcome.result
 			) {
 				try {
-					capabilities.validateInTransaction(db, input.prepared);
+					authorized(db, r);
 				} catch {
 					fail(db, r.id, "capability_revoked");
 					return "applied";
@@ -330,7 +345,7 @@ export function registerImageHandlers(
 				return "applied";
 			}
 			try {
-				capabilities.validateInTransaction(db, input.prepared);
+				authorized(db, r);
 			} catch {
 				fail(db, r.id, "capability_revoked");
 				return "applied";

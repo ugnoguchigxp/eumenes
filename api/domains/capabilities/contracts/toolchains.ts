@@ -96,6 +96,7 @@ export type ToolchainCard = {
 	redirects: Array<ToolchainRedirect & { functionName: string }>;
 	/** A read tool only (execution "read"): the JSON Schema (flat object) of its arguments. */
 	read?: { parameters: Record<string, unknown> };
+	taskInputs?: Record<string, unknown>;
 	/**
 	 * An instant-answer toolchain only (binding execution "instant"), filled by the host while it
 	 * finds the candidates: the arguments its first-round function takes besides the analysis.

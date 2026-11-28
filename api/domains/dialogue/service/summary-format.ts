@@ -14,15 +14,14 @@ import type { DialogueDeps } from "./context";
 import { lineText } from "./input-text";
 import { inheritedHistorySources } from "./history-sources";
 import { excludedOnlyIn } from "./memory-refs";
-import { replayableCalls } from "./tool-exchange";
+import { callsMark, replayableCalls } from "./tool-exchange";
 
 const MECHANICAL_MAX_TOKENS = 400;
-const WIDE_WINDOW_TOKENS = 65_536;
 
 /** Default legacy cut bounds when no window-derived `WorkingLimits` are passed. */
 export const RECENT = {
 	/** One utterance shows at most this much; the rest is cut with `…`. */
-	utteranceTokens: 300,
+	utteranceTokens: 120,
 	hardCount: 20,
 	hardTokens: 4000,
 	/** A fixed-rule cut keeps this many newest utterances (starting with the agent's). */
@@ -31,7 +30,7 @@ export const RECENT = {
 	gapMs: 30 * 60 * 1000,
 } as const;
 
-/** Cache-first epoch thresholds derived from the active model window (`planWindow()`). */
+/** The bounds of the working conversation between two cuts (`workingLimits`). */
 export type WorkingLimits = {
 	hardTokens: number;
 	hardUsers: number;
@@ -42,48 +41,49 @@ export type WorkingLimits = {
 	summaryMaxTokens: number;
 };
 
-/** Derives Soft/Hard/Low epoch limits from `planWindow()` so wide (256k) and narrow (local) windows both fit safely. */
+/**
+ * Size-first bounds (spec conversation-input-size-budget-design-2026-11-28, section 7): the conversation keeps a few
+ * exchanges and a short summary, and what is older is read again with the read tools. The summary is prepared once
+ * more than three exchanges are held and a cut comes once more than five are. A prepared summary covers what was
+ * held when it was prepared less the newest two exchanges, so a cut that adopts it leaves those and what came
+ * since: the conversation holds three to six exchanges.
+ */
+const HISTORY = {
+	hardUsers: 5,
+	softUsers: 3,
+	lowUtterances: 4,
+	hardTokens: 900,
+	softTokens: 600,
+	lowTokens: 400,
+	summaryTokens: 150,
+	/** A small window keeps at least this much before a cut. */
+	floorTokens: 300,
+} as const;
+
+/** The bounds for a model window: the size-first bounds, lowered where the window's own plan leaves less. */
 export function workingLimits(plan: WindowPlan): WorkingLimits {
-	if (plan.window >= WIDE_WINDOW_TOKENS) {
-		const hardTokens = Math.max(
-			4_000,
-			Math.min(24_000, Math.floor(plan.room * 0.35)),
-		);
-		return {
-			hardTokens,
-			hardUsers: 20,
-			softTokens: Math.floor(hardTokens * 0.75),
-			softUsers: 15,
-			lowTokens: Math.min(6_000, Math.floor(hardTokens * 0.35)),
-			lowUtterances: 8,
-			summaryMaxTokens: Math.min(1_500, plan.sections.episode),
-		};
-	}
 	const hardTokens = Math.max(
-		1_500,
-		Math.min(plan.log.high, Math.floor(plan.room * 0.45)),
+		HISTORY.floorTokens,
+		Math.min(HISTORY.hardTokens, plan.log.high, Math.floor(plan.room * 0.45)),
 	);
 	return {
 		hardTokens,
-		hardUsers: 10,
-		softTokens: Math.floor(hardTokens * 0.75),
-		softUsers: 8,
-		lowTokens: Math.min(2_000, Math.floor(hardTokens * 0.35)),
-		lowUtterances: 4,
-		summaryMaxTokens: Math.min(600, plan.sections.episode),
+		hardUsers: HISTORY.hardUsers,
+		softTokens: Math.min(HISTORY.softTokens, Math.floor(hardTokens * 0.67)),
+		softUsers: HISTORY.softUsers,
+		lowTokens: Math.min(HISTORY.lowTokens, Math.floor(hardTokens * 0.45)),
+		lowUtterances: HISTORY.lowUtterances,
+		summaryMaxTokens: Math.min(HISTORY.summaryTokens, plan.sections.episode),
 	};
 }
 
-/** Estimated tokens of one utterance, including its replayable tool calls and results. */
+/** Estimated tokens of one utterance as the recent conversation draws it: its bounded words and the mark of its calls. */
 export function utteranceTokens(u: Utterance): number {
-	let sum = estimateTextTokens(u.text);
-	for (const call of replayableCalls(u))
-		sum +=
-			estimateTextTokens(call.name) +
-			estimateTextTokens(call.arguments) +
-			estimateTextTokens(call.result) +
-			12;
-	return sum;
+	const mark = callsMark(replayableCalls(u));
+	return (
+		estimateTextTokens(headWithin(u.text, RECENT.utteranceTokens).text) +
+		(mark ? estimateTextTokens(mark) : 0)
+	);
 }
 
 export const tokensOf = (utterances: readonly Utterance[]) =>
@@ -149,7 +149,7 @@ export function buildMechanicalSummary(
 	const first = dropped[0]!;
 	const last = dropped.at(-1)!;
 	const lines: string[] = [
-		`対象範囲: ${shortSummaryTime(first.at)}〜${shortSummaryTime(last.at)}（圧縮済み履歴の簡易記録。詳細は read_history / read_agents で確認可）`,
+		`対象範囲: ${shortSummaryTime(first.at)}〜${shortSummaryTime(last.at)}（圧縮済み履歴の簡易記録。詳細は read_history で確認可）`,
 	];
 	if (existing?.text) {
 		const prevLines = existing.text

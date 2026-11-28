@@ -404,41 +404,6 @@ test("an agent whose reply does not hand work over is offered neither tool, and 
 	expect(h.state.searchSlots).toHaveLength(0);
 });
 
-test("the conversation can look up current information and read the cited evidence before replying", async () => {
-	const seen: string[] = [];
-	h = await setup({
-		async lookup(query, signal) {
-			signal.throwIfAborted();
-			seen.push(query);
-			return {
-				text: "東京地方は雨です。",
-				sources: [{ url: "https://www.jma.go.jp/", title: "気象庁" }],
-			};
-		},
-	});
-	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "lookup_public_information",
-					args: { query: "東京地方の11月15日の予報" },
-				},
-			],
-		},
-		{ text: "11月15日の東京地方は雨です。[別サイト](https://example.org/)" },
-	);
-	const run = await h.say("11月15日の東京の天気は？");
-	expect(seen).toEqual(["東京地方の11月15日の予報"]);
-	expect(toolResults(h.state.calls.at(-1)!)).toEqual([
-		{
-			text: "東京地方は雨です。",
-			sources: [{ url: "https://www.jma.go.jp/", title: "気象庁" }],
-		},
-	]);
-	expect(h.dialogue.answerText(run.id)).toContain("https://www.jma.go.jp/");
-	expect(h.dialogue.answerText(run.id)).not.toContain("https://example.org/");
-});
-
 test("a previously shown list is usable without prior dispatch, but its corrected source and unavailable revision grant nothing", async () => {
 	const unavailable: string[] = [];
 	h = await setup({ conversationAgent: handing, unbuildable: unavailable });

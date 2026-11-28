@@ -1,0 +1,29 @@
+{
+  "dateJst": "2026-11-28",
+  "chromeFixture": {
+    "protectedAssets": true,
+    "browserBridge": true,
+    "providerPostsDuringRebuild": 1,
+    "sameOperationAfterRebuild": true,
+    "crossProjectStatusCancelContentDenied": true,
+    "cancellationIgnoredLateResult": true,
+    "revokedContentUnavailable": true,
+    "conversationGenerations": 0,
+    "planningInference": 0,
+    "standaloneSample": true,
+    "standaloneCoreRequests": 0,
+    "startMetadataRetained": true,
+    "lostResponseUnknownWithoutAnotherPost": true,
+    "suggestionRequiresHostAction": true,
+    "adapterCapabilitiesScoped": true
+  },
+  "liveLarm": {
+    "savedMaterialRead": true,
+    "generatedBytes": 226419,
+    "generationPosts": 1,
+    "excludedFromConversation": true,
+    "bothImagesRenderedInSameChromeFrame": true
+  },
+  "trialImageRemoved": true,
+  "productServerContacted": false
+}

@@ -16,14 +16,12 @@ export function createProgress(deps: DialogueDeps) {
 		// Stored history remains adoption-only. Live progress overlays the current in-memory generation.
 		const answer =
 			run.status === "completed" && run.answerMessageId
-				? conversation
-						.get(run.conversationId)
-						.messages.find((m) => m.id === run.answerMessageId)?.text
+				? conversation.message(run.answerMessageId)
 				: null;
 		return {
 			runId,
 			status: run.status,
-			text: answer ?? "",
+			text: answer?.conversationId === run.conversationId ? answer.text : "",
 			provisional: null,
 			announcement: run.announcement ?? null,
 			error: run.status === "failed" ? run.error : null,

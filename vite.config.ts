@@ -5,6 +5,10 @@ import { defineConfig, loadEnv } from "vite";
 import { resolve } from "node:path";
 import { resolveApiToken } from "./api/infrastructure/auth-config.ts";
 import {
+	worksFrameSource,
+	worksPreviewPort,
+} from "./api/infrastructure/works-preview.ts";
+import {
 	canonicalLoopbackRedirect,
 	shouldAuthorize,
 } from "./api/infrastructure/dev-proxy.ts";
@@ -16,7 +20,11 @@ const first = (value: string | string[] | undefined) =>
  * CSP for the SPA. HMR is off, so no inline React Refresh preamble is needed.
  * The Vite client WebSocket is limited to the request's own host.
  */
-function spaCsp(host: string | undefined, embedded = false): string {
+function spaCsp(
+	host: string | undefined,
+	embedded = false,
+	worksFrame?: string,
+): string {
 	const ws = host && /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? ` ws://${host}` : "";
 	return [
 		"default-src 'self'",
@@ -33,6 +41,7 @@ function spaCsp(host: string | undefined, embedded = false): string {
 		"object-src 'none'",
 		"base-uri 'none'",
 		"form-action 'self'",
+		...(worksFrame ? ["frame-src 'self' " + worksFrame] : []),
 		`frame-ancestors '${embedded ? "self" : "none"}'`,
 	].join("; ");
 }
@@ -41,6 +50,10 @@ export default defineConfig(({ command, mode }) => {
 	// Read backend settings on the dev server; never expose them through VITE_*.
 	const env = { ...loadEnv(mode, process.cwd(), "EUMENES_"), ...process.env };
 	const expectedOrigin = env.EUMENES_ORIGIN ?? "http://127.0.0.1:5173";
+	const worksFrame =
+		env.EUMENES_WORKS_DIR && env.EUMENES_PROTOTYPE_HOME
+			? worksFrameSource(worksPreviewPort(env))
+			: undefined;
 	const token = command === "serve" ? resolveApiToken(env) : undefined;
 	return {
 		plugins: [
@@ -72,7 +85,7 @@ export default defineConfig(({ command, mode }) => {
 						res.setHeader("X-Frame-Options", embedded ? "SAMEORIGIN" : "DENY");
 						res.setHeader(
 							"Content-Security-Policy",
-							spaCsp(req.headers.host, embedded),
+							spaCsp(req.headers.host, embedded, worksFrame),
 						);
 						next();
 					});
@@ -83,7 +96,7 @@ export default defineConfig(({ command, mode }) => {
 						res.setHeader("X-Frame-Options", embedded ? "SAMEORIGIN" : "DENY");
 						res.setHeader(
 							"Content-Security-Policy",
-							spaCsp(req.headers.host, embedded),
+							spaCsp(req.headers.host, embedded, worksFrame),
 						);
 						next();
 					});

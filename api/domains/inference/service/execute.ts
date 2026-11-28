@@ -19,7 +19,7 @@ import {
 } from "../contracts";
 import { get, type RequestRow } from "../repository";
 import { recordAttemptStart, resolveSession } from "./attempt-record";
-import { encodeSections, inputSections } from "./input-sections";
+import { encodeSections, inputSections, tailSections } from "./input-sections";
 import { fallbackErrors, safeError } from "./errors";
 import { operationOutputMessages } from "../contracts/operation-output";
 
@@ -92,6 +92,15 @@ async function attempt(
 				count: sections.length,
 				sections: encodeSections(sections),
 			});
+			// What the last message is made of (the part that changes with every call), by fixed labels and sizes.
+			const tail = tailSections(r.input);
+			if (tail.length)
+				log.info("inference.input_tail", {
+					...logFields,
+					conversationId: r.session?.agentSession?.conversationId ?? undefined,
+					count: tail.length,
+					sections: encodeSections(tail),
+				});
 		} catch {
 			// Nothing is logged for an input that could not be measured.
 		}

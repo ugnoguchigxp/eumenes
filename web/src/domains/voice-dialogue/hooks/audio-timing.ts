@@ -50,11 +50,13 @@ export async function reportPlayed<T>(
 export async function timedVoiceAudio(
 	client: VoiceDialogueClient,
 	identity: ReturnType<typeof chunkTiming>,
+	signal: AbortSignal,
 ) {
 	const started = performance.now();
 	const bytes = await client.voiceAudio(
 		identity.utteranceId,
 		identity.chunkIndex,
+		signal,
 	);
 	browserTiming("audio_fetch", identity, started);
 	speechTrace("received", identity);

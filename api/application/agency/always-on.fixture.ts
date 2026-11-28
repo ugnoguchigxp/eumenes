@@ -434,6 +434,7 @@ export async function replyWith(
 	f: Awaited<ReturnType<typeof agendaFixture>>,
 	tools: Array<{ name: string; arguments: Record<string, unknown> }>,
 	options: {
+		conversationId?: string;
 		runId?: string;
 		messageIds?: string[];
 		host?: Pick<typeof f.host, "conversationAgent">;
@@ -446,7 +447,7 @@ export async function replyWith(
 	const toolDefinitions: ReadonlyArray<ToolDefinition>[] = [];
 	const reply = await (options.host ?? f.host).conversationAgent.respond({
 		run: {
-			conversationId: "ao",
+			conversationId: options.conversationId ?? "ao",
 			runId: options.runId ?? "run-1",
 			messageIds: options.messageIds ?? ["user-a"],
 		},

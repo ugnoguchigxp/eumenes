@@ -29,11 +29,20 @@ import {
 } from "./lifecycle";
 import { pending, read, save, terminal } from "./repository";
 import { createWatch } from "./watch";
+import {
+	enqueueWorksDependency,
+	registerWorksDependencyJobs,
+} from "./works-dependency";
 
 export { migrations } from "./repository";
 export type { GoalTaskView } from "./goal-task";
 export {
 	adapterRef,
+	worksAdapterRef,
+	WorksSelectionRequired,
+	type WorksTarget,
+	type WorksDependencyApproval,
+	type WorksDependencyRequest,
 	type Runner,
 	type Host,
 	type ClaudeRunAuthorization,
@@ -65,6 +74,7 @@ const capableRunner = (client: Runner | undefined) =>
 const canSchedule = (work: Work) =>
 	!terminal(work) &&
 	!work.decisionId &&
+	!work.dependency?.jobId &&
 	!work.effect &&
 	!work.question &&
 	work.supervision?.blocked !== "verification_isolation_unavailable" &&
@@ -177,10 +187,13 @@ export function createClaudeCode({
 	const runnerFor = ({
 		source,
 		supervision,
-	}: Pick<Work, "source" | "supervision">) =>
-		isSupervisedExecutionSource(source) && source.goal
-			? goalRunners?.get(supervision?.authorization.workspaceRef ?? "")
-			: runner;
+		works,
+	}: Pick<Work, "source" | "supervision" | "works">) =>
+		works
+			? host?.works?.runner(works)
+			: isSupervisedExecutionSource(source) && source.goal
+				? goalRunners?.get(supervision?.authorization.workspaceRef ?? "")
+				: runner;
 	const runners = [
 		...new Set(
 			[runner, ...(goalRunners?.values() ?? [])].filter(
@@ -210,18 +223,24 @@ export function createClaudeCode({
 			queue.cancelInTransaction(db, work.decisionId, "cancel_requested");
 			abortJobs.add(work.decisionId);
 		}
+		if (work.dependency?.jobId) {
+			queue.cancelInTransaction(db, work.dependency.jobId, "cancel_requested");
+			abortJobs.add(work.dependency.jobId);
+		}
 		requestStop(db, host, work, reason, now(), operationId);
 		save(db, work, now());
 	}
 
 	registerDecisionJobs(queue, inference, () => host, now, kick);
-	const { task, goal, supervised } = createTaskPort({
+	registerWorksDependencyJobs(queue, store, () => host, now, kick);
+	const { task, worksTask, goal, supervised } = createTaskPort({
 		capabilities,
 		getHost: () => host,
 		available,
 		supervisedAvailable,
 		now,
 		cancel,
+		queueDependency: (db, work) => enqueueWorksDependency(queue, db, work),
 	});
 
 	function queueDecision(db: Database, work: Work, mode: Work["decisionMode"]) {
@@ -263,14 +282,13 @@ export function createClaudeCode({
 		if (checkRecovery) nextRecoveryCheck = now() + 5_000;
 		const rows = await store.write((db) => {
 			const external: Work[] = [];
-			const unconfirmed: {
-				source: OwnedSupervisedExecutionSource;
-				id: string;
-			}[] = [];
+			const unconfirmed: Work[] = [];
+			const idle: Work[] = [];
 			for (const work of pending(db)) {
 				enforceDeadlines(db, currentHost, work, now(), cancel);
 				deliverNotice(db, currentHost, work, now());
 				schedule(db, currentHost, work, now, queueDecision);
+				if (work.idlePending) idle.push(work);
 				if (
 					(work.executionId || work.effect?.kind === "read_events") &&
 					!terminal(work)
@@ -279,19 +297,19 @@ export function createClaudeCode({
 				if (
 					checkRecovery &&
 					work.stop === "unconfirmed" &&
-					isSupervisedExecutionSource(work.source)
+					(work.works || isSupervisedExecutionSource(work.source))
 				)
-					unconfirmed.push({ id: work.id, source: work.source });
+					unconfirmed.push(work);
 			}
-			return { external, unconfirmed };
+			return { external, unconfirmed, idle };
 		});
 		queue.wake();
 		if (abortJobs.size) {
 			queue.flushCancellations([...abortJobs]);
 			abortJobs.clear();
 		}
-		await Promise.all(
-			rows.external.map((work) => {
+		await Promise.allSettled(
+			rows.external.map(async (work) => {
 				const client = runnerFor(work);
 				if (!client) return;
 				return drive(
@@ -311,10 +329,23 @@ export function createClaudeCode({
 			}),
 		);
 		await Promise.all(
-			rows.unconfirmed.map(({ id, source }) =>
-				tryRecovery((proof) => recoverSupervised(source, id, proof)),
+			rows.unconfirmed.map(({ id, source, works }) =>
+				tryRecovery((proof) =>
+					works
+						? recoverAuthorized(id, proof, (db) => {
+								const target = read(db, id)?.works;
+								return (
+									target?.id === works.id &&
+									target.generation === works.generation
+								);
+							})
+						: isSupervisedExecutionSource(source)
+							? recoverSupervised(source, id, proof)
+							: Promise.resolve(false),
+				),
 			),
 		);
+		await retireWorksRunners(rows.idle, runnerFor, store, now);
 	}
 
 	function kick() {
@@ -330,25 +361,45 @@ export function createClaudeCode({
 			});
 		return maintenance;
 	}
-	async function recoverSupervised(
+	function recoverSupervised(
 		source: OwnedSupervisedExecutionSource,
 		id: string,
 		proof: "process_exit" | "host_reboot",
 	) {
+		return recoverAuthorized(
+			id,
+			proof,
+			(db) => !!supervised.viewInTransaction(db, source, id),
+		);
+	}
+
+	async function recoverAuthorized(
+		id: string,
+		proof: "process_exit" | "host_reboot",
+		current: (db: Database) => boolean,
+	) {
 		const currentHost = host;
-		const client = store.read((db) => {
-			if (!supervised.viewInTransaction(db, source, id)) return undefined;
+		const owner = store.read((db) => {
+			if (!current(db)) return undefined;
 			const work = read(db, id);
-			return work ? runnerFor(work) : undefined;
+			return work
+				? { client: runnerFor(work), works: !!work.works }
+				: undefined;
 		});
-		if (!currentHost || !client?.supportsSupervised?.()) return false;
+		const client = owner?.client;
+		if (
+			!currentHost ||
+			!client?.recover ||
+			(!owner?.works && !client.supportsSupervised?.())
+		)
+			return false;
 		const recovered = await recover(
 			store,
 			currentHost,
 			client,
 			id,
 			proof,
-			(db) => !!supervised.viewInTransaction(db, source, id),
+			current,
 			now,
 		);
 		if (recovered) {
@@ -359,6 +410,8 @@ export function createClaudeCode({
 	}
 	return {
 		task,
+		worksTask,
+		worksAvailableInTransaction: () => configured() && !!host?.works,
 		goal,
 		workingDirectory: root,
 		protectedPaths,
@@ -405,6 +458,27 @@ export function createClaudeCode({
 
 export type ClaudeCodeService = ReturnType<typeof createClaudeCode>;
 
+async function retireWorksRunners(
+	idle: readonly Work[],
+	runnerFor: (work: Work) => Runner | undefined,
+	store: SqliteStore,
+	now: () => number,
+) {
+	await Promise.allSettled(
+		idle.map(async (work) => {
+			const client = runnerFor(work);
+			if (client?.retireIdle && !(await client.retireIdle())) return;
+			if (!client && work.works) return;
+			await store.write((db) => {
+				const saved = read(db, work.id);
+				if (!saved?.idlePending || saved.generation !== work.generation) return;
+				saved.idlePending = false;
+				save(db, saved, now());
+			});
+		}),
+	);
+}
+
 function enforceDeadlines(
 	db: Database,
 	currentHost: Host,
@@ -413,9 +487,14 @@ function enforceDeadlines(
 	cancel: (db: Database, work: Work, reason: "expired" | "forgotten") => void,
 ) {
 	if (terminal(work) || work.effect?.kind === "stop") return;
+	const authorityRevoked = work.dependency?.jobId
+		? !currentHost.works?.dependencies ||
+			!isStandardExecutionSource(work.source) ||
+			!currentHost.validSourceInTransaction(db, work.source)
+		: !authorityCurrent(currentHost, db, work);
 	if (
 		work.deadline <= at ||
-		!authorityCurrent(currentHost, db, work) ||
+		authorityRevoked ||
 		((!!work.supervision || isGoalExecutionSource(work.source)) &&
 			(work.question?.expiresAt ?? Infinity) <= at)
 	) {

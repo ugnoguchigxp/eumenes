@@ -144,7 +144,7 @@ test("the talk system part is its sections in order, and the same in every talk 
 		expect(system).not.toContain(`${heading}\n`);
 });
 
-test("a read tool's text result stays in the working epoch for the next turn (never raw JSON)", async () => {
+test("a read tool's text result reaches its own turn as text, and the next turn sees only the mark of the call", async () => {
 	h = await setup();
 	h.state.steps.push(
 		choice({ choice: "none" }),
@@ -155,11 +155,11 @@ test("a read tool's text result stays in the working epoch for the next turn (ne
 	await h.say("私の好きなものは？");
 	await h.say("そう");
 	const next = call(2);
-	expect(next.messages.map((m) => m.content)).toContain("覚えていません。");
-	// The carried read tool call and its text result remain in the working epoch for KV cache continuity.
-	const carried = next.messages.find((m) => (m.role as string) === "tool")!;
-	expect(carried).toBeDefined();
-	expect(carried.content.trim().startsWith("{")).toBe(false);
+	expect(next.messages.map((m) => m.content)).toContain(
+		"覚えていません。\n[道具: read_history]",
+	);
+	// The result itself is not carried into the next turn: it is read again when needed.
+	expect(next.messages.some((m) => (m.role as string) === "tool")).toBe(false);
 	// What the read found reached the talk call as the tool's result, never as JSON.
 	const read = call(1).messages.find((m) => (m.role as string) === "tool")!;
 	expect(read.content.trim().startsWith("{")).toBe(false);

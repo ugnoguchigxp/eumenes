@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { submitSchema } from "../contracts";
 import { registerDialogue } from "..";
-import { setup, type Harness } from "./generation.fixture";
+import { reply, setup, type Harness } from "./generation.fixture";
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -17,6 +17,55 @@ async function app() {
 	registerDialogue(hono, h.dialogue);
 	return hono;
 }
+
+test("the run stream returns a completed answer outside recent history and reflects later edits", async () => {
+	const hono = await app();
+	const harness = h!;
+	harness.state.steps.push(...reply("保存した回答。"));
+	harness.start();
+	const run = await harness.say("質問");
+	const answerId = run.answerMessageId!;
+	await harness.store.write((db) => {
+		for (let i = 0; i < 200; i++) {
+			harness.conversation.appendInTransaction(db, {
+				id: `later-${i}`,
+				conversationId: run.conversationId,
+				role: "user",
+				text: "後から追加した発言",
+				createdAt: run.createdAt,
+				runId: null,
+			});
+		}
+	});
+	expect(
+		harness.conversation.get(run.conversationId).messages.map(({ id }) => id),
+	).not.toContain(answerId);
+
+	const readProgress = async () => {
+		const response = await hono.request(`/api/runs/${run.id}/stream`);
+		expect(response.status).toBe(200);
+		return JSON.parse((await response.text()).trim().replace(/^data: /, ""));
+	};
+	expect(await readProgress()).toMatchObject({
+		status: "completed",
+		text: "保存した回答。",
+	});
+
+	expect(
+		await harness.conversation.correct({
+			messageId: answerId,
+			text: "訂正した回答。",
+		}),
+	).toMatchObject({ status: "applied" });
+	expect(await readProgress()).toMatchObject({ text: "訂正した回答。" });
+
+	expect(
+		await harness.conversation.retract({ messageId: answerId }),
+	).toMatchObject({
+		status: "applied",
+	});
+	expect(await readProgress()).toMatchObject({ status: "completed", text: "" });
+});
 
 test("the dialogue controller validates requests and delegates one run per request ID", async () => {
 	const hono = await app();

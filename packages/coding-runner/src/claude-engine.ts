@@ -336,11 +336,19 @@ function createEngineHooks(
 								}
 							}
 						}
+						const conflict = input.supervisedTools?.editConflict(
+							hook.tool_name,
+							raw,
+						);
+						if (conflict && !combined.aborted)
+							evidence(conflict.text, conflict);
 						return {
 							hookSpecificOutput: {
 								hookEventName: "PreToolUse",
 								permissionDecision: "deny",
-								permissionDecisionReason: "Outside the authorized work scope",
+								permissionDecisionReason: conflict
+									? "Workspace inputs changed. The unapplied edit was recorded. Preserve the current file."
+									: "Outside the authorized work scope",
 							},
 						};
 					},

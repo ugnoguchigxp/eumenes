@@ -164,8 +164,19 @@ try {
 			"<collaboration_mode>",
 			"<environment_context>",
 			"# AGENTS.md instructions",
+			// What Codex adds by its model catalog (the process reads a catalog with these off).
+			"<multi_agent_role>",
+			"<multi_agent_mode>",
+			'"name":"exec"',
+			'"name":"spawn_agent"',
+			'"name":"apply_patch"',
 		])
 			check(!text(body).includes(block), `${name}: no ${block}`);
+	console.log(
+		`  characters Codex adds to the first request besides the host's text: ${
+			text(first).length - "HOST-INSTRUCTIONS".length - "A-TURN-1".length
+		}`,
+	);
 	check(
 		first.prompt_cache_key === append.prompt_cache_key &&
 			first.prompt_cache_key === reset.prompt_cache_key,

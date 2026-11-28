@@ -11,12 +11,52 @@ import { chunkTiming, reportPlayed, timedVoiceAudio } from "./audio-timing";
 export type ChunkQueue = {
 	id: string;
 	epoch: number;
+	abort: AbortController;
 	audioGeneration?: number;
 	tail: Promise<void>;
 	lastEndedAt?: number;
+	lastCompletedClause?: string;
 };
+
+export function clearChunkQueue(queue: { current: ChunkQueue | null }) {
+	queue.current?.abort.abort();
+	queue.current = null;
+}
+
 type Subtitle = { key: string; text: string } | null;
 type KeyedCue = AvatarCue | null;
+
+const RETRY_DELAY_MS = 250;
+
+async function retryTransport<T>(
+	request: () => Promise<T>,
+	signal: AbortSignal,
+	playable: () => boolean,
+): Promise<T> {
+	try {
+		signal.throwIfAborted();
+		return await request();
+	} catch (error) {
+		const transient =
+			error instanceof TypeError ||
+			(error instanceof ApiError &&
+				[408, 500, 502, 503, 504].includes(error.status));
+		if (!transient || !playable()) throw error;
+		await new Promise<void>((resolve, reject) => {
+			const stop = () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			};
+			const timer = setTimeout(() => {
+				signal.removeEventListener("abort", stop);
+				resolve();
+			}, RETRY_DELAY_MS);
+			signal.addEventListener("abort", stop, { once: true });
+		});
+		if (!playable()) throw error;
+		return request();
+	}
+}
 
 /**
  * Plays a turn's chunks back to back. Each chunk is fetched as soon as it is listed, decoded while
@@ -43,16 +83,22 @@ export function queueChunks(
 	},
 ) {
 	const { client, queued, valid } = deps;
-	const playable = () => valid() && queued();
+	const { signal } = chunkQueue.abort;
+	const playable = () => !signal.aborted && valid() && queued();
 	const fail = (error: unknown) => {
 		if (playable()) deps.fail(error);
 	};
 	for (const chunk of turn.audioChunks ?? []) {
 		const key = `${turn.utteranceId}:${chunk.index}`;
+		const text = chunk.text.trim();
 		if (deps.delivered(key)) continue;
 		deps.markDelivered(key);
 		const identity = chunkTiming(turn.utteranceId, chunk.index);
-		const audio = timedVoiceAudio(client, identity)
+		const audio = retryTransport(
+			() => timedVoiceAudio(client, identity, signal),
+			signal,
+			playable,
+		)
 			.then((bytes) => ({ bytes, at: performance.now() }))
 			.catch(async (error: unknown) => {
 				if (
@@ -62,7 +108,7 @@ export function queueChunks(
 					if (!playable()) return null;
 					// The old URL can expire before the change notification reaches the screen.
 					const current = await client
-						.voiceTurn(turn.utteranceId)
+						.voiceTurn(turn.utteranceId, signal)
 						.catch(() => null);
 					if (
 						current &&
@@ -93,22 +139,31 @@ export function queueChunks(
 						return continues ? { ...cue, speaking: false } : null;
 					});
 					if (!playable()) return;
-					void reportPlayed(identity, () =>
-						client.voicePlayed(
-							turn.utteranceId,
-							chunk.index,
-							(volume ?? 1) > 0 ? gap : { ...gap, audible: false },
-						),
+					const audible = (volume ?? 1) > 0;
+					if (audible && text) chunkQueue.lastCompletedClause = text;
+					void retryTransport(
+						() =>
+							reportPlayed(identity, () =>
+								client.voicePlayed(
+									turn.utteranceId,
+									chunk.index,
+									audible ? gap : { ...gap, audible: false },
+									signal,
+								),
+							),
+						signal,
+						playable,
 					)
-						.then(() =>
-							deps.cache.invalidateQueries({
+						.then(() => {
+							if (!playable()) return;
+							return deps.cache.invalidateQueries({
 								queryKey: [
 									queryRoots.voiceDialogue,
 									client.identity,
 									turn.utteranceId,
 								],
-							}),
-						)
+							});
+						})
 						.catch(fail);
 				};
 				await deps.controller()?.play(bytes, ended, {
@@ -136,8 +191,7 @@ export function queueChunks(
 						else deps.setAvatarCue(() => null);
 					},
 				});
-				if (playable() && chunk.text.trim())
-					deps.setSubtitle(() => ({ key, text: chunk.text.trim() }));
+				if (playable() && text) deps.setSubtitle(() => ({ key, text }));
 			})
 			.catch(fail);
 		chunkQueue.tail = scheduled;

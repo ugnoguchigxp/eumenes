@@ -16,6 +16,11 @@ export function ConversationFailures({ state }: { state: WorkspaceState }) {
 		voice,
 	} = state;
 	const failure = voice.failure;
+	const voiceRestarted = failure?.cause === "backend_restarted";
+	const position =
+		failure && "playbackPosition" in failure
+			? failure.playbackPosition
+			: undefined;
 	const linkedRun = failure?.turn?.runId;
 	const reportedByRun =
 		linkedRun &&
@@ -28,7 +33,7 @@ export function ConversationFailures({ state }: { state: WorkspaceState }) {
 				),
 		);
 	const sendFailed = submit.isError;
-	const visibleVoiceFailure = !!failure && !reportedByRun;
+	const visibleVoiceFailure = !!failure && (voiceRestarted || !reportedByRun);
 	useEffect(() => {
 		if (sendFailed || visibleVoiceFailure || audioError) followLatestIfPinned();
 	}, [
@@ -50,9 +55,16 @@ export function ConversationFailures({ state }: { state: WorkspaceState }) {
 			)}
 			{visibleVoiceFailure && (
 				<ChatFailure
-					heading="音声処理に失敗しました"
+					heading={
+						voiceRestarted ? "読み上げが中断しました" : "音声処理に失敗しました"
+					}
 					cause={failure.cause}
 					summary={"summary" in failure ? failure.summary : undefined}
+					detail={
+						position === null
+							? "どこまで再生できたか確認できませんでした。"
+							: position && `最後に再生完了を確認した句は「${position}」です。`
+					}
 					runId={failure.turn?.runId}
 					utteranceId={failure.turn?.utteranceId}
 					sessionId={failure.turn?.sessionId}
@@ -74,6 +86,7 @@ function ChatFailure({
 	heading,
 	cause,
 	summary = describeError(cause),
+	detail,
 	runId,
 	utteranceId,
 	sessionId,
@@ -82,6 +95,7 @@ function ChatFailure({
 	heading: string;
 	cause: unknown;
 	summary?: string;
+	detail?: string;
 	runId?: string | null;
 	utteranceId?: string;
 	sessionId?: string;
@@ -109,6 +123,7 @@ function ChatFailure({
 			label="会話エラー"
 			heading={heading}
 			summary={summary}
+			detail={detail}
 			agentName={agentName}
 			load={async () => ({ text })}
 		/>

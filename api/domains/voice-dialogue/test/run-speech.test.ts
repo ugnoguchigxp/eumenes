@@ -37,7 +37,6 @@ async function fixture(
 			},
 			...(cloud ? {} : { speak }),
 		},
-		undefined,
 		adoption
 			? {
 					replyInputInTransaction: () => ({

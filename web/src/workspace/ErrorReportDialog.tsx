@@ -39,12 +39,14 @@ export function FailureNotice({
 	label,
 	heading,
 	summary,
+	detail,
 	agentName,
 	load,
 }: {
 	label: string;
 	heading: string;
 	summary: string;
+	detail?: string;
 	agentName?: string;
 	load: (signal: AbortSignal) => Promise<{ text: string }>;
 }) {
@@ -73,6 +75,12 @@ export function FailureNotice({
 			</div>
 			<p className="message-error-summary" role="alert">
 				{summary}
+				{detail && (
+					<>
+						<br />
+						<span>{detail}</span>
+					</>
+				)}
 			</p>
 			<ErrorReportButton load={load} heading={heading} summary={summary} />
 		</article>

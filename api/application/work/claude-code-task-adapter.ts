@@ -1,5 +1,6 @@
 import {
 	adapterRef,
+	worksAdapterRef,
 	type ClaudeCodeService,
 	type Host,
 } from "../../domains/claude-code";
@@ -15,38 +16,47 @@ import type { DomainAdapter } from "../../domains/tool-runtime";
 
 export const ordinaryClaudeWorkspaceRef = "eumenes";
 
-export function describeClaudeCodeTaskAdapter() {
+export function describeClaudeCodeTaskAdapter(works = false) {
 	return {
-		owner: "claude-code",
+		owner: works ? "prototype" : "claude-code",
 		operations: new Map(),
 		queries: new Set<string>(),
 		inputAdapters: new Map(),
 		projections: new Set<string>(),
-		availability: "availability:claude-code-task@1",
+		availability: works
+			? "availability:prototype-task@1"
+			: "availability:claude-code-task@1",
 		task: true,
 	};
 }
 
 export function createClaudeCodeTaskAdapter(
 	service: () => ClaudeCodeService | undefined,
+	works = false,
 ): DomainAdapter {
+	const port = () => (works ? service()?.worksTask : service()?.task);
 	const required = () => {
-		const task = service()?.task;
+		const task = port();
 		if (!task) throw new Error("claude_task_unavailable");
 		return task;
 	};
 	return {
-		ref: adapterRef,
-		describe: describeClaudeCodeTaskAdapter,
-		availableInTransaction: () => service()?.availableInTransaction() ?? false,
+		ref: works ? worksAdapterRef : adapterRef,
+		describe: () => describeClaudeCodeTaskAdapter(works),
+		availableInTransaction: () =>
+			(works
+				? service()?.worksAvailableInTransaction()
+				: service()?.availableInTransaction()) ?? false,
 		artifactAvailableInTransaction: () => false,
 		task: {
+			get inputParameters() {
+				return port()?.inputParameters;
+			},
 			startInTransaction: (db, input) =>
 				required().startInTransaction(db, input),
 			controlInTransaction: (db, conversationId, input, messageId) =>
 				required().controlInTransaction(db, conversationId, input, messageId),
-			viewInTransaction: (db, id) =>
-				service()?.task.viewInTransaction(db, id) ?? null,
+			viewInTransaction: (db, id) => port()?.viewInTransaction(db, id) ?? null,
 			cancelInTransaction: (db, conversationId, id) =>
 				required().cancelInTransaction?.(db, conversationId, id),
 			forgetInTransaction: (db, id) => required().forgetInTransaction?.(db, id),

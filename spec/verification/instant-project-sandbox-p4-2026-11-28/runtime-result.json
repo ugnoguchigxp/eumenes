@@ -1,0 +1,584 @@
+{
+  "trials": 3,
+  "method": "macOS process physical footprint, Chrome timings; browser memory recorded separately",
+  "results": {
+    "cold": [
+      {
+        "separate": {
+          "firstMs": 1693,
+          "secondMs": 962,
+          "updateMs": 180,
+          "reopenMs": 100,
+          "physicalBytesByWorkCount": [
+            0,
+            281067744,
+            549028432
+          ],
+          "browserBytesByWorkCount": [
+            55185896,
+            328606792,
+            404744776
+          ],
+          "browserBytesBothPagesClosed": 251090992,
+          "physicalBytesBothPagesClosed": 550634064,
+          "serverPids": [
+            97810,
+            97819
+          ],
+          "loopbackPorts": [
+            55729,
+            55875
+          ],
+          "physicalBytesSecondAlone": 151961584
+        },
+        "works": {
+          "sharedPreparationMs": 1478,
+          "firstMs": 2662,
+          "secondMs": 2299,
+          "updateMs": 1805,
+          "reopenMs": 1831,
+          "physicalBytesByWorkCount": [
+            123208784,
+            123585616,
+            123896912
+          ],
+          "physicalBytesFirstRegistered": 123257936,
+          "physicalBytesBothPagesClosed": 122815568,
+          "browserBytesByWorkCount": [
+            398582808,
+            426306024,
+            455356368
+          ],
+          "browserBytesBothFramesClosed": 435384368,
+          "sampledBuildAndTypecheckPeakBytes": 395495464,
+          "hostPid": 98009,
+          "loopbackPorts": [
+            55965,
+            55964
+          ],
+          "workerPidsObserved": [
+            98198,
+            98215,
+            98224,
+            98227,
+            98287,
+            98357,
+            98363,
+            98554,
+            98580
+          ],
+          "workerPidsAfterClose": [],
+          "watcherStates": [
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 1,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 2,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            }
+          ],
+          "individualNodeModules": false
+        }
+      },
+      {
+        "separate": {
+          "firstMs": 1831,
+          "secondMs": 941,
+          "updateMs": 179,
+          "reopenMs": 97,
+          "physicalBytesByWorkCount": [
+            0,
+            265454056,
+            528221088
+          ],
+          "browserBytesByWorkCount": [
+            106795880,
+            347628688,
+            412019344
+          ],
+          "browserBytesBothPagesClosed": 258988152,
+          "physicalBytesBothPagesClosed": 529449888,
+          "serverPids": [
+            98828,
+            98845
+          ],
+          "loopbackPorts": [
+            56382,
+            56531
+          ],
+          "physicalBytesSecondAlone": 138543136
+        },
+        "works": {
+          "sharedPreparationMs": 1373,
+          "firstMs": 2689,
+          "secondMs": 2077,
+          "updateMs": 1800,
+          "reopenMs": 1835,
+          "physicalBytesByWorkCount": [
+            129500192,
+            130008096,
+            130237472
+          ],
+          "physicalBytesFirstRegistered": 129500192,
+          "physicalBytesBothPagesClosed": 128959520,
+          "browserBytesByWorkCount": [
+            398943280,
+            432679376,
+            463499120
+          ],
+          "browserBytesBothFramesClosed": 444739488,
+          "sampledBuildAndTypecheckPeakBytes": 419645432,
+          "hostPid": 98860,
+          "loopbackPorts": [
+            56668,
+            56642
+          ],
+          "workerPidsObserved": [
+            98881,
+            98897,
+            98905,
+            98912,
+            98984,
+            99094,
+            99104,
+            99105,
+            99114,
+            99118,
+            99150
+          ],
+          "workerPidsAfterClose": [],
+          "watcherStates": [
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 1,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 2,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            }
+          ],
+          "individualNodeModules": false
+        }
+      },
+      {
+        "separate": {
+          "firstMs": 1688,
+          "secondMs": 957,
+          "updateMs": 179,
+          "reopenMs": 99,
+          "physicalBytesByWorkCount": [
+            0,
+            282526088,
+            563037160
+          ],
+          "browserBytesByWorkCount": [
+            108368744,
+            346514552,
+            414198416
+          ],
+          "browserBytesBothPagesClosed": 258758776,
+          "physicalBytesBothPagesClosed": 564315112,
+          "serverPids": [
+            99381,
+            99391
+          ],
+          "loopbackPorts": [
+            56974,
+            57120
+          ],
+          "physicalBytesSecondAlone": 162021480
+        },
+        "works": {
+          "sharedPreparationMs": 1409,
+          "firstMs": 2699,
+          "secondMs": 2032,
+          "updateMs": 1304,
+          "reopenMs": 1835,
+          "physicalBytesByWorkCount": [
+            123995192,
+            124306488,
+            124961848
+          ],
+          "physicalBytesFirstRegistered": 124027960,
+          "physicalBytesBothPagesClosed": 123880504,
+          "browserBytesByWorkCount": [
+            400467040,
+            430795288,
+            454569888
+          ],
+          "browserBytesBothFramesClosed": 476917712,
+          "sampledBuildAndTypecheckPeakBytes": 379160424,
+          "hostPid": 99405,
+          "loopbackPorts": [
+            57155,
+            57152
+          ],
+          "workerPidsObserved": [
+            99425,
+            99426,
+            99463,
+            99466,
+            99531,
+            99591,
+            99606,
+            99609,
+            99635
+          ],
+          "workerPidsAfterClose": [],
+          "watcherStates": [
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 1,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 2,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            }
+          ],
+          "individualNodeModules": false
+        }
+      }
+    ],
+    "primed": [
+      {
+        "separate": {
+          "firstMs": 1903,
+          "secondMs": 929,
+          "updateMs": 178,
+          "reopenMs": 87,
+          "physicalBytesByWorkCount": [
+            0,
+            270958648,
+            542753048
+          ],
+          "browserBytesByWorkCount": [
+            106140520,
+            349332528,
+            408791552
+          ],
+          "browserBytesBothPagesClosed": 256710704,
+          "physicalBytesBothPagesClosed": 543768856,
+          "serverPids": [
+            99829,
+            99838
+          ],
+          "loopbackPorts": [
+            57309,
+            57457
+          ],
+          "physicalBytesSecondAlone": 137560072
+        },
+        "works": {
+          "sharedPreparationMs": 661,
+          "firstMs": 2733,
+          "secondMs": 2069,
+          "updateMs": 1804,
+          "reopenMs": 1839,
+          "physicalBytesByWorkCount": [
+            119522360,
+            119866424,
+            120112184
+          ],
+          "physicalBytesFirstRegistered": 119489592,
+          "physicalBytesBothPagesClosed": 119129144,
+          "browserBytesByWorkCount": [
+            401335296,
+            425683312,
+            455028472
+          ],
+          "browserBytesBothFramesClosed": 435023680,
+          "sampledBuildAndTypecheckPeakBytes": 391940112,
+          "hostPid": 99943,
+          "loopbackPorts": [
+            57490,
+            57489
+          ],
+          "workerPidsObserved": [
+            99965,
+            99966,
+            99983,
+            99985,
+            99993,
+            99998,
+            164,
+            166,
+            168,
+            228,
+            230,
+            232,
+            235,
+            239,
+            243,
+            244,
+            247,
+            249,
+            253,
+            279,
+            281,
+            283
+          ],
+          "workerPidsAfterClose": [],
+          "watcherStates": [
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 1,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 2,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            }
+          ],
+          "individualNodeModules": false
+        }
+      },
+      {
+        "separate": {
+          "firstMs": 1765,
+          "secondMs": 1089,
+          "updateMs": 24,
+          "reopenMs": 136,
+          "physicalBytesByWorkCount": [
+            0,
+            271630704,
+            538199040
+          ],
+          "browserBytesByWorkCount": [
+            107008872,
+            345400440,
+            412133984
+          ],
+          "browserBytesBothPagesClosed": 258398304,
+          "physicalBytesBothPagesClosed": 539231232,
+          "serverPids": [
+            1088,
+            1099
+          ],
+          "loopbackPorts": [
+            57758,
+            57956
+          ],
+          "physicalBytesSecondAlone": 149225432
+        },
+        "works": {
+          "sharedPreparationMs": 1366,
+          "firstMs": 2580,
+          "secondMs": 2093,
+          "updateMs": 1804,
+          "reopenMs": 1841,
+          "physicalBytesByWorkCount": [
+            123405368,
+            123798584,
+            124126264
+          ],
+          "physicalBytesFirstRegistered": 123454520,
+          "physicalBytesBothPagesClosed": 123225144,
+          "browserBytesByWorkCount": [
+            402236584,
+            428010080,
+            457895960
+          ],
+          "browserBytesBothFramesClosed": 439316576,
+          "sampledBuildAndTypecheckPeakBytes": 425085016,
+          "hostPid": 1525,
+          "loopbackPorts": [
+            57992,
+            57991
+          ],
+          "workerPidsObserved": [
+            1619,
+            1622,
+            1628,
+            1646,
+            1706,
+            1743,
+            1787,
+            1916,
+            1967,
+            2083,
+            2085,
+            2123,
+            2125,
+            2147,
+            2149,
+            2151,
+            2158,
+            2161,
+            2188,
+            2189,
+            2191
+          ],
+          "workerPidsAfterClose": [],
+          "watcherStates": [
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 1,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 2,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            }
+          ],
+          "individualNodeModules": false
+        }
+      },
+      {
+        "separate": {
+          "firstMs": 1727,
+          "secondMs": 1010,
+          "updateMs": 179,
+          "reopenMs": 115,
+          "physicalBytesByWorkCount": [
+            0,
+            270221632,
+            549896880
+          ],
+          "browserBytesByWorkCount": [
+            107631488,
+            342369424,
+            407956112
+          ],
+          "browserBytesBothPagesClosed": 252598368,
+          "physicalBytesBothPagesClosed": 551027376,
+          "serverPids": [
+            2584,
+            2593
+          ],
+          "loopbackPorts": [
+            58361,
+            58665
+          ],
+          "physicalBytesSecondAlone": 163332056
+        },
+        "works": {
+          "sharedPreparationMs": 1285,
+          "firstMs": 2797,
+          "secondMs": 2111,
+          "updateMs": 1799,
+          "reopenMs": 1834,
+          "physicalBytesByWorkCount": [
+            128500792,
+            128975928,
+            129188920
+          ],
+          "physicalBytesFirstRegistered": 128549944,
+          "physicalBytesBothPagesClosed": 128009272,
+          "browserBytesByWorkCount": [
+            396371016,
+            428468664,
+            458026888
+          ],
+          "browserBytesBothFramesClosed": 437301248,
+          "sampledBuildAndTypecheckPeakBytes": 422725648,
+          "hostPid": 2606,
+          "loopbackPorts": [
+            58778,
+            58777
+          ],
+          "workerPidsObserved": [
+            2628,
+            2645,
+            2646,
+            2653,
+            2659,
+            2749,
+            2751,
+            2813,
+            2815,
+            2828,
+            2829,
+            2832,
+            2839,
+            2842,
+            2869,
+            2871
+          ],
+          "workerPidsAfterClose": [],
+          "watcherStates": [
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 1,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 2,
+              "waiting": 0,
+              "active": 0
+            },
+            {
+              "watchers": 0,
+              "waiting": 0,
+              "active": 0
+            }
+          ],
+          "individualNodeModules": false
+        }
+      }
+    ]
+  }
+}

@@ -24,6 +24,7 @@ import {
 	explicitRequestedMigration,
 	inputBudgetMigration,
 	itemMarksMigration,
+	sizeFirstInputBudgetMigration,
 } from "../repository";
 import { hostInputsMigration } from "../repository/host-inputs";
 import {
@@ -52,6 +53,7 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 				m.sql !== explicitRequestedMigration &&
 				m.sql !== itemMarksMigration &&
 				m.sql !== inputBudgetMigration &&
+				m.sql !== sizeFirstInputBudgetMigration &&
 				m.sql !== hostInputsMigration &&
 				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&
@@ -240,7 +242,7 @@ test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled
 	}
 });
 
-test("memory/0016-item-marks and memory/0017-input-budget come up from the version before, keeping the settings and giving the budget its defaults", async () => {
+test("memory/0016-item-marks, memory/0017-input-budget and memory/0018-size-first-input-budget come up from the version before, keeping the settings and giving the budget its size-first values", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-0016-"));
 	const path = join(dir, "db.sqlite3");
 	const all = [
@@ -252,7 +254,10 @@ test("memory/0016-item-marks and memory/0017-input-budget come up from the versi
 	let store = openStore(
 		path,
 		all.filter(
-			(m) => m.sql !== itemMarksMigration && m.sql !== inputBudgetMigration,
+			(m) =>
+				m.sql !== itemMarksMigration &&
+				m.sql !== inputBudgetMigration &&
+				m.sql !== sizeFirstInputBudgetMigration,
 		),
 	);
 	try {
@@ -280,8 +285,9 @@ test("memory/0016-item-marks and memory/0017-input-budget come up from the versi
 			id: 1,
 			enabled: 0,
 			revision: 7,
-			always_tokens: 2000,
-			always_scope: "facts",
+			// The column defaults of 0017 (2000, facts), lowered by 0018.
+			always_tokens: 100,
+			always_scope: "responses",
 			recall_enabled: 0,
 			recall_tokens: 400,
 			recall_items: 8,

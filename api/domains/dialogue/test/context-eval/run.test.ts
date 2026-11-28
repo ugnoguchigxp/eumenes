@@ -149,7 +149,7 @@ test("the trajectory measurement is a valid report; ordinary calls share nearly 
 	expect(compared.calls).toHaveLength(12);
 	expect(compared.medianRatio).toBeGreaterThan(0.9);
 	const rebuilt = compared.calls.filter((c) => c.cut !== null);
-	expect(rebuilt.map((c) => c.label)).toEqual(["g9"]);
+	expect(rebuilt.map((c) => c.label)).toEqual(["g8", "g9"]);
 	// A cut rewrites the start of the input (here `## Memory` takes in the waiting memory).
 	for (const call of rebuilt) expect(call.tokenRatio!).toBeLessThan(1);
 	expect(

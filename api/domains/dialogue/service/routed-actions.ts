@@ -63,6 +63,11 @@ export async function handWith(
 		toolchain: candidate.id,
 		// Keep the complete words for request-based delegation.
 		request: typeof fields.request === "string" ? fields.request : words,
+		...(candidate.execution === "task" &&
+		candidate.inputs &&
+		fields.inputs !== undefined
+			? { inputs: fields.inputs }
+			: {}),
 		...(typeof fields.diagnosticRef === "string"
 			? { diagnosticRef: fields.diagnosticRef }
 			: {}),

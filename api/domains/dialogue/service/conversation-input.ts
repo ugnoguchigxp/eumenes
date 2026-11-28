@@ -38,7 +38,7 @@ import {
 	workingLimits,
 	type WorkingLimits,
 } from "./summary-format";
-import { replayableCalls } from "./tool-exchange";
+import { callsMark, replayableCalls } from "./tool-exchange";
 import { stateLinesInTransaction, stateText } from "./state-text";
 
 export {
@@ -94,12 +94,13 @@ export function recentUtterances(
 
 /**
  * The recent conversation as native messages: one per side's run of utterances, each utterance within its bound. The
- * searches, hand-overs and notices an utterance carries are not drawn: the talk turn reads the words only.
+ * calls a reply made are drawn as one line under its words (`callsMark`), never as the calls and results themselves:
+ * a result is read again when a later turn needs it.
  */
 export function recentMessages(
 	utterances: readonly Utterance[],
 	imageNotes: ReadonlyMap<string, string> = new Map(),
-	/** Replay carried tool calls and results in the working conversation history. */
+	/** Mark the calls each reply made. */
 	withCalls = false,
 	originOf?: (utterance: Utterance) => InputOrigin,
 	/** Include agency-owned tools (`start_preparation`, `read_note`, goal tools) when the agency serves replies. */
@@ -109,48 +110,18 @@ export function recentMessages(
 	for (const u of utterances) {
 		const role = u.speaker === "user" ? "user" : "assistant";
 		const note = u.messageId ? imageNotes.get(u.messageId) : null;
+		const mark =
+			withCalls && role === "assistant"
+				? callsMark(replayableCalls(u, includeAgency))
+				: "";
 		const text = dataText(
-			[headWithin(u.text, RECENT.utteranceTokens).text, note]
+			[headWithin(u.text, RECENT.utteranceTokens).text, note, mark]
 				.filter(Boolean)
 				.join("\n"),
 		);
-		const calls =
-			withCalls && role === "assistant"
-				? replayableCalls(u, includeAgency)
-				: [];
 		const origin = originOf?.(u);
-		if (calls.length) {
-			// The reply's own tool calls come back as its history: it sees what it did (the package's rule).
-			const ids = calls.map((_, k) =>
-				`${u.messageId ?? u.seq}_${k}`.replace(/[^A-Za-z0-9_-]/gu, "_"),
-			);
-			messages.push({
-				role: "assistant",
-				content: "",
-				tool_calls: calls.map((c, k) => ({
-					id: ids[k]!,
-					type: "function" as const,
-					function: { name: c.name, arguments: c.arguments },
-				})),
-			} as unknown as ChatMessage);
-			calls.forEach((c, k) =>
-				// Typed as the prefix's messages: the tool role is the chat shape the model reads.
-				messages.push({
-					role: "tool",
-					content: c.result,
-					tool_call_id: ids[k]!,
-				} as unknown as ChatMessage),
-			);
-			const words: ChatMessage = { role, content: text };
-			messages.push(origin ? markInput(words, origin) : words);
-			continue;
-		}
 		const last = messages.at(-1);
-		if (
-			last &&
-			last.role === role &&
-			!(last as { tool_calls?: unknown }).tool_calls
-		) {
+		if (last && last.role === role) {
 			const from = last.content.length + 1;
 			last.content += `\n${text}`;
 			if (origin) markInput(last, origin, from);

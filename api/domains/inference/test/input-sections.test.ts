@@ -4,6 +4,7 @@ import {
 	decodeSections,
 	encodeSections,
 	inputSections,
+	tailSections,
 } from "../service/input-sections";
 
 const tool = {
@@ -121,4 +122,45 @@ test("the hash is keyed: it is not the plain digest of a short text", () => {
 		createHash("sha256").update(text).digest("hex").slice(0, 12);
 	for (const guess of [content, JSON.stringify([content, null, null, 0])])
 		expect(section!.hash).not.toBe(plain(guess));
+});
+
+test("the last message is told by its sections, the fields of State and the keys of the agency's state; never by text", () => {
+	const secret = "鎌倉の秘密の予定";
+	const tail = tailSections([
+		{ role: "system", content: "指示" },
+		{
+			role: "user",
+			content: [
+				"## Agency",
+				`<あなたの今の状態 label="資料">${JSON.stringify({ notes: [{ id: "n1", title: secret }], quiet: {}, 利用者の名前: 1 })}</あなたの今の状態>`,
+				"",
+				"## State",
+				"今: 11-28（土）22:00",
+				"仕事:",
+				`- ${secret}`,
+				"提示中:",
+				"- a1「地図」",
+				`${secret}: これは見出しではない`,
+				"",
+				"## User",
+				secret,
+			].join("\n"),
+		},
+	]);
+	expect(tail.map((part) => `${part.role}:${part.label}`)).toEqual([
+		"part:Agency.notes",
+		"part:Agency.quiet",
+		"part:Agency.other",
+		"part:State.now",
+		"part:State.work",
+		"part:State.presented",
+		"part:User",
+	]);
+	expect(tail.every((part) => part.tokens > 0)).toBe(true);
+	expect(encodeSections(tail)).not.toContain("鎌倉");
+	// A message that is not the user's last, or has none of the product's headings, has no parts.
+	expect(tailSections([{ role: "user", content: secret }])).toEqual([]);
+	expect(
+		tailSections([{ role: "assistant", content: "## State\n今: x" }]),
+	).toEqual([]);
 });

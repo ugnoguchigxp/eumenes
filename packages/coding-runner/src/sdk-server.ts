@@ -58,6 +58,7 @@ export async function servePrivateRunner<T>(
 		server.listen(socket, resolve);
 	});
 	chmodSync(socket, 0o600);
+	const original = lstatSync(socket);
 	return {
 		socket,
 		close: async () => {
@@ -66,7 +67,11 @@ export async function servePrivateRunner<T>(
 				server.closeAllConnections();
 			});
 			await service.close();
-			if (existsSync(socket)) unlinkSync(socket);
+			if (existsSync(socket)) {
+				const current = lstatSync(socket);
+				if (current.dev === original.dev && current.ino === original.ino)
+					unlinkSync(socket);
+			}
 		},
 	};
 }

@@ -1,4 +1,5 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
+import { createConversationService } from "../../conversation";
 import type { RunProgress } from "../contracts";
 import type { DialogueDeps } from "../service/context";
 import { createProgress } from "../service/progress";
@@ -20,10 +21,9 @@ async function setup() {
 			"INSERT INTO dialogue_runs (id, request_id, conversation_id, status, revision, input_message_id, created_at, updated_at) VALUES ('r', 'req', 'c', 'running', 1, 'm', 'now', 'now')",
 		);
 	});
-	const saved = [{ id: "answer", text: "採用した回答。" }];
 	const progress = createProgress({
 		store,
-		conversation: { get: () => ({ messages: saved }) },
+		conversation: createConversationService(store),
 	} as unknown as DialogueDeps);
 	cleanups.push(async () => {
 		progress.close();

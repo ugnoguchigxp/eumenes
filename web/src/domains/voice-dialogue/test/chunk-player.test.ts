@@ -54,7 +54,12 @@ it("fetches every listed chunk at once, plays the next without waiting for the p
 		}),
 	} as unknown as AudioController;
 	const delivered = new Set<string>();
-	const queue: ChunkQueue = { id: "u", epoch: 1, tail: Promise.resolve() };
+	const queue: ChunkQueue = {
+		id: "u",
+		epoch: 1,
+		abort: new AbortController(),
+		tail: Promise.resolve(),
+	};
 	queueChunks(turn, queue, {
 		client,
 		cache: new QueryClient(),
@@ -103,7 +108,12 @@ it("discards prefetched chunks after cancellation and never reports them played"
 		}),
 	} as unknown as AudioController;
 	const delivered = new Set<string>();
-	const queue: ChunkQueue = { id: "u", epoch: 1, tail: Promise.resolve() };
+	const queue: ChunkQueue = {
+		id: "u",
+		epoch: 1,
+		abort: new AbortController(),
+		tail: Promise.resolve(),
+	};
 	queueChunks(turn, queue, {
 		client,
 		cache: new QueryClient(),
@@ -141,7 +151,12 @@ it("ignores a late audio fetch error after its playback queue was cancelled", as
 	} as unknown as VoiceDialogueClient;
 	const queued = vi.fn(() => live);
 	const fail = vi.fn();
-	const queue: ChunkQueue = { id: "u", epoch: 1, tail: Promise.resolve() };
+	const queue: ChunkQueue = {
+		id: "u",
+		epoch: 1,
+		abort: new AbortController(),
+		tail: Promise.resolve(),
+	};
 	queueChunks({ ...turn, audioChunks: turn.audioChunks!.slice(0, 1) }, queue, {
 		client,
 		cache: new QueryClient(),
@@ -180,7 +195,12 @@ it("ignores a late playback acknowledgement error after its queue was cancelled"
 		}),
 	} as unknown as AudioController;
 	const fail = vi.fn();
-	const queue: ChunkQueue = { id: "u", epoch: 1, tail: Promise.resolve() };
+	const queue: ChunkQueue = {
+		id: "u",
+		epoch: 1,
+		abort: new AbortController(),
+		tail: Promise.resolve(),
+	};
 	queueChunks({ ...turn, audioChunks: turn.audioChunks!.slice(0, 1) }, queue, {
 		client,
 		cache: new QueryClient(),
@@ -215,7 +235,12 @@ it("a muted live chunk is acknowledged as inaudible", async () => {
 			end = onEnded;
 		}),
 	} as unknown as AudioController;
-	const queue: ChunkQueue = { id: "u", epoch: 1, tail: Promise.resolve() };
+	const queue: ChunkQueue = {
+		id: "u",
+		epoch: 1,
+		abort: new AbortController(),
+		tail: Promise.resolve(),
+	};
 	queueChunks({ ...turn, audioChunks: turn.audioChunks!.slice(0, 1) }, queue, {
 		client,
 		cache: new QueryClient(),
@@ -233,5 +258,10 @@ it("a muted live chunk is acknowledged as inaudible", async () => {
 	});
 	await queue.tail;
 	end();
-	expect(client.voicePlayed).toHaveBeenCalledWith("u", 0, { audible: false });
+	expect(client.voicePlayed).toHaveBeenCalledWith(
+		"u",
+		0,
+		{ audible: false },
+		queue.abort.signal,
+	);
 });

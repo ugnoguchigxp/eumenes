@@ -326,7 +326,7 @@ test("the settings schema takes any of the settings, at least one, within their 
 	).toBe(true);
 	for (const bad of [
 		{},
-		{ alwaysTokens: 199 },
+		{ alwaysTokens: 49 },
 		{ alwaysTokens: 8001 },
 		{ alwaysScope: "all" },
 	])

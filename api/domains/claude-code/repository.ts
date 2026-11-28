@@ -78,6 +78,7 @@ export function save(db: Database, work: Work, now: number) {
 			!terminal(work) ||
 				!!work.notice ||
 				!!work.effect ||
+				!!work.idlePending ||
 				(!!work.supervision && work.stop === "unconfirmed"),
 		),
 		now,

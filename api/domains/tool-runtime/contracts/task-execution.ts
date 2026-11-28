@@ -313,6 +313,8 @@ export function isStandardExecutionSource(
 }
 /** A registered task owner. Dialogue owns the TODO; this port owns the actual work. */
 export interface TaskLifecyclePort {
+	/** Explicit optional argument fields for conversation intake. User prose is carried separately. */
+	inputParameters?: Record<string, unknown>;
 	/** This registered owner runs its own selected package as a research worker. */
 	selectedWorker?: true;
 	startInTransaction(
@@ -324,6 +326,7 @@ export interface TaskLifecyclePort {
 			toolchainRevisionId?: string;
 			bindingRevisionId?: string;
 			deadline?: number;
+			arguments?: Record<string, unknown>;
 		},
 	): ExecutionView;
 	controlInTransaction(

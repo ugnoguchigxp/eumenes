@@ -71,7 +71,7 @@ function formatCompactionPrompt(
 	maxTokens: number,
 ): string {
 	const parts: string[] = [
-		`上限: 約${maxTokens}トークン以内。先頭行に「対象範囲: ${shortSummaryTime(dropped[0]!.at)}〜${shortSummaryTime(dropped.at(-1)!.at)}（圧縮済み履歴の要約。詳細は read_history / read_agents で確認可）」を置く。`,
+		`上限: 約${maxTokens}トークン以内。先頭行に「対象範囲: ${shortSummaryTime(dropped[0]!.at)}〜${shortSummaryTime(dropped.at(-1)!.at)}（圧縮済み履歴の要約。詳細は read_history で確認可）」を置く。`,
 	];
 	if (existing?.text) {
 		parts.push(`### 既存要約\n${dataText(existing.text)}`);

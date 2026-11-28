@@ -253,6 +253,7 @@ export async function recover(
 		)
 			return false;
 		work.stop = "confirmed";
+		if (work.works) work.idlePending = true;
 		work.summary = "実行の停止を確認しました。結果は中断です。";
 		work.observedAt = now();
 		work.observation = observation;

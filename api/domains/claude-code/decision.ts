@@ -73,7 +73,10 @@ export async function decide(
 					"\nA Claude Code execution is active. Return wait with a brief, evidence-based progress summary."
 				: work.decisionMode === "question"
 					? questionRules
-					: rules,
+					: rules +
+						(work.works
+							? "\nFor a missing Works package, use ask_user with dependency only after a failed registered check identifies that package. Include its exact registry version, package-relative browser JavaScript entry and TypeScript declaration, intended usage, and evidenceRef. Ask Claude Code to report candidates without installing them."
+							: ""),
 		tools: work.decisionMode === "work" ? tools : [],
 		outputSchema: schema,
 	});
@@ -106,6 +109,17 @@ export async function decide(
 			? { pendingQuestion: work.pendingRunnerQuestion }
 			: {}),
 		observation: work.observation ? { ...rest, evidence: extra } : null,
+		...(work.works && work.observation?.structuredEvidence
+			? {
+					checks: work.observation.structuredEvidence
+						.filter((e) => e.kind === "check" && !e.passed)
+						.slice(-4)
+						.map(({ ref, stderr }) => ({
+							ref,
+							diagnostics: stderr?.slice(0, 600),
+						})),
+				}
+			: {}),
 		...(eventExcerpts.length
 			? { eventCursor: work.eventCursor ?? 0, eventExcerpts }
 			: {}),

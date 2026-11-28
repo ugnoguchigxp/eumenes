@@ -18,6 +18,7 @@ import {
 } from "../domains/toolchain-artifacts/registry";
 import { queryRoots } from "../queryKeys";
 import { readScreenState } from "../domains/toolchain-artifacts/screen-observation";
+import { worksScreen } from "../domains/prototype/resource-screen";
 import {
 	prepareToolchainAdapter,
 	toolchainWebAdapters,
@@ -131,7 +132,9 @@ export function useCurrentViewing(
 			}
 		}
 		if (viewing) return viewing;
-		const uri = viewingUriOf(current, entries, adapters);
+		const uri =
+			viewingUriOf(current, entries, adapters) ??
+			(!current ? worksScreen.viewing() : null);
 		return uri ? { resource: uri } : undefined;
 	}, [specialistViewing, cache, adapters]);
 }

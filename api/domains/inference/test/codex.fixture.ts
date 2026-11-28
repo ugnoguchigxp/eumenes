@@ -30,6 +30,8 @@ export type FakeBehavior = {
 	deltas?: number;
 	/** `thread/delete` is answered with an error and leaves its record file. */
 	deleteFails?: boolean;
+	/** What `debug models` prints; absent: the CLI has no catalog to print (it exits with an error). */
+	catalog?: unknown;
 };
 export type FakeRequest = {
 	pid: number;
@@ -58,6 +60,13 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "
 import { join } from "node:path";
 const out = (m) => process.stdout.write(JSON.stringify(m) + "\\n");
 const note = (entry) => appendFileSync(${JSON.stringify(log)}, JSON.stringify({ pid: process.pid, ...entry }) + "\\n");
+if (process.argv[2] === "debug" && process.argv[3] === "models") {
+	const { catalog } = JSON.parse(readFileSync(${JSON.stringify(behavior)}, "utf8"));
+	note({ method: "catalog", params: { argv: process.argv.slice(2), home: process.env.CODEX_HOME, key: process.env.CODEX_API_KEY ?? null } });
+	if (catalog === undefined) process.exit(1);
+	process.stdout.write(JSON.stringify(catalog));
+	process.exit(0);
+}
 note({ method: "spawn", params: { argv: process.argv.slice(2), home: process.env.CODEX_HOME, cwd: process.cwd(), key: process.env.CODEX_API_KEY ?? null } });
 const threads = new Map();
 let n = 0;

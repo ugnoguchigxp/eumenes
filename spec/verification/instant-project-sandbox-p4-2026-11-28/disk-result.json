@@ -1,0 +1,140 @@
+{
+  "filesystem": "APFS, isolated sparse volumes",
+  "bun": "1.4.4",
+  "installBackend": "clonefile",
+  "trialsPerMode": 3,
+  "typescript": "5.9.3",
+  "vite": "8.3.5",
+  "cold": {
+    "separate": {
+      "first_install_allocated_bytes": {
+        "median": 106905600,
+        "min": 106860544,
+        "max": 106946560
+      },
+      "second_install_allocated_bytes": {
+        "median": 962560,
+        "min": 901120,
+        "max": 995328
+      },
+      "two_install_allocated_bytes": {
+        "median": 107847680,
+        "min": 107823104,
+        "max": 107900928
+      },
+      "first_install_ms": {
+        "median": 886,
+        "min": 866,
+        "max": 943
+      },
+      "second_install_ms": {
+        "median": 87,
+        "min": 80,
+        "max": 103
+      },
+      "apfs_fragment_bytes": {
+        "median": 4096,
+        "min": 4096,
+        "max": 4096
+      }
+    },
+    "works": {
+      "preparation_ms": {
+        "median": 1472,
+        "min": 1287,
+        "max": 1572
+      },
+      "zero_works_allocated_bytes": {
+        "median": 74612736,
+        "min": 74588160,
+        "max": 74670080
+      },
+      "first_cumulative_allocated_bytes": {
+        "median": 75325440,
+        "min": 75288576,
+        "max": 75350016
+      },
+      "second_cumulative_allocated_bytes": {
+        "median": 76058624,
+        "min": 76017664,
+        "max": 76083200
+      },
+      "addition_with_old_release_bytes": {
+        "median": 77234176,
+        "min": 76976128,
+        "max": 77271040
+      },
+      "after_oldest_cleanup_bytes": {
+        "median": 77004800,
+        "min": 76992512,
+        "max": 77033472
+      }
+    }
+  },
+  "primed": {
+    "separate": {
+      "first_install_allocated_bytes": {
+        "median": 1314816,
+        "min": 1306624,
+        "max": 1331200
+      },
+      "second_install_allocated_bytes": {
+        "median": 1146880,
+        "min": 1138688,
+        "max": 1146880
+      },
+      "two_install_allocated_bytes": {
+        "median": 2461696,
+        "min": 2445312,
+        "max": 2478080
+      },
+      "first_install_ms": {
+        "median": 82,
+        "min": 77,
+        "max": 91
+      },
+      "second_install_ms": {
+        "median": 75,
+        "min": 69,
+        "max": 81
+      },
+      "apfs_fragment_bytes": {
+        "median": 4096,
+        "min": 4096,
+        "max": 4096
+      }
+    },
+    "works": {
+      "preparation_ms": {
+        "median": 680,
+        "min": 669,
+        "max": 767
+      },
+      "zero_works_allocated_bytes": {
+        "median": 1380352,
+        "min": 1335296,
+        "max": 1392640
+      },
+      "first_cumulative_allocated_bytes": {
+        "median": 2121728,
+        "min": 2072576,
+        "max": 2129920
+      },
+      "second_cumulative_allocated_bytes": {
+        "median": 2854912,
+        "min": 2801664,
+        "max": 2859008
+      },
+      "addition_with_old_release_bytes": {
+        "median": 4022272,
+        "min": 3809280,
+        "max": 4071424
+      },
+      "after_oldest_cleanup_bytes": {
+        "median": 3792896,
+        "min": 3760128,
+        "max": 3821568
+      }
+    }
+  }
+}

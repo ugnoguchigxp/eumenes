@@ -3,7 +3,6 @@ import { imageReferenceText } from "../../conversation";
 import type { z } from "zod";
 import {
 	hash,
-	isReadToolName,
 	READ_TOOLS,
 	readToolParameters,
 	type readToolInputs,
@@ -19,7 +18,6 @@ import {
 import { systemContext } from "../../../infrastructure/system-context";
 import type { Run } from "../contracts";
 import { hiddenMessages, recentRuns } from "../repository";
-import { sessionEventsOfRun } from "../repository/specialist";
 import type { DialogueDeps, GenerateInput } from "./context";
 import type {
 	ExecutorContext,
@@ -27,6 +25,7 @@ import type {
 	ToolOutcome,
 } from "./executor-context";
 import type { ParsedCall } from "./generation-tools";
+import { callsMark } from "./tool-exchange";
 import { memoryItemLine } from "./result-text";
 import { messageDigests, readDiagnostic } from "./diagnostic-evidence";
 import { withheldIn } from "./memory-refs";
@@ -52,19 +51,12 @@ const LIMITS = {
 	historySearch: 20,
 	/** One record's words: a saved message, a request, a report. */
 	textChars: 200,
-	/** Stored work request text shown by `read_agents`. */
-	workRequestChars: 300,
 	/** The head of a run's utterance; a page's name. */
 	headChars: 40,
-	sourceChars: 80,
 	/** Warnings told of one run. */
 	warnings: 3,
-	/** Runs and work items looked back over for `read_runs` / `read_agents`. */
+	/** Runs looked back over for `read_runs`. */
 	scannedRuns: 100,
-	/** Per piece of work: pages, tools and specialist steps told. */
-	sources: 3,
-	tools: 6,
-	sessionSteps: 3,
 	/** How long the history search's session may live (it is released after the read). */
 	historyMs: 60_000,
 	/** How long the operational log is read for a read of runs. */
@@ -141,11 +133,9 @@ export function availableReadTools(
 	return READ_TOOLS.filter(({ name }) =>
 		name === "read_memory"
 			? !!deps.memory?.readyInTransaction(db)
-			: name === "read_agents"
-				? !!deps.agents
-				: name === "read_world"
-					? !!deps.worldContext?.recordsInTransaction
-					: true,
+			: name === "read_world"
+				? !!deps.worldContext?.recordsInTransaction
+				: true,
 	).map(({ name }) => name);
 }
 
@@ -247,38 +237,6 @@ async function memoryFound(
 	};
 }
 
-function toolSummaryTag(
-	calls: ReadonlyArray<{ name: string; arguments: string; result: string }>,
-): string {
-	if (!calls.length) return "";
-	const labels = calls.slice(0, 3).map((call) => {
-		let target = "";
-		if (call.name === "delegate") {
-			try {
-				const args = JSON.parse(call.arguments) as Record<string, unknown>;
-				const tc =
-					typeof args.toolchainId === "string"
-						? args.toolchainId
-						: typeof args.toolchain === "string"
-							? args.toolchain
-							: "";
-				if (tc) target = `(${tc})`;
-			} catch {
-				// ignore malformed args
-			}
-		}
-		let extra = "";
-		try {
-			const res = JSON.parse(call.result) as Record<string, unknown>;
-			if (typeof res.assignment === "string") extra = `→${res.assignment}`;
-		} catch {
-			// plain text result
-		}
-		return `${call.name}${target}${extra}`;
-	});
-	return `[道具: ${labels.join("、")}]`;
-}
-
 function historyFound(
 	deps: DialogueDeps,
 	db: Database,
@@ -324,7 +282,7 @@ function historyFound(
 					toolByMessage.set(u.messageId, u.toolCalls);
 		}
 		const lines = shown.map((view) => {
-			const tag = toolSummaryTag(toolByMessage.get(view.messageId) ?? []);
+			const tag = callsMark(toolByMessage.get(view.messageId) ?? []);
 			return `- ${when(view.createdAt)} ${view.speaker === "user" ? "利用者" : "Eumenes"}: ${clip(view.text, LIMITS.textChars)} ${imageReferenceText((view.imageReferences ?? []).filter((ref) => !blocked.has(ref.messageId)))} ${tag}`.trimEnd();
 		});
 		const messageIds = shown.map((view) => view.messageId);
@@ -430,145 +388,6 @@ async function runsFound(
 	};
 }
 
-/** A tool revision's tool id (`tool:web.lookup@2` → `web.lookup`). */
-const toolName = (revisionId: string) =>
-	/^tool:([^@]+)@/.exec(revisionId)?.[1] ?? revisionId;
-
-function matchesAgentsFilter(
-	text: string,
-	toolchainId: string | null | undefined,
-	args: z.infer<(typeof readToolInputs)["read_agents"]>,
-): boolean {
-	if (args.toolchain?.trim()) {
-		const wanted = args.toolchain.normalize("NFKC").toLowerCase().trim();
-		if (!(toolchainId ?? "").normalize("NFKC").toLowerCase().includes(wanted))
-			return false;
-	}
-	if (args.query?.trim()) {
-		const tokens = args.query
-			.normalize("NFKC")
-			.toLowerCase()
-			.trim()
-			.split(/[\s\u3000]+/)
-			.filter(Boolean);
-		const hay = text.normalize("NFKC").toLowerCase();
-		if (!tokens.every((t) => hay.includes(t))) return false;
-	}
-	return true;
-}
-
-function agentsFound(
-	deps: DialogueDeps,
-	input: GenerateInput,
-	args: z.infer<(typeof readToolInputs)["read_agents"]>,
-): Found | null {
-	const agents = deps.agents;
-	if (!agents) return null;
-	const count = args.count ?? 1;
-	const loaded = deps.store.read((db) => {
-		const blocked = blockedOf(deps, db, input.conversationId);
-		if (!blocked) return null;
-		const runs = recentRuns(
-			db,
-			input.conversationId,
-			input.runId,
-			LIMITS.scannedRuns,
-		)
-			.filter((run) => !blocked.has(run.inputMessageId))
-			.map((run) => {
-				const usage = deps.toolchains?.usageOfRunInTransaction?.(db, run.id);
-				return {
-					run,
-					// A read the search offered is the conversation's own, not work handed over.
-					usage:
-						usage?.toolchainId && isReadToolName(usage.toolchainId)
-							? undefined
-							: usage,
-					session: sessionEventsOfRun(db, run.id),
-				};
-			});
-		return { runs };
-	});
-	if (!loaded) return null;
-	type Entry = {
-		at: string;
-		toolchainId: string | null | undefined;
-		line: string;
-		messageIds: string[];
-	};
-	const entries: Entry[] = [];
-	for (const { run, usage, session } of loaded.runs) {
-		const tasks = agents.list(run.id);
-		if (!usage && !tasks.length && !session.length) continue;
-		const tools = new Map<string, number>();
-		for (const task of tasks)
-			for (const outcome of task.toolOutcomes) {
-				const label = `${toolName(outcome.toolRevisionId)}(${outcome.state}${codeText(outcome.errorCode)})`;
-				tools.set(label, (tools.get(label) ?? 0) + 1);
-			}
-		const root = tasks.find((task) => !task.parentTaskId) ?? tasks[0];
-		let report: ReturnType<typeof agents.report> | null = null;
-		if (root)
-			try {
-				report = agents.report(root.id);
-			} catch {
-				report = null;
-			}
-		const sources = (report?.sources ?? [])
-			.slice(0, LIMITS.sources)
-			.map((source) =>
-				clip(source.title || source.url || "", LIMITS.sourceChars),
-			)
-			.filter(Boolean);
-		const toolchainId = usage?.toolchainId;
-		const requestText = usage?.request;
-		const summaryText = report?.summary;
-		const line = [
-			`- ${when(run.createdAt)} 担当: ${toolchainId ?? "なし"}`,
-			...(requestText
-				? [`依頼: ${clip(requestText, LIMITS.workRequestChars)}`]
-				: []),
-			`状態: ${usage?.outcome ?? root?.status ?? run.status}${codeText(usage?.code ?? root?.errorCode)}`,
-			...(tools.size
-				? [
-						`道具: ${[...tools]
-							.slice(0, LIMITS.tools)
-							.map(([label, n]) => (n > 1 ? `${label}×${n}` : label))
-							.join("、")}`,
-					]
-				: []),
-			...session
-				.slice(0, LIMITS.sessionSteps)
-				.map((event) =>
-					event.kind === "handover"
-						? `専門担当への引き渡し: ${clip(event.request, LIMITS.textChars)}`
-						: `専門担当の操作: ${event.tool}(${event.ok ? "成功" : `失敗${codeText(event.error)}`})`,
-				),
-			...(sources.length ? [`見た所: ${sources.join("、")}`] : []),
-			...(summaryText ? [`報告: ${clip(summaryText, LIMITS.textChars)}`] : []),
-		].join(" ");
-		entries.push({
-			at: run.createdAt,
-			toolchainId,
-			line,
-			messageIds: run.inputMessageId ? [run.inputMessageId] : [],
-		});
-	}
-	entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-	const filtered = entries.filter((entry) =>
-		matchesAgentsFilter(entry.line, entry.toolchainId, args),
-	);
-	const selected = filtered.slice(0, count);
-	const messageIds = [
-		...new Set(selected.flatMap((entry) => entry.messageIds)),
-	];
-	return {
-		lines: selected.map((entry) => entry.line),
-		more: Math.max(0, filtered.length - selected.length),
-		...(messageIds.length ? { sources: { messageIds } } : {}),
-	};
-}
-
 function worldFound(
 	deps: DialogueDeps,
 	db: Database,
@@ -622,12 +441,6 @@ async function found(
 				deps,
 				input,
 				(args as z.infer<(typeof readToolInputs)["read_runs"]>).count ?? 1,
-			);
-		case "read_agents":
-			return agentsFound(
-				deps,
-				input,
-				args as z.infer<(typeof readToolInputs)["read_agents"]>,
 			);
 		case "read_world":
 			return deps.store.read((db) =>

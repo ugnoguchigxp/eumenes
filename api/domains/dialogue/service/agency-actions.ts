@@ -100,6 +100,7 @@ function launch(
 				toolchainRevisionId: input.revisionId,
 				bindingRevisionId: entry.runtime.binding?.bindingRevisionId,
 				deadline: input.deadline,
+				arguments: input.details?.inputs,
 			})
 		: entry.runtime.execution === "pipeline"
 			? deps.agents!.executions.startPipelineInTransaction(db, {

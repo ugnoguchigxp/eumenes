@@ -1,0 +1,228 @@
+{
+  "separated_builder": {
+    "boundary": {
+      "readDenied": true,
+      "writeDenied": true,
+      "sharedWriteDenied": true,
+      "networkDenied": true,
+      "environmentClean": true
+    },
+    "normal_build": {
+      "built": true,
+      "outputs": 1
+    },
+    "restored_lock_build_matches": true,
+    "other_fixed_environment_accepts_new_dependency": true,
+    "original_build_unchanged_after_adding_dependency": true,
+    "both_builds_unchanged_after_fixture_core_dependency_update": true,
+    "normal_typecheck": {
+      "diagnostics": []
+    },
+    "editor_language_service": {
+      "definitions": {
+        "React": true,
+        "Scene": true,
+        "OrbitControls": true
+      },
+      "errors": []
+    },
+    "registered_checks": {
+      "boundary": {
+        "worker": {
+          "readDenied": true,
+          "writeDenied": true,
+          "sharedWriteDenied": true,
+          "networkDenied": true,
+          "environmentClean": true
+        },
+        "registeredCheckAccepted": true,
+        "unregisteredArgsRejected": true,
+        "exitCode": 0,
+        "passed": true,
+        "changedInputCannotPass": true
+      },
+      "typecheck": {
+        "worker": {
+          "diagnostics": []
+        },
+        "registeredCheckAccepted": true,
+        "unregisteredArgsRejected": true,
+        "exitCode": 0,
+        "passed": true,
+        "changedInputCannotPass": true
+      },
+      "build": {
+        "worker": {
+          "built": true,
+          "outputs": 1
+        },
+        "registeredCheckAccepted": true,
+        "unregisteredArgsRejected": true,
+        "exitCode": 0,
+        "passed": true,
+        "changedInputCannotPass": true
+      },
+      "typed_error": {
+        "worker": {
+          "diagnostics": [
+            {
+              "code": 2322,
+              "message": "Type 'string' is not assignable to type 'number'."
+            }
+          ]
+        },
+        "registeredCheckAccepted": true,
+        "unregisteredArgsRejected": true,
+        "exitCode": 3,
+        "passed": false,
+        "changedInputCannotPass": true
+      },
+      "build_with_typed_error": {
+        "worker": {
+          "diagnostics": [
+            {
+              "code": 2322,
+              "message": "Type 'string' is not assignable to type 'number'."
+            }
+          ]
+        },
+        "registeredCheckAccepted": true,
+        "unregisteredArgsRejected": true,
+        "exitCode": 3,
+        "passed": false,
+        "changedInputCannotPass": true
+      }
+    },
+    "type_error": {
+      "diagnostics": [
+        {
+          "code": 2322,
+          "message": "Type 'string' is not assignable to type 'number'."
+        }
+      ]
+    },
+    "preview_build_from_typed_error_input": {
+      "built": true,
+      "outputs": 1
+    },
+    "macro_rejection": {
+      "error": "macro_import_forbidden"
+    },
+    "macro_marker_created": false,
+    "project_preload_marker_created": false,
+    "project_node_modules_created": false
+  },
+  "browser_intercepted": {
+    "chromium": "149.0.7827.55",
+    "browserChannel": "playwright-headless-shell",
+    "interceptedRoutesOnly": true,
+    "forceSiteIsolation": true,
+    "assetLoaded": true,
+    "styleLoaded": true,
+    "parentPrivate": true,
+    "apiBlocked": true,
+    "serviceWorkerBlocked": true,
+    "separateStorage": true,
+    "restoredStorage": true,
+    "indexedDbIsolated": true,
+    "broadcastChannelIsolated": true,
+    "assetTransferToSelectedFrame": true,
+    "stoppedBeforeWorkACompleted": true
+  },
+  "git_registration": {
+    "independent_repositories_accepted": true,
+    "core_linked_worktree_rejected": true,
+    "work_linked_worktree_rejected": true,
+    "registered_alias_rejected": true,
+    "path_inside_repository_rejected": true,
+    "relocated_clone_contains_registration_anchor": true,
+    "unrelated_repository_lacks_anchor": true
+  },
+  "nested_claude_check": {
+    "standaloneProfileApplied": true,
+    "registeredCheckAllowed": true,
+    "unregisteredShellAndWorkspaceEscapeDenied": true,
+    "externalReadScopeCurrentlyRejected": true,
+    "profileAppliedUnderClaudeCheck": false,
+    "exit": 1,
+    "sandboxOperationNotPermitted": true
+  },
+  "image_and_work_interfaces": {
+    "explicitReferenceIsStableAcrossTabSwitch": true,
+    "unopenedWorkAndAmbiguousNameChecked": true,
+    "oldWorkspaceGenerationRejected": true,
+    "imageJobQueuedWithoutConversationOrPlan": true,
+    "duplicateOperationKeptReceiptAndDeadline": true,
+    "differentInputRejectedForSameOperation": true,
+    "projectScopedCancellation": true,
+    "sourceEditDidNotInvalidateAcceptedImage": true,
+    "expiredOrRevokedResultRejected": true
+  },
+  "dependency_admission": {
+    "youngReleaseRejected": true,
+    "installLifecycleScriptRejected": true,
+    "noPublicationBeforeApproval": true,
+    "staleApprovalRejected": true,
+    "sameWorkIdResumed": true,
+    "otherWorkKeptItsFixedVersion": true,
+    "approvalReplayDoesNotRepublish": true
+  },
+  "source_snapshot_and_watch": {
+    "ignoredFilesExcluded": true,
+    "outsideLinkAndOversizedInputRejected": true,
+    "fileCountAndTotalLimitRejected": true,
+    "compiledInputIdentityIncludesFixedVersion": true,
+    "consecutiveWritesCoalesced": true,
+    "unmodifiedWorkNotRefreshed": true,
+    "watchHandlesReleased": true
+  },
+  "shared_release": {
+    "publishedVersions": [
+      "1.0",
+      "1.1",
+      "2.0"
+    ],
+    "publishedFingerprints": {
+      "1.0": {
+        "commit": "4dc58f5a3940070a9ba2a82e5c387ceaff3b9553",
+        "digest": "cfffaee25d8eb32831bef6ba1e538c3a2c6f43acb7e85325bd88c42948518260"
+      },
+      "1.1": {
+        "commit": "2bc80ce24a545b24ef6411adc3cf5fec8de8b36c",
+        "digest": "b2327c27c055d87ffe43f911734856906bfb3475e36cde437f8053ead9b09e27"
+      },
+      "2.0": {
+        "commit": "8ca80f9f0f0201c21bb7c7fba55de03d2a56f079",
+        "digest": "cf6a70ad6cb1725d128027caec3a569041ad768dddb2489c1657c6475d1d8bd8"
+      }
+    },
+    "events": [
+      "prepared 1.0",
+      "prepared 1.1",
+      "evicted 1.0",
+      "prepared 2.0",
+      "evicted 1.1",
+      "prepared 1.0"
+    ],
+    "cacheBudgetBytes": 536870912,
+    "estimatedRetainedLogicalBytes": 317544733,
+    "concurrentOldAndNewIsolated": true,
+    "activeVersionsNotEvicted": true,
+    "evictedVersionRestoredFromLockedTag": true,
+    "overBudgetAdmissionLeavesPublishedInstallsIntact": true,
+    "duplicatePublicationAndChangedTagRejected": true
+  },
+  "image_migration_and_deadline": {
+    "legacyMigrationsApplied": 4,
+    "rollbackPreservedLegacyRows": true,
+    "legacyOrderAndReferencesPreserved": true,
+    "prototypeRowsExcludedFromConversation": true,
+    "prototypeIdempotencyScoped": true,
+    "generationBudgetMs": 300000,
+    "queueSafetyMs": 15000,
+    "capacityWaitLimitMs": 1800000,
+    "hardDeadlineFromAcceptanceMs": 2100000,
+    "callerDeadlineRespected": true,
+    "lateRevokedOrCancelledResultsRejected": true
+  }
+}

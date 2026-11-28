@@ -1,2 +1,2 @@
 # Source: api/domains/dialogue/service/routed-talk-work.ts
-text = '''利用可能な専門担当（Toolchain）を検索する。依頼に合う担当が未発見・候補外のときに使う（結果で前回候補を置換）。query に単独で分かる対象・作業・条件・指定担当を書き、適合する id を delegate へ渡す。見つからなければ状況を伝える。'''
+text = '''頼める専門担当を探す（未発見・候補外のとき。結果は前回の候補を置き換える）。query は単独で通じる対象・作業・条件・指定担当。合う id を delegate へ渡す。'''

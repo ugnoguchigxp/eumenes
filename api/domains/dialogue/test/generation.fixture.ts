@@ -170,7 +170,6 @@ export type SetupOptions = {
 	agency?: AgencyLayerPort;
 	/** The conversation agent (default: the agency's own reply loop, see conversation-agent.fixture.ts). */
 	conversationAgent?: ConversationAgentPort;
-	lookup?: Parameters<typeof createDialogueService>[0]["lookup"];
 	worldContext?: WorldContextPort;
 	/** Queue limits (the queue's own options). */
 	queue?: Parameters<typeof createQueue>[1];
@@ -486,7 +485,6 @@ export async function setup(options: SetupOptions = {}) {
 		clock,
 		continuity,
 		conversationAgent: options.conversationAgent ?? testConversationAgent,
-		lookup: options.lookup,
 		toolchains,
 		image,
 		...(music ? { music } : {}),

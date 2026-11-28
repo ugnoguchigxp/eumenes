@@ -1,12 +1,9 @@
 import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
-import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "./toolchain.fixture";
 import {
-	afterUtterance,
 	candidatesOf,
 	findToolchain,
-	toolResults,
 	UNAVAILABLE_TEXT,
 	type Candidate,
 } from "./conversation-script.fixture";

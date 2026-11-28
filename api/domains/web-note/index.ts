@@ -16,4 +16,3 @@ export type {
 	WebNoteTurn,
 } from "./contracts";
 export { parseNote, today } from "./service/note";
-export { createConversationLookup } from "./service/lookup";

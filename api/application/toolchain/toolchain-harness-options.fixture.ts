@@ -7,8 +7,13 @@ import type { Step } from "./conversation-script.fixture";
 
 /** The knobs of the toolchain harness (`harness` in toolchain.fixture.ts). */
 export type HarnessOptions = {
+	works?: {
+		execution: NonNullable<import("../../domains/claude-code").Host["works"]>;
+		resource: import("../../domains/resources").ResourceAdapter;
+	};
 	/** Caller-owned test directory, shared by successive backend processes in a recovery test. */
 	directory?: string;
+	origin?: string;
 	claudeRunner?: import("../../domains/claude-code").Runner;
 	structuredResponse?: (
 		messages: import("../../domains/inference/contracts").Messages,

@@ -21,6 +21,8 @@ import {
 } from "./toolchain-adapters";
 import type { WorkspaceState } from "./useWorkspace";
 import { useShownNotes } from "./useShownNotes";
+import { prototypeScreenRef } from "../../../api/domains/prototype/contracts";
+import { worksScreen } from "../domains/prototype/resource-screen";
 
 const CONVERSATION_ID = "main";
 const NO_VIEWER = () => {};
@@ -38,6 +40,8 @@ export function useWorkspaceLauncher(
 	return useMemo<ResourceLauncher>(
 		() => ({
 			open: async (adapterRef, targetRef) => {
+				if (adapterRef === prototypeScreenRef)
+					return worksScreen.focus(targetRef);
 				if (adapterRef === SCRATCH_ADAPTER_REF) {
 					openScratch(targetRef);
 					return true;

@@ -11,6 +11,7 @@ import {
 import { appServices } from "./server-app-services";
 import { createLifecycles } from "./server-lifecycles";
 import { buildServices } from "./server-services";
+import type { prototypeModule } from "./prototype/wiring";
 import {
 	PROCESS_SHUTDOWN_DEADLINE_MS,
 	SHUTDOWN_DEADLINE_MS,
@@ -35,6 +36,7 @@ async function main() {
 	process.on("uncaughtException", guard.onException);
 	let runner: ReturnType<typeof createLifecycleRunner> | undefined;
 	let server: ReturnType<typeof Bun.serve> | undefined;
+	let works: ReturnType<typeof prototypeModule>;
 	// Resolves to true when every step succeeded. A failing step never skips the later ones.
 	let stopping: Promise<boolean> | null = null;
 	const gate = createStartupGate();
@@ -89,12 +91,14 @@ async function main() {
 		log.info("server.listening", { port: listening.port });
 		const services = await gate.step(async () => {
 			const built = await buildServices(config);
-			runner = createLifecycleRunner(
-				createLifecycles(built, {
-					name: "http",
-					close: () => listening.stop(true),
-				}),
-			);
+			const lifecycles = createLifecycles(built, {
+				name: "http",
+				close: () => listening.stop(true),
+			});
+			runner = createLifecycleRunner(lifecycles);
+			works = built.works;
+			if (works)
+				runner = createLifecycleRunner([...lifecycles, works.lifecycle]);
 			return built;
 		});
 		if (stopping) return;
@@ -108,7 +112,10 @@ async function main() {
 		const app = createApp({
 			token,
 			origin: config.origin,
-			modules: appModules(appServices(services, [token])),
+			modules: [
+				...appModules(appServices(services, [token])),
+				...(works ? [works.module] : []),
+			],
 		});
 		await gate.step(() => {
 			listening.reload({ fetch: app.fetch });

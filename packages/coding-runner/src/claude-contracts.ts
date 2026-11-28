@@ -30,6 +30,7 @@ export const claudeAuthorization = z
 		readablePaths: z.array(path).max(128),
 		writablePaths: z.array(path).max(128),
 		checks: z.array(claudeCheck).max(16),
+		worksRuntime: path.optional(),
 	})
 	.refine(
 		({ mode, writablePaths, checks }) =>
@@ -96,10 +97,11 @@ export const claudeDaemonConfigSchema = z.strictObject({
 	workspace: path,
 	executable: path.optional(),
 	protectedPaths: z.array(path).max(32).optional(),
+	idleMs: z.number().int().positive().max(300_000).optional(),
 });
 export const claudeEvidence = z.strictObject({
 	ref: z.string().max(160),
-	kind: z.enum(["read", "edit", "check"]),
+	kind: z.enum(["read", "edit", "check", "edit_conflict"]),
 	executionId: z.uuid(),
 	targetRevision: z.string().min(1).max(160),
 	inputDigest: z.string().min(1).max(160).optional(),
@@ -170,6 +172,7 @@ export const claudeObservation = z.strictObject({
 });
 export const claudeRequest = z.discriminatedUnion("operation", [
 	z.strictObject({ operation: z.literal("health") }),
+	z.strictObject({ operation: z.literal("retire_idle"), instance: z.uuid() }),
 	z.strictObject({ operation: z.literal("start"), spec: claudeStart }),
 	z.strictObject({ operation: z.literal("inspect"), id: z.uuid() }),
 	z.strictObject({

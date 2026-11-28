@@ -5,6 +5,13 @@
  * allow-list in `depends`; raising a dependency means raising `tier` here.
  */
 export const domains = {
+	prototype: {
+		tier: 1,
+		backend: "api/domains/prototype",
+		web: "web/src/domains/prototype",
+		components: null,
+		depends: { api: ["coding", "resources"], web: [], test: [] },
+	},
 	scratch: {
 		tier: 1,
 		backend: "api/domains/scratch",
@@ -477,6 +484,7 @@ export const domains = {
 			"api/application/agency/goal-recovery.test.ts",
 			"api/application/agency/goal-autonomy.live.test.ts",
 			"api/application/work/claude-runners.test.ts",
+			"api/application/work/works-stop.test.ts",
 			"api/application/work/goal-supervision.test.ts",
 		],
 		depends: { api: [], web: [], test: [] },
@@ -765,6 +773,7 @@ export function ownedPaths(domain: Domain): string[] {
  * rules (not domain-internal rules) to `api/application/**`.
  */
 export const applicationPaths: Partial<Record<Domain, readonly string[]>> = {
+	prototype: ["api/application/prototype"],
 	"agent-runtime": [
 		"api/application/agent-attempt-purge.test.ts",
 		"api/application/task-purge.test.ts",

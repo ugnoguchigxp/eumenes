@@ -9,6 +9,9 @@ import {
 	within,
 } from "@testing-library/react";
 import { ApiError } from "../../client";
+import { conversationClient } from "../../client/conversation";
+import { eventsClient, type ChangeKind } from "../../client/events";
+import type { Transport } from "../../client/transport";
 import type { ContextCapture, Run } from "../../api/domains/dialogue/contracts";
 import {
 	post,
@@ -124,6 +127,108 @@ afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
 	window.location.hash = "";
+});
+
+test("the conversation updates during a burst of save events and catches up after a reconnect", async () => {
+	const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+	const requests: { finish: () => void; signal?: AbortSignal | null }[] = [];
+	const artifactList = vi.fn(async () => []);
+	let revision = 1;
+	const transport: Transport = {
+		identity: "smoke",
+		async call(path, init) {
+			if (path === "/api/events") {
+				return new Response(
+					new ReadableStream({ start: (stream) => void streams.push(stream) }),
+					{ headers: { "Content-Type": "text/event-stream" } },
+				);
+			}
+			expect(path).toBe("/api/conversations/main");
+			const saved = revision;
+			const response = () =>
+				Response.json({
+					id: "main",
+					revision: saved,
+					messages: [
+						{
+							id: String(saved),
+							conversationId: "main",
+							role: "user",
+							text: `保存した発言 ${saved}`,
+							createdAt: "2026-11-28T00:00:00Z",
+							runId: null,
+						},
+					],
+				});
+			if (saved === 1) return response();
+			const signal = init?.signal;
+			return new Promise<Response>((resolve, reject) => {
+				const abort = () => reject(signal?.reason);
+				signal?.addEventListener("abort", abort, { once: true });
+				requests.push({
+					signal,
+					finish: () => {
+						signal?.removeEventListener("abort", abort);
+						resolve(response());
+					},
+				});
+			});
+		},
+	};
+	const events = eventsClient(transport, { retryMs: 5 });
+	api.current = mockClient({
+		...events,
+		conversation: conversationClient(transport).conversation,
+		toolchainArtifacts: artifactList,
+	});
+	const notify = async (kind: ChangeKind) => {
+		await act(async () => {
+			streams
+				.at(-1)!
+				.enqueue(new TextEncoder().encode(`event: ${kind}\ndata: {}\n\n`));
+		});
+	};
+	const app = render(<App />);
+	expect(await screen.findByText("保存した発言 1")).toBeTruthy();
+	await waitFor(() => expect(artifactList).toHaveBeenCalledTimes(1));
+
+	revision = 2;
+	await notify("change");
+	await waitFor(() => expect(requests).toHaveLength(1));
+	for (const saved of [3, 4, 5]) {
+		revision = saved;
+		await notify("change");
+	}
+	expect(requests[0]!.signal?.aborted).toBe(false);
+	expect(requests).toHaveLength(1);
+	act(() => requests[0]!.finish());
+	expect(await screen.findByText("保存した発言 2")).toBeTruthy();
+	await waitFor(() => expect(requests).toHaveLength(2));
+	expect(artifactList).toHaveBeenCalledTimes(1);
+
+	revision = 6;
+	await act(async () => streams[0]!.close());
+	await waitFor(() => expect(streams).toHaveLength(2));
+	await notify("reset");
+	await waitFor(() =>
+		expect(artifactList.mock.calls.length).toBeGreaterThan(1),
+	);
+	expect(requests[1]!.signal?.aborted).toBe(false);
+	act(() => requests[1]!.finish());
+	expect(await screen.findByText("保存した発言 5")).toBeTruthy();
+	await waitFor(() => expect(requests).toHaveLength(3));
+	act(() => requests[2]!.finish());
+	expect(await screen.findByText("保存した発言 6")).toBeTruthy();
+	expect(requests).toHaveLength(3);
+
+	revision = 7;
+	await notify("change");
+	await waitFor(() => expect(requests).toHaveLength(4));
+	revision = 8;
+	await notify("change");
+	await act(async () => app.unmount());
+	expect(requests[3]!.signal?.aborted).toBe(true);
+	expect(requests).toHaveLength(4);
 });
 
 test("A01 boot: the conversation screen renders without a settings button", async () => {

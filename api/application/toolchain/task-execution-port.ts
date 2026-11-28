@@ -41,6 +41,7 @@ import { taskExecutionStops } from "./task-execution-stops";
 import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
+	works?: import("../../domains/claude-code").Host["works"];
 	developmentSupervision?: ReturnType<
 		typeof import("../../domains/development-supervision").createDevelopmentSupervision
 	>;
@@ -189,6 +190,7 @@ function configureClaudeCode(
 ) {
 	const claude = host.claudeCode;
 	claude?.configure({
+		works: host.works,
 		workspace: claudeWorkspace(ordinaryClaudeWorkspaceRef, {
 			parallel: !!host.developmentSupervision,
 		}),

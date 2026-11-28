@@ -15,6 +15,16 @@ ALTER TABLE memory_host_settings ADD COLUMN recall_tokens INTEGER NOT NULL DEFAU
 ALTER TABLE memory_host_settings ADD COLUMN recall_items INTEGER NOT NULL DEFAULT 8;
 `;
 
+/**
+ * The size-first input (spec/.todo/conversation-input-size-budget-design-2026-11-28.md section 7): `## Memory` holds
+ * only what steers every reply (the user's constraints and preferences) within 100 tokens; the rest is read with
+ * `read_memory`. A saved bound above it is lowered once; the settings API can still set another value.
+ */
+export const sizeFirstInputBudgetMigration = `
+UPDATE memory_host_settings SET always_tokens = 100 WHERE always_tokens > 100;
+UPDATE memory_host_settings SET always_scope = 'responses';
+`;
+
 export function readInputBudget(db: Database): MemoryInputBudget {
 	return db
 		.query(

@@ -161,7 +161,7 @@ test("the non-streaming call answers over the call's own messages (steered words
 	expect(seen[0]).toContain("steered words");
 });
 
-test("when the agency serves the replies, a reply's tool calls and the conversation's first words stay in the history", async () => {
+test("when the agency serves the replies, a reply's calls are marked under its words and the conversation's first words stay in the history", async () => {
 	h = await setup({
 		agency: agencyWith({
 			servesRepliesInTransaction: () => true,
@@ -194,22 +194,17 @@ test("when the agency serves the replies, a reply's tool calls and the conversat
 	const messages = h.state.calls.at(-1)!.messages as Array<{
 		role: string;
 		content: string;
-		tool_calls?: Array<{ function: { name: string } }>;
 	}>;
 	// The first words of the conversation are kept (with `## Memory` in that first message).
 	expect(messages[1]!.role).toBe("user");
 	expect(messages[1]!.content).toContain("鎌倉の天気を調べて");
 	expect(messages[1]!.content).toContain("## Memory");
-	// The reply's own call, then what it answered, then its words.
-	const at = messages.findIndex((m) => m.tool_calls?.length);
-	expect(at).toBeGreaterThan(0);
-	expect(messages[at]!.tool_calls![0]!.function.name).toBe("start_preparation");
-	expect(messages[at + 1]).toMatchObject({
-		role: "tool",
-		content: "accepted: 頼んだ",
+	// The reply's words with one line naming its call: neither the call nor its result is replayed.
+	expect(messages.some((m) => m.role === "tool")).toBe(false);
+	expect(messages[2]).toEqual({
+		role: "assistant",
+		content: "調べますね。\n[道具: start_preparation]",
 	});
-	expect(messages[at + 2]).toMatchObject({ role: "assistant" });
-	expect(messages[at + 2]!.content).toContain("調べますね。");
 });
 
 test("without the agency serving, the history stays words only", async () => {

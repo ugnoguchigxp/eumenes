@@ -181,7 +181,6 @@ export async function runConversationTurn(
 				}
 			: {}),
 		...debug,
-		...(turn.lookupSources.length ? { lookupSources: turn.lookupSources } : {}),
 		...(receipt ? { receipt } : {}),
 		...(emotion ? { emotion } : {}),
 		...(imageAnswer ? { imageAnswer } : {}),
@@ -275,7 +274,6 @@ function createTurn(
 	const { signal } = options;
 	const executed: GenerationOutcome["executed"] = [];
 	const exchange: ExchangeStep[] = [];
-	const lookupSources: NonNullable<GenerationOutcome["lookupSources"]> = [];
 	let receipt: Receipt | undefined;
 	let imageAnswer: GenerationOutcome["imageAnswer"];
 	let writeOutput: ((db: Database) => boolean) | undefined;
@@ -348,7 +346,6 @@ function createTurn(
 		utterance: input.utterances.join("\n"),
 		executed,
 		exchange,
-		lookupSources,
 		calls: () => calls,
 		said: () => said,
 		published: () => published,
@@ -549,8 +546,6 @@ function createTurn(
  * The reply's read and work tools. Only offered tools run and their arguments must be objects. Work tools
  * require the routed input and an agent whose reply may hand work over.
  */
-const LOOKUP_TOOL = "lookup_public_information";
-
 function conversationToolPort(
 	turn: Turn,
 	acts: boolean,
@@ -591,29 +586,13 @@ function conversationToolPort(
 	// The memory tool refuses a call by its reason and the model repairs it in the same reply: a few calls, not one.
 	const memoryTools =
 		acts && input.routed && deps.steward ? [MEMORY_REQUEST_TOOL] : [];
-	const lookup = acts ? deps.lookup : undefined;
 	const tools = [...readTools, ...memoryTools, ...(work?.tools ?? [])];
-	if (lookup)
-		tools.push({
-			name: LOOKUP_TOOL,
-			description: systemContext(
-				"dialogue.contexts.agency.external-lookup",
-				{},
-			),
-			parameters: {
-				type: "object",
-				additionalProperties: false,
-				required: ["query"],
-				properties: { query: { type: "string" } },
-			},
-		});
 	return {
 		tools,
 		maxToolCalls:
 			(readTools.length ? 1 : 0) +
 			(memoryTools.length ? MEMORY_CALLS : 0) +
-			(work?.tools.length ?? 0) +
-			(lookup ? 1 : 0),
+			(work?.tools.length ?? 0),
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {
@@ -652,24 +631,6 @@ function conversationToolPort(
 					};
 				onDebugTarget(target);
 				return { content: "", end: true };
-			}
-			if (lookup && toolCall.name === LOOKUP_TOOL) {
-				const { query } = args as { query?: unknown };
-				if (typeof query !== "string" || !query.trim() || query.length > 2000)
-					return { content: JSON.stringify({ code: "lookup_query_invalid" }) };
-				try {
-					const result = await lookup(query.trim(), turn.signal);
-					turn.lookupSources.push(...result.sources);
-					turn.exchange.push({
-						name: LOOKUP_TOOL,
-						arguments: toolCall.arguments,
-						result,
-					});
-					return { content: JSON.stringify(result) };
-				} catch {
-					turn.signal.throwIfAborted();
-					return { content: JSON.stringify({ code: "lookup_unavailable" }) };
-				}
 			}
 			if (work?.handles(toolCall.name)) {
 				const before = turn.exchange.length;

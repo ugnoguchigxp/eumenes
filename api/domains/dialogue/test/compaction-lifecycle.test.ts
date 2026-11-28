@@ -33,8 +33,9 @@ function staged(h: Harness) {
 for (const window of [32_768, 262_144]) {
 	test(`the foreground and background share the ${window}-token window budget`, async () => {
 		const requests: number[] = [];
-		const soft = window === 32_768 ? 8 : 15;
-		const hard = window === 32_768 ? 10 : 20;
+		// The size-first bounds are the same for every window: a summary is prepared past three exchanges, a cut comes past five.
+		const soft = 3;
+		const hard = 5;
 		const h = (harness = await setup({
 			window,
 			debugInference: {
@@ -55,7 +56,7 @@ for (const window of [32_768, 262_144]) {
 		expect(h.queue.list({ kind: COMPACT_SUMMARY_KIND }).items).toHaveLength(0);
 		await say(h, "次の予定");
 		await waitFor(() => !!staged(h));
-		expect(requests).toEqual([window === 32_768 ? 900 : 1500]);
+		expect(requests).toEqual([450]);
 		for (let n = soft + 2; n <= hard + 2; n++) await say(h, `予定${n}`);
 		expect(active(h)).toMatchObject({ kind: "llm", text: "話題のまとめ" });
 	});
@@ -105,13 +106,21 @@ for (const background of [false, true]) {
 			itemIds: [item.id],
 		});
 		const before = h.state.calls.length;
-		for (let n = 0; n < 12; n++) {
+		// Until the first cut: in the background case the prepared summary is waited for, so the cut adopts it.
+		for (let n = 0; n < 10 && !active(h); n++) {
 			await say(h, `別件${n}`);
-			if (background && n === 8) await waitFor(() => !!staged(h));
+			if (
+				background &&
+				!active(h) &&
+				h.queue.list({ kind: COMPACT_SUMMARY_KIND }).items.length
+			)
+				await waitFor(() => !!staged(h));
 		}
 		expect(active(h)?.kind).toBe(background ? "llm" : "mechanical");
 		expect(active(h)!.text).not.toContain("緑七号");
-		expect(prompts.length).toBe(background ? 1 : 0);
+		// The next summary may already be under way after the cut.
+		if (background) expect(prompts.length).toBeGreaterThanOrEqual(1);
+		else expect(prompts).toHaveLength(0);
 		expect(prompts.join("\n")).not.toContain("緑七号");
 		for (const call of h.state.calls.slice(before))
 			expect(call.messages.map((m) => m.content).join("\n")).not.toContain(
@@ -196,7 +205,7 @@ test("correcting a source during inference discards the pending summary before a
 	};
 	try {
 		const first = await say(h, "以前の予定です。");
-		for (let n = 1; n <= 8; n++) await say(h, `予定${n}`);
+		for (let n = 1; n <= 3; n++) await say(h, `予定${n}`);
 		await waitFor(() => started);
 		revision = h.store.read(
 			(db) => h.conversation.input.cutInTransaction(db, "main")!.revision,
@@ -242,7 +251,7 @@ test("a delayed background claim still gets its full inference deadline", async 
 		}
 	});
 	try {
-		for (let n = 0; n < 9; n++) await say(h, "予定" + n);
+		for (let n = 0; n < 4; n++) await say(h, "予定" + n);
 		await waitFor(() =>
 			h.queue
 				.list({ kind: COMPACT_SUMMARY_KIND })
@@ -271,19 +280,20 @@ test("a second compaction round runs background LLM pre-compaction even though c
 			}),
 		},
 	}));
-	// Round 1: soft at 9 users -> staged -> hard at 11 users -> active
-	for (let n = 1; n <= 9; n++) await say(h, `一期予定${n}`);
+	// Round 1: prepared past three exchanges -> staged -> cut past five -> active
+	for (let n = 1; n <= 4; n++) await say(h, `一期予定${n}`);
 	await waitFor(() => !!staged(h));
 	expect(staged(h)?.text).toBe("第1回のまとめ");
-	for (let n = 10; n <= 12; n++) await say(h, `一期予定${n}`);
+	for (let n = 5; n <= 7; n++) await say(h, `一期予定${n}`);
 	expect(active(h)).toMatchObject({ kind: "llm", text: "第1回のまとめ" });
 
-	// Round 2: cut.seq advanced while cut.revision stayed 1; crossing soft again must enqueue & stage a second LLM job.
-	for (let n = 1; n <= 5; n++) await say(h, `二期予定${n}`);
+	// Round 2: cut.seq advanced while cut.revision stayed 1; what the cut left is past three exchanges again, so a
+	// second LLM job is enqueued and staged, and the next cut adopts it.
 	await waitFor(() => staged(h)?.text === "第2回のまとめ");
-	for (let n = 6; n <= 9; n++) await say(h, `二期予定${n}`);
+	for (let n = 1; n <= 3; n++) await say(h, `二期予定${n}`);
 	expect(active(h)).toMatchObject({ kind: "llm", text: "第2回のまとめ" });
-	expect(round).toBe(2);
+	// A third may already be under way after the second cut.
+	expect(round).toBeGreaterThanOrEqual(2);
 });
 
 test("an immediately excluded memory record hides its compacted summary before closure delete runs", async () => {
@@ -291,7 +301,7 @@ test("an immediately excluded memory record hides its compacted summary before c
 		window: 32_768,
 		memory: true,
 	}));
-	for (let n = 1; n <= 7; n++) await say(h, `通常話題${n}`);
+	await say(h, "通常話題1");
 	const secret = await say(h, "暗証番号は青九番です。");
 	const item = await saveItem(h.store, h.memory!, {
 		kind: "personal_fact",
@@ -300,7 +310,7 @@ test("an immediately excluded memory record hides its compacted summary before c
 		conversationId: "main",
 		messageId: secret.inputMessageId,
 	});
-	for (let n = 8; n <= 11; n++) await say(h, `通常話題${n}`);
+	for (let n = 2; n <= 6; n++) await say(h, `通常話題${n}`);
 	expect(active(h)?.text).toContain("青九番");
 	expect(active(h)?.sourceRefs).toContain(secret.inputMessageId);
 

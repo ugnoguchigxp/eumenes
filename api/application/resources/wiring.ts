@@ -62,6 +62,7 @@ const CONVERSATIONS = ["main"] as const;
  * The resource registry with every owner's adapter (spec resource-uri-implementation-plan-2026-10-25.md §3). A kind with several owners is combined by id prefix.
  */
 export function buildResources(deps: {
+	works?: PrototypeService;
 	retireUiCompositions?: boolean;
 	store: SqliteStore;
 	capabilities: Pick<
@@ -121,6 +122,7 @@ export function buildResources(deps: {
 				deps.capabilities.resourceKindsInTransaction(db),
 			) as ResourceKind[],
 		adapters: [
+			...(deps.works ? [prototypeResource(deps.works)] : []),
 			createImageResourceAdapter({ store }),
 			track,
 			playlist,
@@ -164,3 +166,7 @@ export function buildResources(deps: {
 	};
 }
 export type Resources = ReturnType<typeof buildResources>;
+import {
+	prototypeResource,
+	type PrototypeService,
+} from "../../domains/prototype";

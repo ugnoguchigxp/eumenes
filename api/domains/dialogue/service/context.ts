@@ -219,13 +219,6 @@ export type DialogueDeps = {
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
-	lookup?: (
-		query: string,
-		signal: AbortSignal,
-	) => Promise<{
-		text: string;
-		sources: Array<{ url: string; title: string }>;
-	}>;
 	/** Session toolchains and their domain work; without it no specialist session exists. */
 	specialist?: SpecialistPort;
 	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */

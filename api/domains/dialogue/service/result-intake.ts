@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { AnswerTicket } from "../../agent-runtime";
 import type { Run } from "../contracts";
-import { researchCitations } from "./research-citations";
 import type { DialogueDeps, GenerateInput } from "./context";
 
 /** The run's sub-agent answer waiting to be spoken about, or null (none, or its evidence no longer holds). */
@@ -36,26 +35,6 @@ export async function refreshAgentAnswer(
 				return input.agent!;
 			}
 		});
-}
-
-/**
- * The links of a reply that looked something up are kept to the sources the lookup returned, written in the canonical
- * form. A reply that looked nothing up is left as it is.
- */
-export function reportedLinks(
-	text: string,
-	lookupSources: Array<{ url: string }> = [],
-): string {
-	if (!text || !lookupSources.length) return text;
-	const verified = lookupSources.map(({ url }, index) => ({
-		url,
-		sourceId: `lookup-${index}`,
-	}));
-	const projection = JSON.stringify({
-		sources: verified,
-		claims: [{ sourceIds: verified.map(({ sourceId }) => sourceId) }],
-	});
-	return researchCitations(text, projection, { requireSources: true });
 }
 
 /** Consumes the sub-agent's answer an adopted generation spoke of; one no longer valid is not adopted. */

@@ -111,7 +111,6 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 		const reads = [
 			"read_history",
 			"read_runs",
-			"read_agents",
 			"find_toolchain",
 			"delegate",
 			"discard_for_pending_switch",

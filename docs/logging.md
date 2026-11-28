@@ -193,6 +193,8 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 - スレッドの捨て（10分の空き、作ってから30分、先頭ごとに空き2本、全体32本、取消で2秒以内に止まらない、ターンの失敗、忘却）は `thread/delete` で行い、ログは出しません。削除できなかったスレッドの記録ファイルはアダプタが消します。
 - 忘却では、空いているスレッドをすぐ捨て、実行中のターンは終わりを待ってから捨てます。その後すべてのプロセスを止めてホームを空にします。その間に来た呼出しは、空になるまで待ってから新しいプロセスで始まります。
 - 起動したプロセスが15秒以内に初期化へ応答しないときは止め、その呼出しは `cloud_agent_codex_unavailable` で失敗します。
+- ツールの選択で `arguments` が JSON の object でなかったとき（モデルが検索文などをそのまま書いた場合）は、`inference.codex_tool_arguments_invalid`（`warn`、`kind`＝ツール名）を記録し、書かれたままの文字列でツールの実行側へ渡します。実行側が `invalid_tool_call` などの理由で断り、モデルが同じ返事の中で呼び直します（スレッドは続きます）。引数の中身は記録しません。選んだツール名が一覧にない、`arguments` が文字列でないときは、これまでどおり `cloud_agent_invalid_tool_call` でそのターンが失敗します。
+- プロセスを起動するたびに、同じホームとログインで `codex debug models` を呼んでモデルの一覧を取り、どのモデルでも Codex 組込みのツール（`exec`・`wait`・`apply_patch`・協調エージェント）と `<multi_agent_role>`・`<multi_agent_mode>` の文が入らない形に直して、`model_catalog_json` として渡します（モデル名はコードに書きません。一覧のほかの項目はそのまま）。Web検索のプロセスは Codex の一覧のままです。一覧を作れなかったとき（CLI の失敗、10秒の超過、形の不一致）は `inference.codex_catalog_unavailable`（`warn`、`reason`＝`catalog_unavailable`・`catalog_timeout`・`catalog_too_large`・`catalog_invalid`・`catalog_write_failed`・`catalog_failed`）を記録し、そのプロセスは Codex の一覧のまま起動します（入力が 約 3,500 token 多くなります）。
 - 出力の上限（1フレーム1 MiB、1ターン4 MiB）はターンごとです。超えると `cloud_agent_output_limit` でそのターンが失敗し、スレッドは捨てられます。
 
 スレッドを捨てた後も、Codex 自身の SQLite（`logs_*`・`thread_history_*` の WAL）に本文が残ることがあります。これらはホームごと、最後のプロセスの終了時（10分の空きの後、または忘却の後）と backend の起動時に消えます。
@@ -213,10 +215,20 @@ LLM呼出しの試行ごとに、`inference.attempt_started` の直後に `infer
 区画は次の順です。ツール定義があれば1区画（`tools:tools:…`）、出力スキーマがあれば1区画（`schema:schema:…`）、その後に各メッセージ。実際の送信順（Codex は instructions とツール、他経路はツール配列が先頭側）に合わせています。
 
 - `role` は `system`・`user`・`assistant`・`tool`、またはツール定義・スキーマを示す `tools`・`schema`。
-- `label` は固定の語だけです。本文の先頭行が、製品が入力に書く見出し（`## Memory`・`## Earlier`・`## State`・`## User`・`## Host notice`・`## Candidates`・`## Pending`・`## Retry`・`## Points`・`## Task`）と完全に一致するときだけ、その見出し名（`## ` を除く）。`<あなたの今の状態` で始まるものは `agency-state`。それ以外は、利用者や道具が `## ` で始まる文を書いた場合も含めて `system`・`text`・`tool-calls`・`tool-result` の固定語で、本文の一部は出ません。
+- `label` は固定の語だけです。本文の先頭行が、製品が入力に書く見出し（`## Memory`・`## Summary`・`## Earlier`・`## Agency`・`## State`・`## User`・`## Host notice`・`## Candidates`・`## Pending`・`## Retry`・`## Points`・`## Task`）と完全に一致するときだけ、その見出し名（`## ` を除く）。`<あなたの今の状態` で始まるものは `agency-state`。それ以外は、利用者や道具が `## ` で始まる文を書いた場合も含めて `system`・`text`・`tool-calls`・`tool-result` の固定語で、本文の一部は出ません。
 - `tokens` は推定トークン数（`estimateTextTokens` / `estimateJsonTokens` / メッセージ枠の見積り）で、課金や利用量の値ではありません。
 - `hash` は区画の本文（メッセージは本文・ツール呼出し・画像枚数、ツール定義・スキーマは JSON 化したもの）の HMAC-SHA256 の先頭12桁です。鍵は起動のたびに乱数で作り、メモリだけに置いて保存も出力もしません。短い発話でも、鍵がないと候補を試して本文を割り出せません。同じ値かどうかの比較にだけ使い、**同じ起動の中でしか比べられません**（再起動をまたぐと一致しません）。同じ行の `bootId` が起動の区別です。
 - `sections` は4096文字までです（他の文字列項目は256文字まで）。超える場合は、区画を途中で切らず先頭から入るだけ入れ、最後に省略した区画数を `|…+N` で示します。
+
+同じ試行で、入力の最後のメッセージ（呼出しごとに変わる部分）の内訳を `inference.input_tail` に1行記録します（最後が利用者のメッセージで、製品の見出しを含むときだけ）。`sections` の形は同じで、`role` は `part`、`label` は次の固定語です。本文は出ません。
+
+| `label` | 内容 |
+| --- | --- |
+| `Memory`・`Summary`・`Earlier`・`User`・`Host notice` ほか | その見出しの区画 |
+| `State.now`・`State.work`・`State.presented`・`State.shared`・`State.plans`・`State.goals`・`State.media`・`State.interests`・`State.other` | `## State` の項目（今・仕事・提示中・共有中・予定・目標・受領した生成画像・関心と問い・そのほか） |
+| `Agency.<キー>` | `## Agency` の状態（JSON）の最上位のキーごと（`notes`・`researchLog`・`assignments` など、パッケージが書くキー名。英数字でないキーは `Agency.other`） |
+
+返事が使ったツールは、返事ごとに `agency.reply_tool_called`（`info`、`runId`、`kind`＝ツール名）で1行ずつ記録します。引数と結果は出しません。どのツールがどれだけ使われているかを数えるための記録です（[計画](../spec/.todo/conversation-input-size-budget-design-2026-11-28.md)）。
 
 ## LLM生成JSONの補正と拒否
 

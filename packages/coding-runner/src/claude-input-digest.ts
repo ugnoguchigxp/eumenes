@@ -9,6 +9,7 @@ const checksum = (input: string | Uint8Array) =>
 export function claudeInputDigest(
 	paths: readonly string[],
 	exclude?: string,
+	works = false,
 ): string | undefined {
 	try {
 		const files: Array<[string, string]> = [];
@@ -24,7 +25,14 @@ export function claudeInputDigest(
 			if (stat.isDirectory()) {
 				files.push([path, "directory"]);
 				for (const name of readdirSync(path).sort()) {
-					if (name === ".git") continue;
+					if (
+						name === ".git" ||
+						(works &&
+							(name.startsWith(".") ||
+								name === "dist" ||
+								name === "node_modules"))
+					)
+						continue;
 					visit(join(path, name));
 				}
 			} else if (stat.isFile()) {

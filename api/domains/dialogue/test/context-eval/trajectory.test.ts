@@ -51,16 +51,20 @@ test("the system part stays the same and the recent conversation stays within th
 		const window = call.input.messages
 			.slice(1, -1)
 			.filter((m) => !m.content.startsWith("## Memory\n"));
+		// A cut comes once more than five exchanges are held (`workingLimits`).
 		expect(window.filter((m) => m.role === "user").length).toBeLessThanOrEqual(
-			call.input.harness.history.users ?? 20,
+			call.input.harness.history.users ?? 5,
 		);
 	}
 });
 
-test("the recent conversation is cut where the host's rules say: a long silence resumes the conversation", async () => {
+test("the recent conversation is cut where the host's rules say: past five exchanges, and a long silence resumes the conversation", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
 	expect(calls.map((c, i) => [`g${i + 1}`, c.cut?.reason ?? null])).toEqual(
-		calls.map((_, i) => [`g${i + 1}`, i === 8 ? "resumed" : null]),
+		calls.map((_, i) => [
+			`g${i + 1}`,
+			i === 7 ? "over_limit" : i === 8 ? "resumed" : null,
+		]),
 	);
 	// The gap is said in the state, once.
 	expect(sectionOf(calls[8]!, "State")[0]).toMatch(/（前の発言から37分）$/);
@@ -69,9 +73,10 @@ test("the recent conversation is cut where the host's rules say: a long silence 
 
 test("a memory saved after the profile was drawn waits until a cut draws `## Memory` again", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
-	for (const n of [3, 4, 5, 6, 7, 8])
+	for (const n of [3, 4, 5, 6, 7])
 		expect(memoryOf(calls[n - 1]!).join("\n")).not.toContain("辛い物が好き");
-	expect(memoryOf(calls[8]!).join("\n")).toContain("辛い物が好き");
+	// The eighth generation is cut (past five exchanges): the waiting memory joins `## Memory` there.
+	expect(memoryOf(calls[7]!).join("\n")).toContain("辛い物が好き");
 });
 
 test("a notice of the finished work and a timer are the host notice of their own generation", async () => {

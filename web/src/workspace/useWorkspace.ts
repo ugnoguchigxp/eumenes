@@ -50,7 +50,11 @@ import { useSettings, useVoiceMute } from "../domains/settings";
 import { useWorkspaceLive } from "./useWorkspaceLive";
 import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
 import { useClaudeCodeArtifacts } from "../domains/terminals/useClaudeCodeArtifacts";
-import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
+import {
+	invalidateAllButLive,
+	queryRoots,
+	subscribeQueryRefresh,
+} from "../queryKeys";
 
 export function useWorkspace({
 	client,
@@ -221,14 +225,7 @@ export function useWorkspace({
 	);
 	useEffect(
 		() =>
-			client.subscribeChanges((kind) => {
-				if (kind === "reset") {
-					void invalidateAllButLive(cache);
-					return;
-				}
-				for (const root of changeRoots)
-					void cache.invalidateQueries({ queryKey: [root] });
-			}),
+			subscribeQueryRefresh(cache, (notify) => client.subscribeChanges(notify)),
 		[client, cache],
 	);
 	const status = useQuery({

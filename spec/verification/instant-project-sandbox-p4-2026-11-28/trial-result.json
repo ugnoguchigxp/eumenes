@@ -1,0 +1,31 @@
+{
+  "cleanGitAndFiles": true,
+  "gitRootCommonAndRemotesUnchanged": true,
+  "existingProject": "L-Lang World Clock",
+  "existingCompatibility": "requires generated HTML, capability JSON and WebAssembly served by the original server",
+  "originalHandlerReady": true,
+  "buildAndPreviewOnCompatibleFixture": true,
+  "registeredAndRemovedInChrome": true,
+  "legacyPreviewStayedOpen": true,
+  "readOnlyEditRejected": true,
+  "registrationOutputWatchersRemoved": true,
+  "missingDependencyExamples": [
+    "@biomejs/biome",
+    "@modelcontextprotocol/sdk",
+    "@openai/codex-sdk",
+    "@types/bun",
+    "@types/node",
+    "ajv",
+    "binaryen",
+    "jsonc-parser"
+  ],
+  "configuration": [
+    "bunfig.toml",
+    "tsconfig.json",
+    ".env.example"
+  ],
+  "unsupported": [
+    "index.html",
+    "server.ts"
+  ]
+}

@@ -2,11 +2,8 @@ import { z } from "zod";
 
 export const scheduleReadTarget = z.strictObject({
 	kind: z.enum(["schedule"]),
-	id: z.uuid().optional().describe("既知の予約ID。候補を確認する場合は省く。"),
-	at: z.iso
-		.datetime({ offset: true })
-		.optional()
-		.describe("確認する回の予定日時（時差付き ISO 8601）。"),
+	id: z.uuid().optional(),
+	at: z.iso.datetime({ offset: true }).optional(),
 });
 export type ScheduleReadTarget = z.infer<typeof scheduleReadTarget>;
 
@@ -19,44 +16,15 @@ export type ScheduleReadTarget = z.infer<typeof scheduleReadTarget>;
 export const readToolInputs = {
 	read_memory: z
 		.object({
-			query: z
-				.string()
-				.trim()
-				.min(1)
-				.max(60)
-				.optional()
-				.describe(
-					"確かめたいことを、記録に出てきそうな短い語で書く（例: 辛いもの、住んでいる場所）。本人について全体を聞かれたときは書かない。",
-				),
+			query: z.string().trim().min(1).max(60).optional(),
 		})
 		.strict(),
 	read_history: z
 		.object({
-			query: z
-				.string()
-				.trim()
-				.min(1)
-				.max(100)
-				.optional()
-				.describe(
-					"探す語。発言の中にそのまま現れる短い語（例: 旅行、集合時刻）。",
-				),
-			from: z
-				.string()
-				.datetime({ offset: true })
-				.optional()
-				.describe(
-					"この日時以降の発言。「今」の行から解いた日時（例: 2026-10-30T00:00:00+09:00）。",
-				),
-			until: z
-				.string()
-				.datetime({ offset: true })
-				.optional()
-				.describe("この日時より前の発言。from と同じ形。"),
-			speaker: z
-				.enum(["user", "assistant"])
-				.optional()
-				.describe("話し手。user は利用者、assistant は Eumenes。"),
+			query: z.string().trim().min(1).max(100).optional(),
+			from: z.string().datetime({ offset: true }).optional(),
+			until: z.string().datetime({ offset: true }).optional(),
+			speaker: z.enum(["user", "assistant"]).optional(),
 		})
 		.strict()
 		.refine(
@@ -64,18 +32,8 @@ export const readToolInputs = {
 		),
 	read_runs: z
 		.object({
-			count: z
-				.number()
-				.int()
-				.min(1)
-				.max(5)
-				.optional()
-				.describe("最近の会話実行を読むときだけ指定する（1〜5、既定1）。"),
-			target: scheduleReadTarget
-				.optional()
-				.describe(
-					'予約の有無・実行結果には必ず指定する。IDも日時も不明なら target は {"kind":"schedule"} だけでよい。count は省く。',
-				),
+			count: z.number().int().min(1).max(5).optional(),
+			target: scheduleReadTarget.optional(),
 		})
 		.strict()
 		.refine(
@@ -84,27 +42,6 @@ export const readToolInputs = {
 				path: ["target"],
 			},
 		),
-	read_agents: z
-		.object({
-			count: z
-				.number()
-				.int()
-				.min(1)
-				.max(10)
-				.optional()
-				.describe("何件前まで見るか（1〜10、書かなければ1）。"),
-			query: z
-				.string()
-				.max(120)
-				.optional()
-				.describe("依頼内容や結果のキーワード絞り込み（任意）。"),
-			toolchain: z
-				.string()
-				.max(80)
-				.optional()
-				.describe("担当IDの絞り込み（任意、例: image.create）。"),
-		})
-		.strict(),
 	read_world: z
 		.object({
 			names: z
@@ -133,11 +70,11 @@ export type ReadTool = {
 export const READ_TOOLS: readonly ReadTool[] = [
 	{
 		name: "read_memory",
-		revision: 2,
+		revision: 3,
 		title: "記憶の確認",
 		subject: "記憶",
 		description:
-			"覚えている記録（本人の好み・事実・習慣）を、query に関係の強い順に確かめる。「## Memory」に載っている記録は含まない。query に確かめたい語。本人について全体を聞かれたら query を書かない。",
+			"「## Memory」に無い、覚えている記録（本人の好み・事実・習慣）を確かめる。query は記録に出てきそうな短い語。本人全体を聞かれたら query なし。",
 		useWhen: [
 			"「記憶を確認して」「メモリーをチェックして」と、覚えている記録を確かめたい",
 			"「私について何を覚えてる？」と、本人について覚えていることを聞いている",
@@ -153,11 +90,11 @@ export const READ_TOOLS: readonly ReadTool[] = [
 	},
 	{
 		name: "read_history",
-		revision: 2,
+		revision: 3,
 		title: "会話ログの確認",
 		subject: "会話ログ",
 		description:
-			"この会話の保存済みの発言から、利用者や Eumenes がいつ何を言ったかを確かめる。query に探す語、from・until に発言の時間（「今」から解いた日時）、speaker に話し手。要るものだけ書く。",
+			"この会話の保存済みの発言から、誰がいつ何を言ったかを確かめる。query は発言に現れる短い語、from・until は「今」から解いた時差付きの日時。",
 		useWhen: [
 			"「会話ログを確認して」「会話履歴を見せて」と、保存されている会話の記録を確かめたい",
 			"この会話でさっき自分が伝えたことや、相手が返した言葉を読み返したい",
@@ -174,11 +111,11 @@ export const READ_TOOLS: readonly ReadTool[] = [
 	},
 	{
 		name: "read_runs",
-		revision: 3,
+		revision: 4,
 		title: "実行の記録の確認",
 		subject: "最近の回",
 		description:
-			'実行ログを読み、最近の依頼の結果やエラーの記録を確かめるには target を省く（count、既定1）。Eumenes の予約の有無、次回予定、実行・スキップ、後続結果は {"target":{"kind":"schedule"}} で確認する。IDと時刻は分かる場合だけ target に足す。',
+			'最近の依頼の結果・エラー（count、既定1）か、予約の有無・次回・実行結果（target {"kind":"schedule"}。id・at は分かるときだけ）を確かめる。',
 		useWhen: [
 			"「さっきの依頼はなぜ失敗したの？」と、依頼の結果や失敗の理由を確かめたい",
 			"「なんで調べてくれなかったの？」と、依頼がどう扱われたかを確かめたい",
@@ -192,26 +129,6 @@ export const READ_TOOLS: readonly ReadTool[] = [
 			"最近のエラーを確認して",
 			"この会話の予約は登録されてる？",
 			"今朝の実行予約が動いたか確認して",
-		],
-	},
-	{
-		name: "read_agents",
-		revision: 1,
-		title: "担当の作業の記録の確認",
-		subject: "担当の作業",
-		description:
-			"過去〜最近の担当（サブエージェント・制作TODO）の依頼内容、使った道具、結果を確かめる。count・query・toolchainで絞れる。",
-		useWhen: [
-			"「担当は何をしたの？」と、担当が受けた依頼や使った道具を確かめたい",
-			"「さっきの調べもの、どこを見たの？」と、担当の作業の中身を確かめたい",
-			"「サブエージェントの会話を見せて」と、担当とのやりとりを確かめたい",
-		],
-		examples: [
-			"サブエージェントの会話を確認して",
-			"画像の担当は何をしたの？",
-			"さっきの調べもの、どのページを見た？",
-			"担当にどう頼んだか見せて",
-			"担当の作業の記録を確認して",
 		],
 	},
 	{

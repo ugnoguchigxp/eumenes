@@ -212,12 +212,19 @@ export function createDefaultClaudePrepare(config: ClaudeDaemonConfig): {
 						},
 					}
 				: {}),
-			authorize: (tool, raw) =>
-				evaluateOrdinaryToolAuthorization(tool, raw, {
+			authorize: (tool, raw) => {
+				const ordinary = evaluateOrdinaryToolAuthorization(tool, raw, {
 					workspace,
 					protectedPaths,
 					readOnly: spec.readOnly,
-				}),
+				});
+				const fixed = spec.supervised?.authorization.worksRuntime;
+				if (ordinary !== "ask" || tool !== "Read" || !fixed) return ordinary;
+				const target = resolveToolPath(workspace, tool, raw);
+				return (
+					!!target && contained(fixed, target) && /\.d\.[cm]?ts$/.test(target)
+				);
+			},
 			validateAccount: (account) => {
 				if (auth.email && account.email) return account.email === auth.email;
 				return Boolean(account.apiProvider || account.email);

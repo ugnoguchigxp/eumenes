@@ -35,6 +35,7 @@ import { toolchainActionsClient } from "./toolchain-actions";
 import { voiceDialogueClient } from "./voice-dialogue";
 import { liveVoiceClient } from "./live-voice";
 import { webResearchClient } from "./web-research";
+import { prototypeClient } from "./prototype";
 
 export { ApiError, ApiConnectionError } from "./transport";
 export { readSse } from "./sse";
@@ -81,6 +82,7 @@ export function createClient(
 		...shellClient(transport),
 		...kanbanClient(transport),
 		...toolchainActionsClient(transport),
+		...prototypeClient(transport),
 	};
 }
 export type EumenesClient = ReturnType<typeof createClient>;

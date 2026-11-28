@@ -149,6 +149,7 @@ type ToolchainOptions = {
 	 */
 	webNote?: Pick<WebNoteDeps, "turn" | "record" | "inspectSource">;
 	claudeRunner?: ClaudeRunner;
+	worksEnabled?: boolean;
 	claudeProtectedPaths?: readonly string[];
 	goalClaudeRunners?: ReadonlyMap<string, ClaudeRunner>;
 	conversation?: import("../../domains/conversation").ConversationService;
@@ -267,7 +268,7 @@ function enabledBackends(options: ToolchainOptions) {
 		...(options.uiCompositions ? ["ui-compositions"] : []),
 		...(options.objectRecognition ? ["object-recognition"] : []),
 		...(options.shell ? ["shell"] : []),
-		...(options.terminals ? ["claude-code"] : []),
+		...(options.terminals || options.worksEnabled ? ["claude-code"] : []),
 		...(options.kanban && options.terminals ? ["kanban"] : []),
 		...(options.kanbanSdk ? ["codex-tasks"] : []),
 		...(options.weather ? ["weather"] : []),
@@ -345,6 +346,9 @@ export async function createToolchain(
 		createTaskAdapter(() => taskRuntime),
 		...createWebNoteAdapters(() => webNoteRuntime),
 		createClaudeCodeTaskAdapter(() => claudeCode),
+		...(options.worksEnabled
+			? [createClaudeCodeTaskAdapter(() => claudeCode, true)]
+			: []),
 		createSupervisionAdapter(() => supervision),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk

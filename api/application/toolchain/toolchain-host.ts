@@ -143,6 +143,7 @@ export async function createHostToolchain(
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
 		webResearch: WebResearchService;
 		claudeRunner?: import("../../domains/claude-code").Runner;
+		worksEnabled?: boolean;
 		goalClaudeRunners?: ReadonlyMap<
 			string,
 			import("../../domains/claude-code").Runner
@@ -216,6 +217,7 @@ export async function createHostToolchain(
 			kanban,
 			kanbanSdk: sdkHost,
 			claudeRunner: s.claudeRunner,
+			worksEnabled: s.worksEnabled,
 			claudeProtectedPaths:
 				s.dbPath && s.dbPath !== ":memory:" ? [dirname(resolve(s.dbPath))] : [],
 			goalClaudeRunners: s.goalClaudeRunners,

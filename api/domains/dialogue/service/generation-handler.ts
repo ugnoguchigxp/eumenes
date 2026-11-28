@@ -21,7 +21,7 @@ import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
 import { isPinnedDecision, pinnedGeneration } from "./pinned-assignment";
 import type { Progress } from "./progress";
-import { refreshAgentAnswer, reportedLinks } from "./result-intake";
+import { refreshAgentAnswer } from "./result-intake";
 import { endRun } from "./run-end";
 import { flushDeferred } from "./specialist-core";
 
@@ -166,7 +166,7 @@ export function createGenerationHandler(
 											generated.finishSilentReplyInTransaction,
 									}
 								: {}),
-							text: reportedLinks(generated.text, generated.lookupSources),
+							text: generated.text,
 							...(generated.imageAnswer
 								? { imageAnswer: generated.imageAnswer }
 								: {}),

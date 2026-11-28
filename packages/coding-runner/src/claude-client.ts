@@ -11,7 +11,11 @@ import {
 	type ClaudeStart,
 } from "./claude-contracts";
 
-export function claudeRunnerClient(socketPath: string, workspace: string) {
+export function claudeRunnerClient(
+	socketPath: string,
+	workspace: string,
+	options?: { pinnedWorkspace: true },
+) {
 	let available = false;
 	let supervised = false;
 	let matchedWorkspace: boolean | null = null;
@@ -59,27 +63,42 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 			req.end(JSON.stringify(body));
 		});
 	}
-	async function probe() {
+	async function health() {
 		try {
 			const health = (await call({ operation: "health" })) as {
 				ready?: boolean;
 				workspace?: string;
 				supervised?: boolean;
+				instance?: string;
+				retiring?: boolean;
 			} | null;
-			const matches = health?.workspace === realpathSync(workspace);
+			const matches =
+				health?.workspace ===
+				(options?.pinnedWorkspace ? workspace : realpathSync(workspace));
 			matchedWorkspace = matches;
 			available = matches && health?.ready === true;
 			supervised = matches && health?.supervised === true;
+			return matches ? health : null;
 		} catch {
 			available = false;
 			supervised = false;
+			return null;
 		}
-		return available;
 	}
 	return {
 		ready: () => available,
 		supportsSupervised: () => supervised,
-		probe,
+		health,
+		probe: async () => (await health())?.ready === true,
+		async retireIdle() {
+			const state = await health();
+			if (!state?.instance) return false;
+			const result = (await call({
+				operation: "retire_idle",
+				instance: state.instance,
+			})) as { accepted?: boolean };
+			return result.accepted === true;
+		},
 		async start(spec: ClaudeStart) {
 			return claudeObservation.parse(await call({ operation: "start", spec }));
 		},

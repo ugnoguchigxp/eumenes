@@ -44,3 +44,21 @@ export const errorStatus = {
 	image_import_capacity: 429,
 	image_import_connection_changed: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
+
+export const prototypeImageRequest = z.strictObject({
+	operationId: z.uuid(),
+	prompt: z.string().trim().min(1).max(2_000),
+	width: z.int().min(100).max(1280),
+	height: z.int().min(100).max(1280),
+	format: z.enum(["png", "webp"]),
+	seed: z.int().min(0).max(Number.MAX_SAFE_INTEGER),
+	deadline: z.int().positive().optional(),
+});
+export const prototypeImageView = z.object({
+	operationId: z.uuid(),
+	state: z.enum(["generating", "completed", "failed", "cancelled"]),
+	phase: z.string(),
+	errorCode: z.string().nullable(),
+	deadline: z.number(),
+});
+export type PrototypeImageRequest = z.output<typeof prototypeImageRequest>;

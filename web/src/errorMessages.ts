@@ -167,6 +167,7 @@ const messages: Record<string, string> = {
 		"回答に使った情報の有効性を確認できず、回答を保存できませんでした。",
 	timeout: "応答がタイムアウトしました。",
 	replay_failed: "読み上げに失敗しました。",
+	backend_restarted: "サーバーが再起動しました。",
 	voice_failed: "音声処理に失敗しました。",
 	sample_failed: "サンプルの再生に失敗しました。",
 	mic_lost: "マイクが切断されました。音声を再開してください。",

@@ -22,6 +22,7 @@ import { createGoalWorkspaceRegistry } from "./agency/goal-workspaces";
 import { createLiveBridge } from "./media/live-bridge";
 import { createMemoryHostConnection } from "./memory-host";
 import { createLateResources } from "./resources/late";
+import { prototypeModule } from "./prototype/wiring";
 import { buildResources } from "./resources/wiring";
 import { buildCore, buildWebResearch } from "./server-core";
 import { buildMedia } from "./server-media";
@@ -192,6 +193,7 @@ export async function buildServices(
 ) {
 	const { dbPath } = config;
 	const core = await buildCore(config, dependencies);
+	const works = prototypeModule(config, core.store);
 	const {
 		store,
 		changes,
@@ -282,6 +284,7 @@ export async function buildServices(
 		{
 			core,
 			goalWorkspaces,
+			worksEnabled: !!works?.execution,
 			workspace,
 			lateResources,
 			tasks,
@@ -305,10 +308,13 @@ export async function buildServices(
 	const enabled = config.toolchainEnabled;
 	const media = buildMedia(config, {
 		core,
+		prototypeGuard: works?.images?.allows,
 		agents: toolchain.agents,
 		capabilities: toolchain.capabilities,
 	});
+	works?.attachImage(media.image);
 	const resources = buildResources({
+		works: works?.service,
 		store,
 		markdown,
 		retireUiCompositions: true,
@@ -382,6 +388,7 @@ export async function buildServices(
 	knowledge.attachDialogue(dialogue);
 	if (enabled && toolchains) {
 		agencyExecution = wireToolchainExecution({
+			works: works?.execution,
 			goalWorkspaces,
 			...(registeredGoals.authority
 				? { goalAuthority: registeredGoals.authority }
@@ -495,6 +502,7 @@ export async function buildServices(
 		goalLedger: goals.goals,
 		voice,
 		monitoring,
+		works,
 	};
 }
 export type Services = Awaited<ReturnType<typeof buildServices>>;

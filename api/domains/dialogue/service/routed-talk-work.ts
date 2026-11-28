@@ -90,6 +90,9 @@ export function createTalkWork(turn: Turn) {
 				summary: card.summary,
 				useWhen: card.useWhen,
 				execution: choice.execution,
+				...(choice.execution === "task" && choice.inputs
+					? { inputs: choice.inputs }
+					: {}),
 				...(choice.produces?.length ? { produces: choice.produces } : {}),
 			});
 		}
@@ -185,7 +188,9 @@ export function createTalkWork(turn: Turn) {
 		// The pending-switch control is the only path here that can request discard of unsaved work.
 		const { resolveUnsaved: _unsaved, ...given } = filled.fields;
 		const fields: Fields = {
-			...(resources.length ? { refs: resources } : {}),
+			...(resources.length && !(choice.execution === "task" && choice.inputs)
+				? { refs: resources }
+				: {}),
 			...given,
 			...(typeof args.diagnosticRef === "string"
 				? { diagnosticRef: args.diagnosticRef }

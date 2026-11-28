@@ -77,7 +77,11 @@ test("a replaced audio queue drops old chunks and keeps the turn available for t
 		});
 		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
 		expect(stopPlayback).toHaveBeenCalledTimes(1);
-		expect(voiceAudio).toHaveBeenLastCalledWith(expect.any(String), 1);
+		expect(voiceAudio).toHaveBeenLastCalledWith(
+			expect.any(String),
+			1,
+			expect.any(AbortSignal),
+		);
 		expect(hook.result.current.failure).toBeNull();
 		expect(voiceCancel).not.toHaveBeenCalled();
 	} finally {
@@ -483,7 +487,7 @@ for (const status of ["responding", "ready"] as const)
 		});
 		await act(async () => endings[2]?.());
 		expect(hook.result.current.avatarCue).toBeNull();
-		expect(voicePlayed).not.toHaveBeenCalledWith(oldId, expect.anything());
+		expect(voicePlayed.mock.calls.map(([id]) => id)).not.toContain(oldId);
 		expect(voiceAudio.mock.calls.map((call) => call[1])).toEqual([0, 1, 0, 1]);
 		hook.unmount();
 		query.clear();

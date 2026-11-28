@@ -7,68 +7,64 @@
 	},
 	"elements": {
 		"system.alwaysOn": {
-			"chars": 3662,
-			"tokens": 3029
+			"chars": 3635,
+			"tokens": 3036
 		},
 		"system.alwaysOn.Role": {
 			"chars": 1191,
 			"tokens": 995
 		},
 		"system.alwaysOn.Speaking": {
-			"chars": 295,
-			"tokens": 246
+			"chars": 256,
+			"tokens": 227
 		},
 		"system.alwaysOn.Emotion": {
 			"chars": 232,
 			"tokens": 150
 		},
 		"system.alwaysOn.Input": {
-			"chars": 700,
-			"tokens": 584
+			"chars": 686,
+			"tokens": 581
 		},
 		"system.alwaysOn.Facts": {
-			"chars": 1236,
-			"tokens": 1054
+			"chars": 1262,
+			"tokens": 1083
 		},
 		"system.alwaysOnGoal": {
-			"chars": 4003,
-			"tokens": 3241
+			"chars": 3976,
+			"tokens": 3248
 		},
 		"tools.read": {
-			"chars": 2456,
-			"tokens": 1231
+			"chars": 1375,
+			"tokens": 607
 		},
 		"tool.read_memory": {
-			"chars": 356,
-			"tokens": 210
+			"chars": 250,
+			"tokens": 120
 		},
 		"tool.read_history": {
-			"chars": 592,
-			"tokens": 297
+			"chars": 354,
+			"tokens": 158
 		},
 		"tool.read_runs": {
-			"chars": 722,
-			"tokens": 360
-		},
-		"tool.read_agents": {
-			"chars": 450,
-			"tokens": 216
+			"chars": 436,
+			"tokens": 179
 		},
 		"tool.read_world": {
 			"chars": 330,
 			"tokens": 149
 		},
 		"tools.talkWork": {
-			"chars": 984,
-			"tokens": 529
+			"chars": 791,
+			"tokens": 382
 		},
 		"tool.find_toolchain": {
-			"chars": 292,
-			"tokens": 161
+			"chars": 250,
+			"tokens": 125
 		},
 		"tool.delegate": {
-			"chars": 689,
-			"tokens": 367
+			"chars": 538,
+			"tokens": 255
 		},
 		"tools.workControls": {
 			"chars": 241,
@@ -79,24 +75,24 @@
 			"tokens": 111
 		},
 		"tools.agenda": {
-			"chars": 1809,
-			"tokens": 867
+			"chars": 1746,
+			"tokens": 811
 		},
 		"tool.start_preparation": {
-			"chars": 406,
-			"tokens": 216
+			"chars": 446,
+			"tokens": 247
 		},
 		"tool.read_note": {
-			"chars": 210,
-			"tokens": 94
+			"chars": 188,
+			"tokens": 72
 		},
 		"tool.show_note": {
-			"chars": 240,
-			"tokens": 117
+			"chars": 209,
+			"tokens": 93
 		},
 		"tool.set_quiet": {
-			"chars": 519,
-			"tokens": 243
+			"chars": 469,
+			"tokens": 202
 		},
 		"tool.assignment": {
 			"chars": 428,
@@ -119,8 +115,8 @@
 			"tokens": 410
 		},
 		"tool.memory": {
-			"chars": 1490,
-			"tokens": 595
+			"chars": 1185,
+			"tokens": 456
 		},
 		"agency.planSystem": {
 			"chars": 5736,

@@ -194,7 +194,11 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		await voice2.recover();
 		await dialogue2.recover();
 		await queue2.recover();
-		expect(voice2.get(utteranceId)?.status).toBe("interrupted");
+		expect(voice2.get(utteranceId)).toMatchObject({
+			status: "interrupted",
+			error: "backend_restarted",
+			audioChunks: [],
+		});
 		expect(dialogue2.get(runId)?.status).toBe("cancelled");
 		expect(queue2.get(dialogue2.get(runId)?.jobId ?? "")?.state).toBe(
 			"cancelled",

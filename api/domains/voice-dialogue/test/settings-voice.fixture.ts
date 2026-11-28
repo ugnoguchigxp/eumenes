@@ -69,7 +69,6 @@ async function setup(
 	cleanup: Array<() => Promise<void>>,
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
-	lookup?: Parameters<typeof createDialogueService>[0]["lookup"],
 	agency?: Parameters<typeof createDialogueService>[0]["agency"],
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
@@ -158,7 +157,6 @@ async function setup(
 		continuity,
 		larm: inference,
 		queue,
-		lookup,
 		agency,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);

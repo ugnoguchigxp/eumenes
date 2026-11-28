@@ -39,6 +39,52 @@ CREATE UNIQUE INDEX image_source_once ON image_generations(run_id) WHERE json_ex
 		after: ["image/0003-execution-calls"],
 		sql: "ALTER TABLE image_generations ADD COLUMN generated_version TEXT",
 	},
+	{
+		id: "image/0005-prototype-origin",
+		after: ["image/0004-generated-version"],
+		sql: `
+CREATE TABLE image_generations_next (
+ id TEXT PRIMARY KEY,
+ run_id TEXT,
+ conversation_id TEXT,
+ record_json TEXT NOT NULL,
+ request_json TEXT NOT NULL,
+ plan_json TEXT,
+ bindings_json TEXT NOT NULL,
+ deadline INTEGER NOT NULL,
+ queue_job_id TEXT,
+ generated_version TEXT,
+ origin TEXT NOT NULL DEFAULT 'conversation',
+ prototype_id TEXT,
+ operation_id TEXT,
+ grant_revision INTEGER,
+ hard_deadline INTEGER,
+ CHECK (
+   (origin = 'conversation' AND run_id IS NOT NULL AND conversation_id IS NOT NULL
+    AND prototype_id IS NULL AND operation_id IS NULL AND grant_revision IS NULL
+    AND hard_deadline IS NULL)
+   OR
+   (origin = 'prototype' AND run_id IS NULL AND conversation_id IS NULL
+    AND prototype_id IS NOT NULL AND operation_id IS NOT NULL AND grant_revision IS NOT NULL
+    AND plan_json IS NOT NULL AND hard_deadline IS NOT NULL AND deadline <= hard_deadline)
+ )
+);
+INSERT INTO image_generations_next(
+ rowid, id, run_id, conversation_id, record_json, request_json, plan_json, bindings_json,
+ deadline, queue_job_id, generated_version
+)
+SELECT rowid, id, run_id, conversation_id, record_json, request_json, plan_json, bindings_json,
+ deadline, queue_job_id, generated_version FROM image_generations;
+DROP TABLE image_generations;
+ALTER TABLE image_generations_next RENAME TO image_generations;
+CREATE INDEX image_conversation ON image_generations(conversation_id)
+ WHERE origin = 'conversation';
+CREATE UNIQUE INDEX image_source_once ON image_generations(run_id)
+ WHERE origin = 'conversation' AND json_extract(request_json,'$.execution') IS NULL;
+CREATE UNIQUE INDEX image_prototype_operation ON image_generations(prototype_id, operation_id)
+ WHERE origin = 'prototype';
+`,
+	},
 ];
 export function stampGeneratedVersion(
 	db: Database,
@@ -60,7 +106,7 @@ export function generatedVersion(
 		.query(
 			`
 		SELECT generated_version FROM image_generations
-		WHERE run_id=? AND conversation_id=? AND json_extract(record_json,'$.artifactId')=?
+		WHERE origin='conversation' AND run_id=? AND conversation_id=? AND json_extract(record_json,'$.artifactId')=?
 			AND json_extract(record_json,'$.state')='completed'
 			AND json_extract(request_json,'$.execution.erased') IS NULL
 		ORDER BY rowid DESC LIMIT 1`,
@@ -72,8 +118,14 @@ export function generatedVersion(
 }
 export type Row = {
 	id: string;
-	run_id: string;
-	conversation_id: string;
+	run_id: string | null;
+	conversation_id: string | null;
+	origin: "conversation" | "prototype";
+	prototype_id: string | null;
+	operation_id: string | null;
+	grant_revision: number | null;
+	hard_deadline: number | null;
+	generated_version: string | null;
 	record_json: string;
 	request_json: string;
 	plan_json: string | null;
@@ -86,10 +138,14 @@ export function row(db: Database, id: string) {
 		.query("SELECT * FROM image_generations WHERE id=?")
 		.get(id) as Row | null;
 }
-export function record(r: Row): ImageRecord {
+export type StoredImage = Omit<ImageRecord, "runId" | "conversationId"> & {
+	runId: string | null;
+	conversationId: string | null;
+};
+export function record(r: Row): StoredImage {
 	return JSON.parse(r.record_json);
 }
-export function patch(db: Database, id: string, change: Partial<ImageRecord>) {
+export function patch(db: Database, id: string, change: Partial<StoredImage>) {
 	const r = row(db, id);
 	if (!r) throw new Error("image_not_found");
 	const v = { ...record(r), ...change, updatedAt: Date.now() };
@@ -103,7 +159,7 @@ export function list(db: Database, conversationId: string) {
 	return (
 		db
 			.query(
-				"SELECT record_json FROM image_generations WHERE conversation_id=? ORDER BY rowid DESC LIMIT 100",
+				"SELECT record_json FROM image_generations WHERE origin='conversation' AND conversation_id=? ORDER BY rowid DESC LIMIT 100",
 			)
 			.all(conversationId) as { record_json: string }[]
 	).map((r) => JSON.parse(r.record_json) as ImageRecord);
@@ -114,7 +170,7 @@ export function activity(db: Database, since: number) {
 	const records = (
 		db
 			.query(
-				"SELECT record_json FROM image_generations ORDER BY rowid DESC LIMIT 50",
+				"SELECT record_json FROM image_generations WHERE origin='conversation' ORDER BY rowid DESC LIMIT 50",
 			)
 			.all() as { record_json: string }[]
 	).map((r) => JSON.parse(r.record_json) as ImageRecord);
@@ -139,7 +195,7 @@ export function imageGenerations(db: Database) {
 	return (
 		db
 			.query(
-				"SELECT record_json FROM image_generations WHERE json_extract(record_json,'$.state')='completed' AND json_extract(record_json,'$.artifactId') IS NOT NULL ORDER BY rowid DESC",
+				"SELECT record_json FROM image_generations WHERE origin='conversation' AND json_extract(record_json,'$.state')='completed' AND json_extract(record_json,'$.artifactId') IS NOT NULL ORDER BY rowid DESC",
 			)
 			.all() as { record_json: string }[]
 	).map((r) => JSON.parse(r.record_json) as ImageRecord);
@@ -149,8 +205,25 @@ export function imageGenerations(db: Database) {
 export function imageByArtifact(db: Database, artifactId: string) {
 	const r = db
 		.query(
-			"SELECT record_json FROM image_generations WHERE json_extract(record_json,'$.state')='completed' AND json_extract(record_json,'$.artifactId')=? ORDER BY rowid DESC LIMIT 1",
+			"SELECT record_json FROM image_generations WHERE origin='conversation' AND json_extract(record_json,'$.state')='completed' AND json_extract(record_json,'$.artifactId')=? ORDER BY rowid DESC LIMIT 1",
 		)
 		.get(artifactId) as { record_json: string } | null;
 	return r ? (JSON.parse(r.record_json) as ImageRecord) : null;
+}
+
+export function conversationRecord(r: Row | null): ImageRecord | null {
+	if (r?.origin !== "conversation") return null;
+	return { ...record(r), runId: r.run_id!, conversationId: r.conversation_id! };
+}
+
+export function prototypeGeneration(
+	db: Database,
+	id: string,
+	operation: string,
+) {
+	return db
+		.query<Row, [string, string]>(
+			"SELECT * FROM image_generations WHERE origin='prototype' AND prototype_id=? AND operation_id=?",
+		)
+		.get(id, operation);
 }

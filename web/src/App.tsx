@@ -5,8 +5,10 @@ import { createAudioStore } from "./domains/audio";
 import { Workspace } from "./workspace/Workspace";
 import { ServerReady } from "./workspace/ServerReady";
 import { drawingLocation } from "./domains/excalidraw/location";
+import { worksId } from "./domains/prototype/resource-screen";
 
 const DrawingEditor = lazy(() => import("./domains/excalidraw/DrawingEditor"));
+const Works = lazy(() => import("./domains/prototype/Works"));
 export function App() {
 	const [hash, setHash] = useState(window.location.hash);
 	useEffect(() => {
@@ -15,6 +17,10 @@ export function App() {
 		return () => window.removeEventListener("hashchange", change);
 	}, []);
 	const drawing = drawingLocation(hash);
+	const worksTarget =
+		hash.startsWith("#works/") && worksId.test(hash.slice(7))
+			? hash.slice(7)
+			: undefined;
 	const [queryClient] = useState(
 		() =>
 			new QueryClient({
@@ -42,7 +48,13 @@ export function App() {
 				</Suspense>
 			) : (
 				<ServerReady client={client}>
-					<Workspace client={client} store={store} />
+					{hash === "#works" || worksTarget ? (
+						<Suspense fallback={<output>Worksを読み込み中です。</output>}>
+							<Works client={client} target={worksTarget} />
+						</Suspense>
+					) : (
+						<Workspace client={client} store={store} />
+					)}
 				</ServerReady>
 			)}
 		</QueryClientProvider>

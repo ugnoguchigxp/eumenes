@@ -266,7 +266,6 @@ async function measure() {
 			"read_memory",
 			"read_history",
 			"read_runs",
-			"read_agents",
 			"read_world",
 		]),
 		"tools.talkWork": toolsNamed(["find_toolchain", "delegate"]),

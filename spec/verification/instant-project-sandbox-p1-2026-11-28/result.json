@@ -1,0 +1,17 @@
+{
+  "productServerContacted": false,
+  "standaloneCoreRequests": 0,
+  "independentGitRepositories": 2,
+  "standaloneClones": 2,
+  "oneHostPreviewListener": true,
+  "sharedInstallation": "1.0",
+  "worksDependencyInstalls": 0,
+  "authenticatedApi": true,
+  "typeErrorUpdatesHostPreview": true,
+  "standaloneTypeErrorBlocksBuild": true,
+  "hostAndStandaloneAssetsAndStorage": true,
+  "registrationMoveAndRemoval": true,
+  "watchersAfterClose": 0,
+  "busyPreviewStopped": true,
+  "allTestListenersStopped": true
+}

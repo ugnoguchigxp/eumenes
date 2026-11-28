@@ -583,7 +583,8 @@ export async function harness(options: HarnessOptions = {}) {
 				return message?.role === "user" ? message.text : null;
 			},
 		};
-	const origin = process.env.EUMENES_ORIGIN ?? "http://localhost";
+	const origin =
+		options.origin ?? process.env.EUMENES_ORIGIN ?? "http://localhost";
 	const canvasRuntime = options.canvas?.({
 		hostOrigin: origin,
 		previewOrigin: "http://127.0.0.1:8790",
@@ -599,6 +600,7 @@ export async function harness(options: HarnessOptions = {}) {
 		webResearch: options.webResearch,
 		...(options.webNote ? { webNote: options.webNote } : {}),
 		claudeRunner: options.claudeRunner,
+		worksEnabled: !!options.works,
 		docling: options.docling,
 		compute,
 		video,
@@ -770,6 +772,7 @@ export async function harness(options: HarnessOptions = {}) {
 	let executionPort: ReturnType<typeof configureTaskExecution> | undefined;
 	if (
 		options.everyday ||
+		options.works ||
 		options.pipelines ||
 		options.webNote ||
 		appRuntime ||
@@ -788,6 +791,7 @@ export async function harness(options: HarnessOptions = {}) {
 			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		executionPort = configureTaskExecution({
+			works: options.works?.execution,
 			...options.workflowRuntime?.(toolchain.agents),
 			...appWorkflowPorts,
 			settings,
@@ -853,6 +857,7 @@ export async function harness(options: HarnessOptions = {}) {
 		}),
 	});
 	toolchain.agents.start();
+	if (options.works) toolchain.claudeCode.start();
 	queue.start();
 	const request = async (path: string, body?: unknown) =>
 		app.request(path, {

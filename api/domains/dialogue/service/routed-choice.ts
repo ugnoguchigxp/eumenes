@@ -64,6 +64,9 @@ function candidateBranch(
 	return branch(
 		{
 			choice,
+			...(candidate.execution === "task" && candidate.inputs
+				? { inputs: candidate.inputs }
+				: {}),
 			...(candidate.targets?.length
 				? {
 						target: oneOf([
@@ -85,7 +88,7 @@ function candidateBranch(
 					}
 				: {}),
 		},
-		["refs", "diagnosticRef"],
+		["refs", "diagnosticRef", "inputs"],
 	);
 }
 

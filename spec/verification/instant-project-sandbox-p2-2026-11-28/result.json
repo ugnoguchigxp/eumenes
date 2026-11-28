@@ -1,0 +1,57 @@
+{
+  "turns": 2,
+  "realClaudeCode": true,
+  "router": "fixed",
+  "workIdStable": true,
+  "typescriptAndBuildReceipts": 4,
+  "typeErrorChecksFailed": 2,
+  "previews": 2,
+  "refFollowup": true,
+  "secondProjectUntouched": true,
+  "gitStatePreserved": true,
+  "priorUncommittedEditPreserved": true,
+  "unregisterBlockedDuringEdit": true,
+  "registeredIdleProjects": 5,
+  "concurrentEditPreserved": true,
+  "ambiguousNameRejected": true,
+  "trialRunnerPolicy": "default",
+  "testListenersStopped": true,
+  "dependency": {
+    "turns": 1,
+    "realClaudeCode": true,
+    "router": "fixed",
+    "dependencyApproval": true,
+    "sameWorkResumed": true,
+    "releaseVersion": "2.1",
+    "unchangedOtherBuilds": 4,
+    "workIdStable": true,
+    "typescriptAndBuildReceipts": 2,
+    "typeErrorChecksFailed": 2,
+    "previews": 1,
+    "refFollowup": true,
+    "secondProjectUntouched": true,
+    "gitStatePreserved": true,
+    "priorUncommittedEditPreserved": true,
+    "unregisterBlockedDuringEdit": true,
+    "registeredIdleProjects": 5,
+    "concurrentEditPreserved": true,
+    "ambiguousNameRejected": true
+  },
+  "nativeIdle": {
+    "configuredIdleMs": 60000,
+    "elapsedMs": 60005,
+    "listenerExited": true,
+    "restartedByProbe": false
+  },
+  "domainVerification": {
+    "passed": 29,
+    "failed": 0
+  },
+  "remainingAcceptance": {
+    "candidatesWereAsked": true,
+    "chosenWorkStartedOnce": true,
+    "actualClaudeEdit": true,
+    "failedChecks": 2,
+    "falseCompletionRejected": true
+  }
+}

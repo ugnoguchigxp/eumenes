@@ -12,10 +12,13 @@ import {
 	list,
 	activity,
 	generatedVersion,
+	conversationRecord,
+	type StoredImage,
 } from "../repository";
 import { registerImageHandlers } from "./handlers";
 import { createImageUpload } from "./imports";
 import { generatedImageVersion } from "./version";
+import { prototypeImages, type PrototypeImageGuard } from "./prototype";
 import type { ChildExecution } from "../../tool-runtime";
 async function readContent(
 	gateway: LarmPlayground,
@@ -32,7 +35,7 @@ async function readContent(
 /** Read-only source for the registered image screen; the image domain owns this query. */
 export const imageListInTransaction = (db: Database, conversationId: string) =>
 	list(db, conversationId);
-const active = (r: ImageRecord) =>
+const active = (r: StoredImage) =>
 	r.state === "planning" || r.state === "generating";
 export function createImage(deps: {
 	store: SqliteStore;
@@ -40,6 +43,7 @@ export function createImage(deps: {
 	inference: InferencePort;
 	capabilities: Capabilities;
 	gateway: () => LarmPlayground;
+	prototypeGuard?: PrototypeImageGuard;
 	validateExecutionInTransaction?: (
 		db: Database,
 		child: ChildExecution,
@@ -88,7 +92,9 @@ export function createImage(deps: {
 	registerImageHandlers({ ...deps, enqueue, fail, cancel });
 	return {
 		imports: createImageUpload(deps),
+		prototype: prototypeImages({ ...deps, enqueue, cancel, readContent }),
 		library: () => deps.gateway().images,
+		libraryBinding: () => deps.gateway().mediaBinding,
 		content: (id: string, signal: AbortSignal) =>
 			readContent(deps.gateway(), id, signal),
 		generatedVersionInTransaction(
@@ -196,7 +202,7 @@ export function createImage(deps: {
 		},
 		resultForCallInTransaction(db: Database, id: string) {
 			const r = row(db, id);
-			return r ? record(r) : null;
+			return conversationRecord(r);
 		},
 		cancelCallInTransaction(db: Database, id: string) {
 			const r = row(db, id);
@@ -208,7 +214,7 @@ export function createImage(deps: {
 		get: (id: string) =>
 			store.read((db) => {
 				const r = row(db, id);
-				return r ? record(r) : null;
+				return conversationRecord(r);
 			}),
 		list: (conversationId: string) =>
 			store.read((db) => list(db, conversationId)),

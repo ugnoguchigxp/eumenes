@@ -72,7 +72,7 @@ agendaが返事を担う会話では、返事が `find_toolchain`（検索）と
 
 引数を要する担当は、その担当に限定した欄埋めを会話モデルが行います。担当の質問への回答は `assignment(answer)` で同じ仕事へ渡します。構造化回答の形に合わない文は、必要な形を添えて断り、会話エージェントが答え直します（ホストは形を補いません）。過去の訂正（`router_feedback`）と記録（`router_traces`）は保存済みの履歴として残り、一覧は `GET /api/toolchain-history/router-feedback`、取消は `POST /api/toolchain-history/router-feedback/:id/state` で扱えます。新しい会話はこれらを書き足しません。元発言の忘却で派生記録も削除します。hostの操作・成果物・通知はEumenesの結合と通常会話の受入で確認します。
 
-読む道具: 会話の回の読む道具（`read_memory` 記憶・`read_history` 会話ログ・`read_runs` 最近の回・`read_agents` 担当の作業・`read_world` World）は担当ではなく、bundle も持たないが、検索の文を `api/domains/capabilities/contracts/read-tools.ts` に持ち、担当と同じ索引（key `host:<関数名>@<版>`）で専用の担当の枠を取り合う。候補に出ると execution は `read` で、選ぶ呼出しは即答の担当と同じ形（`choice` と `inputs`）で選び、ホストが読んで会話の回が話す。候補に出なくても、会話の回の呼出しに native tools として渡り、1回だけ呼べる（[設計](../spec/.todo/conversation-read-tools-design-2026-10-31.md)）。
+読む道具: 会話の回の読む道具（`read_memory` 記憶・`read_history` 会話ログ・`read_runs` 最近の回・`read_world` World）は担当ではなく、bundle も持たないが、検索の文を `api/domains/capabilities/contracts/read-tools.ts` に持ち、担当と同じ索引（key `host:<関数名>@<版>`）で専用の担当の枠を取り合う。候補に出ると execution は `read` で、選ぶ呼出しは即答の担当と同じ形（`choice` と `inputs`）で選び、ホストが読んで会話の回が話す。候補に出なくても、会話の回の呼出しに native tools として渡り、1回だけ呼べる（[設計](../spec/.todo/conversation-read-tools-design-2026-10-31.md)）。
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 

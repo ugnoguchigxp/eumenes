@@ -137,13 +137,18 @@ export function createSupervisedTaskPort({
 						}
 					: {}),
 				// A cached intermediate poll can predate a check that superseded it.
-				evidence: work.observation?.managedExecutionStopped
+				evidence: (work.observation?.managedExecutionStopped
 					? (work.observation.structuredEvidence ?? [])
-					: (work.supervision.evidence ?? []),
+					: (work.supervision.evidence ?? [])
+				).filter(
+					(item): item is SupervisedView["evidence"][number] =>
+						item.kind !== "edit_conflict",
+				),
 				...(source.goal
 					? {
 							diagnosticChecks: (work.supervision.evidence ?? []).filter(
-								({ kind, passed }) => kind === "check" && passed === false,
+								(item): item is SupervisedView["evidence"][number] =>
+									item.kind === "check" && item.passed === false,
 							),
 						}
 					: {}),
